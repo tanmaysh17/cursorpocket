@@ -15,6 +15,7 @@ class SettingsStoreTests(unittest.TestCase):
             expected = AppSettings(
                 capture_dir="D:/Captures",
                 follow_cursor=False,
+                mouse_gesture_enabled=False,
                 onboarding_seen=True,
                 panel_geometry="560x740+100+80",
             )
@@ -32,6 +33,7 @@ class SettingsStoreTests(unittest.TestCase):
             settings = SettingsStore(path).load()
 
             self.assertTrue(settings.follow_cursor)
+            self.assertTrue(settings.mouse_gesture_enabled)
             self.assertFalse(settings.onboarding_seen)
             self.assertEqual(settings.panel_geometry, "")
             self.assertIn("CursorPocket Captures", settings.capture_dir)
@@ -47,6 +49,7 @@ class SettingsStoreTests(unittest.TestCase):
             settings = SettingsStore(path).load()
 
             self.assertFalse(settings.onboarding_seen)
+            self.assertTrue(settings.mouse_gesture_enabled)
 
 
 if __name__ == "__main__":

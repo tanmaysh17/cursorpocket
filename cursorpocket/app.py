@@ -14,6 +14,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageGrab, ImageTk
 
 from .annotation import ScreenshotAnnotator
 from .audio import AudioRecorder
+from .gesture import DoubleCircleGestureDetector
 from .hotkeys import DEFAULT_HOTKEYS, GlobalHotkeyManager
 from .settings import AppSettings, SettingsStore
 from .startup import StartupManager
@@ -635,6 +636,7 @@ class SettingsWindow:
 
         self.startup_var = tk.BooleanVar(value=startup_enabled)
         self.follow_var = tk.BooleanVar(value=settings.follow_cursor)
+        self.gesture_var = tk.BooleanVar(value=settings.mouse_gesture_enabled)
         self._check(
             shell,
             "Start CursorPocket when I sign in",
@@ -646,6 +648,12 @@ class SettingsWindow:
             "Keep the green dot beside my cursor",
             "Turn this off if you prefer the tray icon and keyboard menu.",
             self.follow_var,
+        )
+        self._check(
+            shell,
+            "Open CursorPocket with two quick mouse circles",
+            "Draw two small circles in either direction. Turn this off if it triggers accidentally.",
+            self.gesture_var,
         )
 
         self._section_label(shell, "SAVE LOCATION").pack(anchor="w", pady=(19, 7))
@@ -768,6 +776,7 @@ class SettingsWindow:
         updated = AppSettings(
             capture_dir=self.folder_var.get(),
             follow_cursor=self.follow_var.get(),
+            mouse_gesture_enabled=self.gesture_var.get(),
             onboarding_seen=self.settings.onboarding_seen,
             panel_geometry=self.settings.panel_geometry,
         )
@@ -833,6 +842,7 @@ class CursorPocketApp:
         self._companion_x, self._companion_y = initial_cursor
         self._last_cursor = initial_cursor
         self._last_cursor_move = time.monotonic()
+        self.gesture_detector = DoubleCircleGestureDetector()
         self._companion_pinned = False
         self._companion_hover = False
         self._build_icon()
@@ -1255,9 +1265,32 @@ class CursorPocketApp:
     def _follow_tick(self) -> None:
         if self.closing:
             return
-        if not self.hidden_mode and not self.capture_active and not self.panel_open and self.settings.follow_cursor:
+        gesture_ready = (
+            self.settings.mouse_gesture_enabled
+            and not self.capture_active
+            and not self.panel_open
+            and not self.recording
+            and self.settings_window is None
+        )
+        follow_ready = (
+            not self.hidden_mode
+            and not self.capture_active
+            and not self.panel_open
+            and self.settings.follow_cursor
+        )
+        if gesture_ready or follow_ready:
             cursor_x, cursor_y = cursor_position()
             now = time.monotonic()
+            if gesture_ready and self.gesture_detector.feed(cursor_x, cursor_y, now):
+                self.show_panel()
+                self.root.after(16, self._follow_tick)
+                return
+            if not gesture_ready:
+                self.gesture_detector.reset()
+        else:
+            self.gesture_detector.reset()
+
+        if follow_ready:
             if (cursor_x, cursor_y) != self._last_cursor:
                 self._last_cursor = (cursor_x, cursor_y)
                 self._last_cursor_move = now

@@ -21,6 +21,7 @@ def default_settings_path() -> Path:
 class AppSettings:
     capture_dir: str
     follow_cursor: bool = True
+    mouse_gesture_enabled: bool = True
     onboarding_seen: bool = False
     panel_geometry: str = ""
 
@@ -42,6 +43,7 @@ class SettingsStore:
             return AppSettings(
                 capture_dir=capture_dir,
                 follow_cursor=bool(raw.get("follow_cursor", True)),
+                mouse_gesture_enabled=bool(raw.get("mouse_gesture_enabled", True)),
                 onboarding_seen=bool(raw.get("onboarding_seen", False)),
                 panel_geometry=str(raw.get("panel_geometry", "")),
             )

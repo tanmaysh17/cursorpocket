@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import unittest
 import tkinter as tk
 from types import SimpleNamespace
@@ -18,6 +19,7 @@ from cursorpocket.app import (
     panel_key_action,
     panel_scroll_units,
 )
+from cursorpocket.gesture import DoubleCircleGestureDetector
 from cursorpocket.windows import is_supported_browser_window
 
 
@@ -33,6 +35,45 @@ class FakeCanvas:
 
 
 class CompanionTests(unittest.TestCase):
+    def test_double_circle_opens_panel_even_when_dot_is_hidden(self) -> None:
+        app = object.__new__(CursorPocketApp)
+        app.closing = False
+        app.hidden_mode = True
+        app.capture_active = False
+        app.panel_open = False
+        app.recording = False
+        app.settings_window = None
+        app.settings = SimpleNamespace(mouse_gesture_enabled=True, follow_cursor=False)
+        app.gesture_detector = DoubleCircleGestureDetector()
+        app.root = SimpleNamespace(after=lambda *_args: None)
+        opened: list[bool] = []
+
+        def open_panel() -> None:
+            opened.append(True)
+            app.panel_open = True
+
+        app.show_panel = open_panel
+        points = [
+            (
+                round(200 + 32 * math.cos(4 * math.pi * index / 90)),
+                round(160 + 32 * math.sin(4 * math.pi * index / 90)),
+            )
+            for index in range(91)
+        ]
+        times = iter(1.1 * index / 90 for index in range(91))
+        app_positions = iter(points)
+
+        with (
+            patch("cursorpocket.app.cursor_position", side_effect=lambda: next(app_positions)),
+            patch("cursorpocket.app.time.monotonic", side_effect=lambda: next(times)),
+        ):
+            for _point in points:
+                app._follow_tick()
+                if opened:
+                    break
+
+        self.assertEqual(opened, [True])
+
     def test_capture_window_explains_that_shortcuts_are_individual_keys(self) -> None:
         help_text = PANEL_SHORTCUT_HELP.lower()
 

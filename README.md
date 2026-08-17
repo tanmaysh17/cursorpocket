@@ -6,7 +6,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 ## The everyday workflow
 
-1. Open the capture window by clicking the green dot, choosing **Open capture window** from the tray icon, or pressing `Ctrl + Shift + Space`.
+1. Open the capture window by drawing two quick, small circles with the mouse, clicking the green dot, choosing **Open capture window** from the tray icon, or pressing `Ctrl + Shift + Space`.
 2. Click an action, or tap one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
@@ -62,6 +62,7 @@ CursorPocket Captures\
 - **Red dot and Stop bar:** audio is recording. Click either one to stop and save.
 - **Tray icon:** right-click it for every capture action, Settings, the capture folder, and Quit.
 - **Hidden mode:** hides the cursor dot while leaving the tray icon and global shortcuts active. Toggle it from the capture window, tray menu, or `Ctrl + Shift + H`.
+- **Mouse gesture:** draw two quick circles, clockwise or counter-clockwise, to open the capture window. It works in hidden mode and can be disabled in Settings.
 
 The dot can also be disabled permanently in Settings. It does not replace the Windows cursor and is excluded from screenshots while capturing.
 
