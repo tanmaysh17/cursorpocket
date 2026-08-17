@@ -9,6 +9,7 @@ from PIL import Image
 
 from cursorpocket.annotation import draw_arrow, draw_rectangle, draw_stroke, draw_text
 from cursorpocket.app import (
+    PANEL_SHORTCUT_HELP,
     CursorPocketApp,
     GREEN,
     RED,
@@ -32,6 +33,12 @@ class FakeCanvas:
 
 
 class CompanionTests(unittest.TestCase):
+    def test_capture_window_explains_that_shortcuts_are_individual_keys(self) -> None:
+        help_text = PANEL_SHORTCUT_HELP.lower()
+
+        self.assertIn("one key at a time", help_text)
+        self.assertIn("do not hold", help_text)
+
     def test_companion_is_small_borderless_and_uses_status_color(self) -> None:
         app = object.__new__(CursorPocketApp)
         app.companion_canvas = FakeCanvas()
@@ -59,7 +66,7 @@ class CompanionTests(unittest.TestCase):
         self.assertEqual(panel_key_action("4"), "monitor_4")
         self.assertIsNone(panel_key_action("Escape"))
 
-    def test_panel_key_dispatch_does_not_depend_on_child_focus(self) -> None:
+    def test_panel_key_dispatches_each_shortcut_as_an_individual_key(self) -> None:
         app = object.__new__(CursorPocketApp)
         app.panel_open = True
         calls: list[str] = []
@@ -75,10 +82,29 @@ class CompanionTests(unittest.TestCase):
         app.capture_link = lambda: calls.append("link")
         app.capture_monitor = lambda index: calls.append(f"monitor-{index}")
 
-        result = app._handle_panel_key(SimpleNamespace(state=0, keysym="Q"))
+        expected = {
+            "Q": "region",
+            "W": "window",
+            "E": "all",
+            "R": "repeat",
+            "A": "audio",
+            "S": "save",
+            "D": "discard",
+            "F": "folder",
+            "1": "monitor-0",
+            "2": "monitor-1",
+            "3": "monitor-2",
+            "4": "monitor-3",
+            "T": "text",
+            "L": "link",
+        }
 
-        self.assertEqual(result, "break")
-        self.assertEqual(calls, ["region"])
+        for key, expected_call in expected.items():
+            with self.subTest(key=key):
+                calls.clear()
+                result = app._handle_panel_key(SimpleNamespace(state=0, keysym=key))
+                self.assertEqual(result, "break")
+                self.assertEqual(calls, [expected_call])
 
     def test_panel_wheel_delta_always_produces_a_scroll_step(self) -> None:
         self.assertEqual(panel_scroll_units(120), -1)

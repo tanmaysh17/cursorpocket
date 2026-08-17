@@ -49,6 +49,12 @@ FONT_BODY = "Segoe UI"
 FONT_DISPLAY = "Segoe UI Variable Display"
 FONT_MONO = "Cascadia Mono"
 
+PANEL_SHORTCUT_HELP = (
+    "Tap one key at a time while this window is open: Q, W, E, or R for screenshots; "
+    "A, S, D, or F for audio; 1, 2, 3, or 4 for a display. These are individual "
+    "keys—do not hold a row together."
+)
+
 PANEL_KEY_ACTIONS = {
     "q": "region_screenshot",
     "w": "window_screenshot",
@@ -659,9 +665,9 @@ class SettingsWindow:
         shortcut_frame.pack(fill="x")
         rows = (
             ("Open capture menu", shortcuts.get("panel", "Ctrl + Shift + Space")),
-            ("Screenshots in the capture window", "Q / W / E / R"),
-            ("Audio in the capture window", "A / S / D / F"),
-            ("Full displays in the capture window", "1 / 2 / 3 / 4"),
+            ("Tap one screenshot key", "Q / W / E / R"),
+            ("Tap one audio key", "A / S / D / F"),
+            ("Tap one display key", "1 / 2 / 3 / 4"),
             ("Clipboard captures", "T for text · L for link"),
         )
         for label, shortcut in rows:
@@ -944,17 +950,17 @@ class CursorPocketApp:
 
         tk.Label(
             content,
-            text="With this window open, press QWER, ASDF, or 1234 without Ctrl or Alt. The green dot and tray icon bring it back.",
+            text=PANEL_SHORTCUT_HELP,
             bg=PANEL,
             fg=MUTED,
             justify="left",
-            wraplength=350,
+            wraplength=470,
             font=(FONT_BODY, 10),
         ).pack(anchor="w", pady=(8, 12))
 
         self.screenshot_buttons = self._keyboard_group(
             content,
-            "SCREENSHOTS  ·  QWER",
+            "SCREENSHOTS  ·  TAP ONE: Q  W  E  R",
             (
                 ("Q", "Region", self.capture_screenshot, True),
                 ("W", "Window", self.capture_active_window, True),
@@ -964,7 +970,7 @@ class CursorPocketApp:
         )
         self.audio_buttons = self._keyboard_group(
             content,
-            "AUDIO  ·  ASDF",
+            "AUDIO  ·  TAP ONE: A  S  D  F",
             (
                 ("A", "Record", self.toggle_audio_recording, True),
                 ("S", "Save", self.stop_audio_recording, False),
@@ -985,7 +991,7 @@ class CursorPocketApp:
             )
         self.display_buttons = self._keyboard_group(
             content,
-            "FULL DISPLAY  ·  1234",
+            "FULL DISPLAY  ·  TAP ONE: 1  2  3  4",
             tuple(display_actions),
         )
 

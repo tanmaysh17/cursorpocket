@@ -17,14 +17,18 @@ $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $shortcutPath = Join-Path $startMenuDir "CursorPocket.lnk"
 $managedPaths = @($sourceExe, $installedExe)
 
-Get-CimInstance Win32_Process |
+$managedProcesses = Get-CimInstance Win32_Process |
     Where-Object {
         $_.Name -eq "CursorPocket.exe" -and
         $_.ExecutablePath -in $managedPaths
-    } |
-    ForEach-Object {
-        Stop-Process -Id $_.ProcessId -ErrorAction SilentlyContinue
     }
+$managedProcessIds = @($managedProcesses | ForEach-Object { $_.ProcessId })
+$managedProcessIds | ForEach-Object {
+    Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+}
+$managedProcessIds | ForEach-Object {
+    Wait-Process -Id $_ -Timeout 10 -ErrorAction SilentlyContinue
+}
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 New-Item -ItemType Directory -Path $startMenuDir -Force | Out-Null

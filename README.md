@@ -7,12 +7,14 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 ## The everyday workflow
 
 1. Open the capture window by clicking the green dot, choosing **Open capture window** from the tray icon, or pressing `Ctrl + Shift + Space`.
-2. Click an action, or press one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
+2. Click an action, or tap one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
 The capture window is a normal Windows window: drag it by its title bar, resize it from any edge, and place it wherever you like. CursorPocket remembers its size and position. A visible scrollbar and the mouse wheel keep every action reachable at smaller window sizes.
 
 ### Keys in the capture window
+
+These are individual one-key actions, not combinations: keep the capture window open and tap one key at a time. For example, tap `Q` by itself for a region screenshot or `1` by itself for display 1. Do not hold `QWER`, `ASDF`, or `1234` together. The plain keys intentionally work only while the capture window is open, so CursorPocket does not interfere with normal typing in other apps.
 
 | Key | Capture |
 | --- | --- |
