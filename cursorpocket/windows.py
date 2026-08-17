@@ -16,6 +16,7 @@ HWND_TOPMOST = -1
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
 ERROR_ALREADY_EXISTS = 183
+WAIT_OBJECT_0 = 0
 PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 SW_RESTORE = 9
 VK_CONTROL = 0x11
@@ -340,18 +341,39 @@ def position_window(window: object, x: int, y: int, width: int, height: int, act
 
 
 class SingleInstance:
-    """Owns a per-user Win32 mutex for the lifetime of the process."""
+    """Owns a per-user mutex and signals the running app on a second launch."""
 
-    def __init__(self, name: str = "Local\\CursorPocket.SingleInstance") -> None:
+    def __init__(
+        self,
+        name: str = "Local\\CursorPocket.SingleInstance",
+        activation_event_name: str = "Local\\CursorPocket.ShowWindow",
+    ) -> None:
         self.handle: int | None = None
+        self.activation_event: int | None = None
         self.acquired = True
         if sys.platform != "win32":
             return
         kernel32 = ctypes.windll.kernel32
+        kernel32.CreateEventW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.CreateEventW.restype = wintypes.HANDLE
+        kernel32.SetEvent.argtypes = [wintypes.HANDLE]
+        kernel32.SetEvent.restype = wintypes.BOOL
+        kernel32.ResetEvent.argtypes = [wintypes.HANDLE]
+        kernel32.ResetEvent.restype = wintypes.BOOL
+        kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.WaitForSingleObject.restype = wintypes.DWORD
         kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, wintypes.BOOL, wintypes.LPCWSTR]
         kernel32.CreateMutexW.restype = wintypes.HANDLE
         kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
         kernel32.CloseHandle.restype = wintypes.BOOL
+        event = kernel32.CreateEventW(None, True, False, activation_event_name)
+        if event:
+            self.activation_event = int(event)
         kernel32.SetLastError(0)
         handle = kernel32.CreateMutexW(None, False, name)
         if not handle:
@@ -360,13 +382,29 @@ class SingleInstance:
         self.handle = int(handle)
         if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
             self.acquired = False
+            if self.activation_event:
+                kernel32.SetEvent(wintypes.HANDLE(self.activation_event))
             kernel32.CloseHandle(handle)
             self.handle = None
+
+    def consume_activation(self) -> bool:
+        """Return True once for each pending request to show the existing app."""
+        if not self.activation_event or sys.platform != "win32":
+            return False
+        kernel32 = ctypes.windll.kernel32
+        event = wintypes.HANDLE(self.activation_event)
+        if kernel32.WaitForSingleObject(event, 0) != WAIT_OBJECT_0:
+            return False
+        kernel32.ResetEvent(event)
+        return True
 
     def close(self) -> None:
         if self.handle and sys.platform == "win32":
             ctypes.windll.kernel32.CloseHandle(wintypes.HANDLE(self.handle))
             self.handle = None
+        if self.activation_event and sys.platform == "win32":
+            ctypes.windll.kernel32.CloseHandle(wintypes.HANDLE(self.activation_event))
+            self.activation_event = None
 
     def __del__(self) -> None:
         self.close()

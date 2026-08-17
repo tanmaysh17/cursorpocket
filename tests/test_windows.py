@@ -4,9 +4,10 @@ import ctypes
 import sys
 import tkinter as tk
 import unittest
+import uuid
 from ctypes import wintypes
 
-from cursorpocket.windows import position_window
+from cursorpocket.windows import SingleInstance, position_window
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows-only positioning test")
@@ -34,3 +35,30 @@ class WindowPositionTests(unittest.TestCase):
         finally:
             window.destroy()
             root.destroy()
+
+    def test_second_instance_signals_the_first_to_open(self) -> None:
+        token = uuid.uuid4().hex
+        first = SingleInstance(
+            name=f"Local\\CursorPocket.Test.{token}",
+            activation_event_name=f"Local\\CursorPocket.Test.Show.{token}",
+        )
+        second = SingleInstance(
+            name=f"Local\\CursorPocket.Test.{token}",
+            activation_event_name=f"Local\\CursorPocket.Test.Show.{token}",
+        )
+        try:
+            self.assertTrue(first.acquired)
+            self.assertFalse(second.acquired)
+            self.assertTrue(first.consume_activation())
+            self.assertFalse(first.consume_activation())
+        finally:
+            second.close()
+            first.close()
+
+
+class SingleInstanceFallbackTests(unittest.TestCase):
+    @unittest.skipIf(sys.platform == "win32", "Non-Windows fallback behavior")
+    def test_activation_check_is_safely_disabled_off_windows(self) -> None:
+        instance = SingleInstance()
+        self.assertTrue(instance.acquired)
+        self.assertFalse(instance.consume_activation())

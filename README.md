@@ -63,6 +63,8 @@ CursorPocket Captures\
 
 The dot can also be disabled permanently in Settings. It does not replace the Windows cursor and is excluded from screenshots while capturing.
 
+CursorPocket remains in the Windows notification area while running. Windows may initially place its green icon under the `^` overflow menu near Wi-Fi, battery, and volume; drag the icon onto the visible notification area if you want it shown there permanently.
+
 ## Settings and Windows startup
 
 Open **Settings** from the top-right of the capture window or from the tray menu. You can:
@@ -75,7 +77,16 @@ Starting with Windows is off until you enable it. CursorPocket uses the current 
 
 ## Install for everyday use
 
-Download or copy `CursorPocket.exe` to a permanent folder, then double-click it. The executable is self-contained; colleagues do not need Python installed.
+Build and install CursorPocket with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\build.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+The installer copies the self-contained executable to `%LOCALAPPDATA%\Programs\CursorPocket`, adds **CursorPocket** to the Start menu, enables launch at Windows sign-in, starts the notification-area icon, and attempts to pin the shortcut to the taskbar. On Windows versions that require a manual pin, search for CursorPocket in Start, right-click it, and choose **Pin to taskbar**.
+
+Launching the Start-menu or taskbar shortcut while CursorPocket is already running opens the existing capture window.
 
 For this source checkout, build the executable with:
 

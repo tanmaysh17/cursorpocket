@@ -47,7 +47,7 @@ def main() -> int:
     if not instance.acquired:
         return 0
     enable_dpi_awareness()
-    app = CursorPocketApp()
+    app = CursorPocketApp(activation_check=instance.consume_activation)
     try:
         app.run()
     finally:

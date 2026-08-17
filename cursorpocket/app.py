@@ -782,7 +782,7 @@ class CursorPocketApp:
     PANEL_WIDTH = 560
     PANEL_HEIGHT = 820
 
-    def __init__(self) -> None:
+    def __init__(self, activation_check: Callable[[], bool] | None = None) -> None:
         self.root = tk.Tk()
         self.root.withdraw()
         self.root.title("CursorPocket")
@@ -808,6 +808,7 @@ class CursorPocketApp:
         self.recording = False
         self.hidden_mode = not self.settings.follow_cursor
         self.closing = False
+        self.activation_check = activation_check
         self.toasts: list[tk.Toplevel] = []
         self.settings_window: SettingsWindow | None = None
         self.recording_started_at = 0.0
@@ -1849,6 +1850,8 @@ class CursorPocketApp:
     def _poll_events(self) -> None:
         if self.closing:
             return
+        if self.activation_check is not None and self.activation_check():
+            self.show_panel()
         while True:
             try:
                 event = self.events.get_nowait()
