@@ -88,12 +88,19 @@ def virtual_screen_bounds() -> tuple[int, int, int, int]:
 def foreground_window_bounds() -> tuple[int, int, int, int] | None:
     if sys.platform != "win32":
         return None
-    user32 = ctypes.windll.user32
     hwnd = foreground_window_handle()
-    if not hwnd or user32.IsIconic(hwnd):
+    return window_bounds(hwnd)
+
+
+def window_bounds(hwnd: int | None) -> tuple[int, int, int, int] | None:
+    """Return visible bounds for a live, non-minimized top-level window."""
+    if sys.platform != "win32" or not hwnd:
+        return None
+    user32 = ctypes.windll.user32
+    if not user32.IsWindow(wintypes.HWND(hwnd)) or user32.IsIconic(wintypes.HWND(hwnd)):
         return None
     rect = RECT()
-    if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+    if not user32.GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(rect)):
         return None
     if rect.right <= rect.left or rect.bottom <= rect.top:
         return None

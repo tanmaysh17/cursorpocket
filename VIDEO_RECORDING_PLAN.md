@@ -270,7 +270,8 @@ These are deferred so the first release can make the core promise dependable: lo
 - Four real-device 15-second gates passed on the target machine: screen, screen + microphone, screen + webcam, and screen + microphone + webcam. The combined gate produced 449 of 450 expected frames with 15.04 seconds of audio.
 - DirectShow microphone and camera inputs are intentionally separate and opened before Desktop Duplication. The planned combined DirectShow input hung during shutdown on the target hardware; the separate-input pipeline stopped cleanly and synchronized correctly.
 - The frozen app packages only `ffmpeg.exe`; the same executable performs media validation, avoiding a second 114 MB `ffprobe.exe` while preserving the validation gate.
-- The optional camera is a clean 16:9 picture-in-picture in v1. Live camera preview and advanced size/corner selectors remain follow-up polish; the everyday `C` toggle and remembered corner are implemented.
+- The optional camera is a clean 16:9 picture-in-picture in v1. Device cycling, source choice, size, and corner controls are implemented in the full interface; live camera preview remains follow-up polish so camera hardware is not opened before an explicit recording action.
+- The synthetic verifier passes screen-only, screen + narration, screen + camera, combined, and forcibly interrupted fragmented-MP4 recovery fixtures.
 - Automated storage, lifecycle, shortcut, tray, settings compatibility, window-affinity, and synthetic H.264/AAC self-tests pass. The final computer-controlled visual click-through could not run while the Windows desktop was locked; it must be repeated after unlock before publishing a release artifact.
 
 ## Technical references

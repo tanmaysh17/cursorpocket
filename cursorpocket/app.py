@@ -27,6 +27,7 @@ from .storage import CaptureRecord, CaptureStore, VideoReservation, is_web_url
 from .tray import TrayManager
 from .video import (
     FFmpegVideoRecorder,
+    RecordingState,
     VideoCapabilities,
     VideoOptions,
     VideoProcessResult,
@@ -46,6 +47,7 @@ from .windows import (
     monitor_bounds,
     position_window,
     virtual_screen_bounds,
+    window_bounds,
 )
 
 
@@ -367,6 +369,8 @@ class RegionSelector:
         virtual_origin: tuple[int, int],
         on_select: Callable[[Image.Image, tuple[int, int, int, int]], None],
         on_cancel: Callable[[], None],
+        title_text: str = "Drag to capture a region",
+        enter_text: str = "Enter captures every screen  ·  Esc cancels",
     ) -> None:
         self.root = root
         self.image = image
@@ -404,7 +408,7 @@ class RegionSelector:
             anchor="nw",
             fill=PAPER,
             font=(FONT_DISPLAY, 13, "bold"),
-            text="Drag to capture a region",
+            text=title_text,
         )
         self.canvas.create_text(
             36,
@@ -412,7 +416,7 @@ class RegionSelector:
             anchor="nw",
             fill=MUTED,
             font=(FONT_BODY, 9),
-            text="Enter captures every screen  ·  Esc cancels",
+            text=enter_text,
         )
 
         position_window(
@@ -876,6 +880,11 @@ class SettingsWindow:
         self.video_microphone_var = tk.BooleanVar(value=settings.video_microphone_enabled)
         self.video_camera_var = tk.BooleanVar(value=settings.video_camera_enabled)
         self.video_countdown_var = tk.BooleanVar(value=settings.video_countdown_seconds > 0)
+        self.video_cursor_var = tk.BooleanVar(value=settings.video_draw_cursor)
+        self.video_60fps_var = tk.BooleanVar(value=settings.video_fps == 60)
+        self.video_source_var = tk.StringVar(value=settings.video_source_kind)
+        self.video_position_var = tk.StringVar(value=settings.video_camera_position)
+        self.video_size_var = tk.StringVar(value=str(settings.video_camera_width))
         self._check(
             shell,
             "Start CursorPocket when I sign in",
@@ -896,6 +905,12 @@ class SettingsWindow:
         )
 
         self._section_label(shell, "SCREEN RECORDING").pack(anchor="w", pady=(16, 5))
+        self._choice(
+            shell,
+            "Default source",
+            self.video_source_var,
+            (("Display under pointer", "display"), ("Select a region", "region"), ("Previous window", "window")),
+        )
         self._check(
             shell,
             "Include microphone narration by default",
@@ -913,6 +928,30 @@ class SettingsWindow:
             "Show a three-second recording countdown",
             "Gives you time to return to the screen before capture begins.",
             self.video_countdown_var,
+        )
+        self._check(
+            shell,
+            "Show the Windows pointer in walkthroughs",
+            "Turn this off for clean demos where pointer motion is distracting.",
+            self.video_cursor_var,
+        )
+        self._check(
+            shell,
+            "Record at 60 frames per second",
+            "Smoother motion with a larger file and higher system load. Default is 30 fps.",
+            self.video_60fps_var,
+        )
+        self._choice(
+            shell,
+            "Webcam corner",
+            self.video_position_var,
+            (("Bottom right", "bottom-right"), ("Bottom left", "bottom-left"), ("Top right", "top-right"), ("Top left", "top-left")),
+        )
+        self._choice(
+            shell,
+            "Webcam size",
+            self.video_size_var,
+            (("Small", "240"), ("Medium", "360"), ("Large", "480")),
         )
 
         self._section_label(shell, "SAVE LOCATION").pack(anchor="w", pady=(19, 7))
@@ -1003,6 +1042,45 @@ class SettingsWindow:
     def _section_label(self, parent: tk.Misc, text: str) -> tk.Label:
         return tk.Label(parent, text=text, bg=PANEL, fg=MUTED, font=(FONT_MONO, 8, "bold"))
 
+    def _choice(
+        self,
+        parent: tk.Misc,
+        title: str,
+        variable: tk.StringVar,
+        choices: tuple[tuple[str, str], ...],
+    ) -> None:
+        row = tk.Frame(parent, bg=PANEL, pady=5)
+        row.pack(fill="x")
+        tk.Label(
+            row,
+            text=title,
+            bg=PANEL,
+            fg=PAPER,
+            font=(FONT_BODY, 10, "bold"),
+        ).pack(side="left")
+        labels = {value: label for label, value in choices}
+        menu = tk.OptionMenu(row, variable, *[value for _label, value in choices])
+        menu.configure(
+            bg=PANEL_RAISED,
+            fg=PAPER,
+            activebackground=LINE,
+            activeforeground=PAPER,
+            highlightthickness=0,
+            relief="flat",
+            bd=0,
+            width=20,
+            font=(FONT_BODY, 9),
+        )
+        menu["menu"].configure(bg=PANEL_RAISED, fg=PAPER, font=(FONT_BODY, 9))
+        menu.pack(side="right")
+        variable.trace_add(
+            "write",
+            lambda *_args, widget=menu, mapping=labels, source=variable: widget.configure(
+                text=mapping.get(source.get(), source.get())
+            ),
+        )
+        menu.configure(text=labels.get(variable.get(), variable.get()))
+
     def _button(
         self,
         parent: tk.Misc,
@@ -1050,9 +1128,12 @@ class SettingsWindow:
             video_camera_enabled=self.video_camera_var.get(),
             video_microphone_name=self.settings.video_microphone_name,
             video_camera_name=self.settings.video_camera_name,
-            video_camera_position=self.settings.video_camera_position,
-            video_fps=self.settings.video_fps,
+            video_source_kind=self.video_source_var.get(),
+            video_camera_position=self.video_position_var.get(),
+            video_camera_width=int(self.video_size_var.get()),
+            video_fps=60 if self.video_60fps_var.get() else 30,
             video_countdown_seconds=3 if self.video_countdown_var.get() else 0,
+            video_draw_cursor=self.video_cursor_var.get(),
         )
         self.on_save(updated, self.startup_var.get())
         self._destroy()
@@ -1092,10 +1173,13 @@ class CursorPocketApp:
         self.video_available = False
         self.video_recording = False
         self.video_finalizing = False
+        self._video_started_once = False
         self.video_reservation: VideoReservation | None = None
         self.video_options: VideoOptions | None = None
         self.video_recording_started_at = 0.0
         self.video_countdown_session = 0
+        self._video_last_disk_check = 0.0
+        self._video_disk_stop = False
         self._quit_after_video = False
         self.startup_manager = StartupManager()
         self.registered_shortcuts = {
@@ -1484,7 +1568,7 @@ class CursorPocketApp:
         )
         (
             _video_glyph,
-            _video_title,
+            self.video_title,
             self.video_description,
             self.video_shortcut,
         ) = self._action_row(
@@ -1511,6 +1595,47 @@ class CursorPocketApp:
             self.toggle_video_camera,
         )
         self.video_camera_button.pack(side="left", padx=(6, 0))
+        self.video_region_button = self._header_button(
+            video_options,
+            "Region",
+            lambda: self.start_video_recording(VideoSourceKind.REGION),
+        )
+        self.video_region_button.pack(side="left", padx=(14, 0))
+        self.video_window_button = self._header_button(
+            video_options,
+            "Window",
+            lambda: self.start_video_recording(VideoSourceKind.WINDOW),
+        )
+        self.video_window_button.pack(side="left", padx=(6, 0))
+
+        video_devices = tk.Frame(content, bg=PANEL)
+        video_devices.pack(fill="x", pady=(0, 7))
+        self.video_mic_device_button = self._header_button(
+            video_devices,
+            "Mic device",
+            lambda: self.cycle_video_device("audio"),
+        )
+        self.video_mic_device_button.pack(side="left")
+        self.video_camera_device_button = self._header_button(
+            video_devices,
+            "Camera device",
+            lambda: self.cycle_video_device("video"),
+        )
+        self.video_camera_device_button.pack(side="left", padx=(6, 0))
+        video_camera_layout = tk.Frame(content, bg=PANEL)
+        video_camera_layout.pack(fill="x", pady=(0, 7))
+        self.video_camera_position_button = self._header_button(
+            video_camera_layout,
+            "Bottom right",
+            self.cycle_video_camera_position,
+        )
+        self.video_camera_position_button.pack(side="left")
+        self.video_camera_size_button = self._header_button(
+            video_camera_layout,
+            "Medium",
+            self.cycle_video_camera_size,
+        )
+        self.video_camera_size_button.pack(side="left", padx=(6, 0))
 
         self.screenshot_buttons = self._keyboard_group(
             content,
@@ -2303,6 +2428,11 @@ class CursorPocketApp:
             return saved_name
         return devices[0].name if devices else ""
 
+    @staticmethod
+    def _compact_device_name(name: str, limit: int = 18) -> str:
+        value = name.strip()
+        return value if len(value) <= limit else value[: limit - 1].rstrip() + "…"
+
     def _update_video_ui(self) -> None:
         mic_name = self._device_name("audio", self.settings.video_microphone_name)
         camera_name = self._device_name("video", self.settings.video_camera_name)
@@ -2313,6 +2443,21 @@ class CursorPocketApp:
             self.video_camera_button.configure(
                 text="Camera on" if self.settings.video_camera_enabled else "Camera off"
             )
+            self.video_mic_device_button.configure(
+                text="Mic · " + self._compact_device_name(mic_name or "None")
+            )
+            self.video_camera_device_button.configure(
+                text="Camera · " + self._compact_device_name(camera_name or "None")
+            )
+            position_label = self.settings.video_camera_position.replace("-", " ").title()
+            size_label = {240: "Small", 360: "Medium", 480: "Large"}.get(
+                self.settings.video_camera_width,
+                "Medium",
+            )
+            self.video_camera_position_button.configure(text=position_label)
+            self.video_camera_size_button.configure(text=size_label)
+            source_label = self.settings.video_source_kind.title()
+            self.video_title.configure(text=f"Record {source_label.lower()}")
         if hasattr(self, "video_description"):
             if not self.video_available:
                 description = "Video recorder unavailable · screenshots and audio still work"
@@ -2321,8 +2466,59 @@ class CursorPocketApp:
             else:
                 mic = mic_name if self.settings.video_microphone_enabled else "Off"
                 camera = camera_name if self.settings.video_camera_enabled else "Off"
-                description = f"This display · Mic: {mic} · Camera: {camera}"
+                source = self.settings.video_source_kind.title()
+                camera_layout = ""
+                if self.settings.video_camera_enabled:
+                    camera_layout = (
+                        f" · {self.settings.video_camera_position.replace('-', ' ')}"
+                        f" · {self.settings.video_camera_width}px"
+                    )
+                description = f"{source} · {self.settings.video_fps} fps · Mic: {mic} · Camera: {camera}{camera_layout}"
             self.video_description.configure(text=description)
+
+    def cycle_video_device(self, kind: str) -> None:
+        if self.video_recording:
+            self.show_toast("Device choice is locked", "Stop this walkthrough before changing it.")
+            return
+        devices = [device for device in self.video_devices if device.kind == kind]
+        if not devices:
+            self.show_toast(
+                "No device is available",
+                "Connect a camera or microphone, then reopen CursorPocket.",
+                error=True,
+            )
+            return
+        attribute = "video_microphone_name" if kind == "audio" else "video_camera_name"
+        current = getattr(self.settings, attribute)
+        names = [device.name for device in devices]
+        next_index = (names.index(current) + 1) % len(names) if current in names else 0
+        setattr(self.settings, attribute, names[next_index])
+        self.settings_store.save(self.settings)
+        self._update_video_ui()
+        label = "Microphone" if kind == "audio" else "Camera"
+        self.show_toast(f"{label} selected", names[next_index])
+
+    def cycle_video_camera_position(self) -> None:
+        if self.video_recording:
+            self.show_toast("Camera layout is locked", "Stop this walkthrough before changing it.")
+            return
+        positions = ("bottom-right", "bottom-left", "top-right", "top-left")
+        current = self.settings.video_camera_position
+        next_index = (positions.index(current) + 1) % len(positions) if current in positions else 0
+        self.settings.video_camera_position = positions[next_index]
+        self.settings_store.save(self.settings)
+        self._update_video_ui()
+
+    def cycle_video_camera_size(self) -> None:
+        if self.video_recording:
+            self.show_toast("Camera layout is locked", "Stop this walkthrough before changing it.")
+            return
+        sizes = (240, 360, 480)
+        current = self.settings.video_camera_width
+        next_index = (sizes.index(current) + 1) % len(sizes) if current in sizes else 0
+        self.settings.video_camera_width = sizes[next_index]
+        self.settings_store.save(self.settings)
+        self._update_video_ui()
 
     def toggle_video_microphone(self) -> None:
         if self.video_recording:
@@ -2357,7 +2553,13 @@ class CursorPocketApp:
         else:
             self.start_video_recording()
 
-    def start_video_recording(self) -> None:
+    def start_video_recording(
+        self,
+        source_kind: VideoSourceKind | None = None,
+        *,
+        bounds: tuple[int, int, int, int] | None = None,
+        window_handle: int | None = None,
+    ) -> None:
         if self.recording:
             self.show_toast("Audio note is already recording", "Save or discard it before recording the screen.", error=True)
             return
@@ -2377,14 +2579,32 @@ class CursorPocketApp:
                 error=True,
             )
             return
+        if source_kind is None:
+            try:
+                source_kind = VideoSourceKind(self.settings.video_source_kind)
+            except ValueError:
+                source_kind = VideoSourceKind.DISPLAY
+        if source_kind == VideoSourceKind.REGION and bounds is None:
+            self._choose_video_region()
+            return
+        if source_kind == VideoSourceKind.WINDOW:
+            window_handle = window_handle or self.last_foreground_handle
+            bounds = window_bounds(window_handle)
+            if not window_handle or not bounds:
+                self.show_toast(
+                    "That window can’t be recorded",
+                    "Return to a visible window, reopen CursorPocket, then choose Window.",
+                    error=True,
+                )
+                return
         try:
             free_bytes = shutil.disk_usage(self.store.base_dir).free
         except OSError:
             free_bytes = 0
-        if free_bytes and free_bytes < 512 * 1024 * 1024:
+        if free_bytes and free_bytes < 1024 * 1024 * 1024:
             self.show_toast(
                 "Not enough free space",
-                "Free at least 512 MB in the capture folder before recording.",
+                "Free at least 1 GB in the capture folder before recording.",
                 error=True,
                 action=self.open_folder,
             )
@@ -2408,29 +2628,46 @@ class CursorPocketApp:
             )
             return
         self.display_bounds = monitor_bounds()
-        cursor_x, cursor_y = cursor_position()
-        selected_bounds = monitor_for_point(self.display_bounds, cursor_x, cursor_y)
-        display_index = self.display_bounds.index(selected_bounds) if selected_bounds in self.display_bounds else 0
+        if source_kind == VideoSourceKind.DISPLAY:
+            cursor_x, cursor_y = cursor_position()
+            selected_bounds = monitor_for_point(self.display_bounds, cursor_x, cursor_y)
+            bounds = selected_bounds
+        else:
+            selected_bounds = bounds
+        if selected_bounds is None:
+            self.show_toast("Recording source is missing", "Choose a display, region, or window.", error=True)
+            return
+        center_x = (selected_bounds[0] + selected_bounds[2]) // 2
+        center_y = (selected_bounds[1] + selected_bounds[3]) // 2
+        selected_display = monitor_for_point(self.display_bounds, center_x, center_y)
+        display_index = self.display_bounds.index(selected_display) if selected_display in self.display_bounds else 0
         options = VideoOptions(
-            source_kind=VideoSourceKind.DISPLAY,
+            source_kind=source_kind,
             display_index=display_index,
             bounds=selected_bounds,
+            window_handle=window_handle,
             fps=self.settings.video_fps,
+            draw_cursor=self.settings.video_draw_cursor,
             include_microphone=self.settings.video_microphone_enabled,
             microphone_name=microphone_name,
             include_camera=self.settings.video_camera_enabled,
             camera_name=camera_name,
             camera_position=self.settings.video_camera_position,
+            camera_width=self.settings.video_camera_width,
         )
         metadata = {
             "source_kind": options.source_kind.value,
             "display_index": display_index,
-            "display_bounds": list(selected_bounds),
+            "source_bounds": list(selected_bounds),
+            "window_handle": window_handle,
+            "draw_cursor": options.draw_cursor,
+            "fps": options.fps,
             "include_microphone": options.include_microphone,
             "microphone_name": microphone_name,
             "include_camera": options.include_camera,
             "camera_name": camera_name,
             "camera_position": options.camera_position,
+            "camera_width": options.camera_width,
         }
         try:
             reservation = self.store.reserve_video(metadata)
@@ -2439,11 +2676,15 @@ class CursorPocketApp:
             return
         self.settings.video_microphone_name = microphone_name
         self.settings.video_camera_name = camera_name
+        self.settings.video_source_kind = source_kind.value
         self.settings_store.save(self.settings)
         self.video_options = options
         self.video_reservation = reservation
         self.video_recording = True
         self.capture_active = True
+        self._video_started_once = False
+        self._video_last_disk_check = 0.0
+        self._video_disk_stop = False
         self.video_countdown_session += 1
         session = self.video_countdown_session
         self.hide_panel()
@@ -2455,6 +2696,45 @@ class CursorPocketApp:
             self._video_countdown_tick(session, countdown)
         else:
             self._begin_video_process(session)
+
+    def _choose_video_region(self) -> None:
+        self.capture_active = True
+        self.hide_panel()
+        self.hide_command_mode()
+        self._hide_companion_window()
+        self.root.after(180, self._begin_video_region_selection)
+
+    def _begin_video_region_selection(self) -> None:
+        try:
+            screenshot = ImageGrab.grab(all_screens=True)
+        except Exception as error:
+            self.capture_active = False
+            self._restore_companion()
+            self.show_toast("Couldn’t select a video region", str(error), error=True)
+            return
+        vx, vy, _vw, _vh = virtual_screen_bounds()
+        RegionSelector(
+            self.root,
+            screenshot,
+            (vx, vy),
+            self._video_region_selected,
+            self._cancel_video_region,
+            title_text="Drag the region to record",
+            enter_text="Enter records every screen  ·  Esc cancels",
+        )
+
+    def _video_region_selected(
+        self,
+        _image: Image.Image,
+        bounds: tuple[int, int, int, int],
+    ) -> None:
+        self.capture_active = False
+        self.start_video_recording(VideoSourceKind.REGION, bounds=bounds)
+
+    def _cancel_video_region(self) -> None:
+        self.capture_active = False
+        self._restore_companion()
+        self.show_toast("Walkthrough cancelled", "No video was recorded.")
 
     def _video_countdown_tick(self, session: int, remaining: int) -> None:
         if session != self.video_countdown_session or not self.video_recording:
@@ -2471,13 +2751,39 @@ class CursorPocketApp:
             return
         if not self.video_options or not self.video_reservation:
             return
+        if (
+            self.video_options.source_kind == VideoSourceKind.WINDOW
+            and not window_bounds(self.video_options.window_handle)
+        ):
+            self.store.discard_video(self.video_reservation)
+            self._reset_video_state()
+            self.show_toast(
+                "That window is no longer recordable",
+                "It may have closed or been minimized during the countdown.",
+                error=True,
+            )
+            return
         self.recording_indicator.show_message("Starting screen recorder…")
         try:
             self.video_recorder.start(self.video_options, self.video_reservation.partial_path)
+            self.root.after(12_000, lambda: self._video_start_timeout(session))
         except Exception as error:
             self.store.discard_video(self.video_reservation)
             self._reset_video_state()
             self.show_toast("Screen recording didn’t start", str(error), error=True)
+
+    def _video_start_timeout(self, session: int) -> None:
+        if (
+            session == self.video_countdown_session
+            and self.video_recording
+            and self.video_recorder.state == RecordingState.STARTING
+        ):
+            self.show_toast(
+                "Recording hardware didn’t respond",
+                "CursorPocket stopped safely. The camera or microphone may be busy.",
+                error=True,
+            )
+            self.video_recorder.stop(discard=True)
 
     def stop_active_recording(self) -> None:
         if self.video_recording:
@@ -2540,6 +2846,7 @@ class CursorPocketApp:
                     "include_camera": options.include_camera,
                     "camera_name": options.camera_name,
                     "camera_position": options.camera_position,
+                    "camera_width": options.camera_width,
                     "video_codec": "h264",
                     "audio_codec": "aac" if inspection.has_audio else None,
                     "recovered": result.forced or result.return_code != 0,
@@ -2552,6 +2859,7 @@ class CursorPocketApp:
     def _reset_video_state(self) -> None:
         self.video_recording = False
         self.video_finalizing = False
+        self._video_started_once = False
         self.capture_active = False
         self.video_options = None
         self.video_reservation = None
@@ -2905,6 +3213,7 @@ class CursorPocketApp:
             return True
         if kind == "video_started":
             if self.video_recording:
+                self._video_started_once = True
                 self.video_recording_started_at = time.monotonic()
                 status_parts = ["Screen"]
                 status_parts.append(
@@ -2927,6 +3236,22 @@ class CursorPocketApp:
                 )
             return True
         if kind == "video_progress":
+            elapsed = float(event[1]) if len(event) > 1 else 0.0
+            if elapsed >= self._video_last_disk_check + 5.0:
+                self._video_last_disk_check = elapsed
+                try:
+                    free_bytes = shutil.disk_usage(self.store.base_dir).free
+                except OSError:
+                    free_bytes = 0
+                if free_bytes and free_bytes < 128 * 1024 * 1024 and not self._video_disk_stop:
+                    self._video_disk_stop = True
+                    self.show_toast(
+                        "Recording stopped · drive nearly full",
+                        "CursorPocket is preserving the video recorded so far.",
+                        error=True,
+                        action=self.open_folder,
+                    )
+                    self.stop_video_recording()
             return True
         if kind == "video_finished":
             result = event[1]
@@ -2936,6 +3261,18 @@ class CursorPocketApp:
             options = self.video_options
             if reservation is None or options is None:
                 self._reset_video_state()
+                return True
+            if (
+                not self._video_started_once
+                and result.return_code != 0
+                and (
+                    not result.output_path.exists()
+                    or result.output_path.stat().st_size < 1024
+                )
+            ):
+                self.store.discard_video(reservation)
+                self._reset_video_state()
+                self._show_video_start_error(options, result.error_detail)
                 return True
             self.video_finalizing = True
             self.recording_indicator.show_message(
@@ -2996,6 +3333,25 @@ class CursorPocketApp:
             self.status.configure(text="An interrupted video is waiting in .in-progress", fg=ORANGE)
             return True
         return False
+
+    def _show_video_start_error(self, options: VideoOptions, detail: str) -> None:
+        summary = detail.splitlines()[-1] if detail.strip() else "The recording device did not respond."
+        if options.include_camera:
+            self.show_toast(
+                "Camera couldn’t start",
+                "It may be busy in another app. Turn Camera off to record without it, or check Windows camera access.",
+                error=True,
+                action=lambda: os.startfile("ms-settings:privacy-webcam"),  # type: ignore[attr-defined]
+            )
+        elif options.include_microphone:
+            self.show_toast(
+                "Microphone couldn’t start",
+                "It may be busy in another app. Turn Mic off for a muted walkthrough, or check Windows microphone access.",
+                error=True,
+                action=lambda: os.startfile("ms-settings:privacy-microphone"),  # type: ignore[attr-defined]
+            )
+        else:
+            self.show_toast("Screen recording couldn’t start", summary, error=True)
 
     def _poll_events(self) -> None:
         if self.closing:

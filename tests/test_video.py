@@ -108,6 +108,65 @@ class VideoCommandTests(unittest.TestCase):
                 ),
             )
 
+    def test_window_source_and_webcam_layout_are_explicit(self) -> None:
+        command = build_ffmpeg_command(
+            "ffmpeg.exe",
+            self.output,
+            VideoOptions(
+                source_kind=VideoSourceKind.WINDOW,
+                window_handle=987654,
+                include_microphone=False,
+                include_camera=True,
+                camera_name="Caméra – Studio",
+                camera_position="top-left",
+                camera_width=480,
+            ),
+        )
+
+        self.assertIn("hwnd=987654", command)
+        self.assertIn("video=Caméra – Studio", command)
+        filters = command[command.index("-filter_complex") + 1]
+        self.assertIn("scale=480:270", filters)
+        self.assertIn("overlay=32:32", filters)
+
+    def test_all_webcam_corners_have_safe_margins(self) -> None:
+        expected = {
+            "top-left": "overlay=32:32",
+            "top-right": "overlay=W-w-32:32",
+            "bottom-left": "overlay=32:H-h-32",
+            "bottom-right": "overlay=W-w-32:H-h-32",
+        }
+        for position, fragment in expected.items():
+            with self.subTest(position=position):
+                command = build_ffmpeg_command(
+                    "ffmpeg.exe",
+                    self.output,
+                    VideoOptions(
+                        include_microphone=False,
+                        include_camera=True,
+                        camera_name="Camera",
+                        camera_position=position,
+                    ),
+                )
+                filters = command[command.index("-filter_complex") + 1]
+                self.assertIn(fragment, filters)
+
+    def test_sixty_fps_screen_does_not_require_a_sixty_fps_webcam(self) -> None:
+        command = build_ffmpeg_command(
+            "ffmpeg.exe",
+            self.output,
+            VideoOptions(
+                fps=60,
+                include_microphone=False,
+                include_camera=True,
+                camera_name="Camera",
+            ),
+        )
+
+        camera_input = command.index("video=Camera")
+        self.assertEqual(command[camera_input - 2 : camera_input], ["30", "-i"])
+        self.assertIn("ddagrab=output_idx=0:framerate=60:draw_mouse=1", command)
+
     def test_required_devices_are_explicit(self) -> None:
         with self.assertRaisesRegex(ValueError, "microphone"):
             build_ffmpeg_command("ffmpeg.exe", self.output, VideoOptions())

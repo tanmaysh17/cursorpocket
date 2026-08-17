@@ -28,9 +28,12 @@ class AppSettings:
     video_camera_enabled: bool = False
     video_microphone_name: str = ""
     video_camera_name: str = ""
+    video_source_kind: str = "display"
     video_camera_position: str = "bottom-right"
+    video_camera_width: int = 360
     video_fps: int = 30
     video_countdown_seconds: int = 3
+    video_draw_cursor: bool = True
 
     @classmethod
     def defaults(cls) -> "AppSettings":
@@ -56,6 +59,12 @@ class SettingsStore:
             video_position = str(raw.get("video_camera_position", "bottom-right"))
             if video_position not in {"top-left", "top-right", "bottom-left", "bottom-right"}:
                 video_position = "bottom-right"
+            video_source = str(raw.get("video_source_kind", "display"))
+            if video_source not in {"display", "region", "window"}:
+                video_source = "display"
+            video_camera_width = int(raw.get("video_camera_width", 360))
+            if video_camera_width not in {240, 360, 480}:
+                video_camera_width = 360
             return AppSettings(
                 capture_dir=capture_dir,
                 follow_cursor=bool(raw.get("follow_cursor", True)),
@@ -66,9 +75,12 @@ class SettingsStore:
                 video_camera_enabled=bool(raw.get("video_camera_enabled", False)),
                 video_microphone_name=str(raw.get("video_microphone_name", "")),
                 video_camera_name=str(raw.get("video_camera_name", "")),
+                video_source_kind=video_source,
                 video_camera_position=video_position,
+                video_camera_width=video_camera_width,
                 video_fps=video_fps,
                 video_countdown_seconds=video_countdown,
+                video_draw_cursor=bool(raw.get("video_draw_cursor", True)),
             )
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             return AppSettings.defaults()

@@ -16,6 +16,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe main.py --self-test
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 .\dist\CursorPocket.exe --self-test
+py -m tools.verify_video_media --ffmpeg .\third_party\ffmpeg\bin\ffmpeg.exe
 ```
 
 For UI changes, also verify the packaged app on Windows with one and multiple displays when available. Check that the capture window can move and resize, the dot stays close to the pointer, the recording state is unmistakable, and all saved files land under the configured capture folder.
@@ -36,4 +37,4 @@ For UI changes, also verify the packaged app on Windows with one and multiple di
 
 Do not commit `.venv`, `build`, `dist`, user settings, or captures. Distribute compiled executables through a versioned GitHub Release instead of checking binaries into source control.
 
-`build.ps1` downloads a checksum-pinned LGPL FFmpeg sidecar through `tools/fetch_ffmpeg.ps1`. Do not update its URL or hashes without repeating the real-device screen, microphone, webcam, and combined capture gates and updating `THIRD_PARTY_NOTICES.md`.
+`build.ps1` downloads a checksum-pinned LGPL FFmpeg sidecar through `tools/fetch_ffmpeg.ps1`. The media verifier encodes screen-only, narrated, webcam, combined, and forcibly interrupted fragmented fixtures. Do not update the FFmpeg URL or hashes without repeating those fixtures plus the real-device screen, microphone, webcam, and combined capture gates and updating `THIRD_PARTY_NOTICES.md`.

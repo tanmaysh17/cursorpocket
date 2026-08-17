@@ -4,6 +4,7 @@
 
 - Added local H.264/AAC screen walkthrough recording with `V` to start or stop.
 - Added optional synchronized webcam picture-in-picture with `C` and microphone narration on by default.
+- Added display-under-pointer, dragged-region, and previous-window sources plus named device cycling, 30/60 fps, pointer, webcam corner, and webcam size choices.
 - Added a visible countdown, named screen/microphone/camera recording state, red dot and tray state, safe Stop/Discard flows, and save-on-quit handling.
 - Added crash-tolerant fragmented MP4 storage, startup recovery, validation, and dated `videos` folders under the existing capture location.
 - Added a checksum-pinned LGPL FFmpeg sidecar with license/notices, capability validation, and an end-to-end packaged self-test.

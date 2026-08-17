@@ -40,7 +40,9 @@ Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highl
 
 ### Screen walkthroughs
 
-Open command mode and press `V` to record the display under your pointer. Microphone narration is on by default. Press `C` before starting to add your webcam in the bottom-right corner; press `C` again to turn it off. A three-second countdown gives you time to return to your work. Press `V` again, click the red cursor dot, use the red **Stop** bar, or choose **Stop and save walkthrough** from the tray menu to finish.
+Open command mode and press `V` to record your remembered source—initially the display under your pointer. Microphone narration is on by default. Press `C` before starting to add your webcam in the bottom-right corner; press `C` again to turn it off. A three-second countdown gives you time to return to your work. Press `V` again, click the red cursor dot, use the red **Stop** bar, or choose **Stop and save walkthrough** from the tray menu to finish.
+
+For a configured walkthrough, open the full Capture window. **Region** lets you drag exactly what should be recorded; **Window** records the app you were using before opening CursorPocket. The named microphone and camera controls cycle through available devices. Separate controls remember webcam corner and size. Settings provides the default source, 30/60 fps, pointer inclusion, countdown, webcam corner, and webcam size.
 
 CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
 
@@ -86,6 +88,7 @@ Open **Settings** from the top-right of the capture window or from the tray menu
 - show or hide the cursor dot;
 - turn **Start CursorPocket when I sign in** on or off.
 - choose whether screen walkthroughs start with microphone, webcam, and a countdown.
+- choose the default display/region/window source, 30 or 60 fps, pointer inclusion, and webcam layout.
 
 Starting with Windows is off until you enable it. CursorPocket uses the current Windows user's startup setting and does not require administrator access.
 

@@ -203,9 +203,7 @@ def build_ffmpeg_command(
                 "-video_size",
                 "640x360",
                 "-framerate",
-                str(options.fps),
-                "-pixel_format",
-                "nv12",
+                str(min(options.fps, 30)),
                 "-i",
                 f"video={options.camera_name}",
             ]
@@ -490,4 +488,3 @@ class FFmpegVideoRecorder:
         self.state = RecordingState.IDLE if return_code == 0 or self._stop_requested else RecordingState.FAILED
         self.process = None
         self.emit(("video_finished", result))
-
