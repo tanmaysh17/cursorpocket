@@ -112,7 +112,7 @@ class CompanionTests(unittest.TestCase):
                 follow_ready=True,
                 hovered=False,
                 recording=False,
-                idle_seconds=1.0,
+                idle_seconds=2.0,
             )
         )
         self.assertTrue(
@@ -164,6 +164,26 @@ class CompanionTests(unittest.TestCase):
 
         self.assertEqual(glass.size, (160, 90))
         self.assertNotEqual(glass.getpixel((80, 45)), backdrop.getpixel((100, 60)))
+
+    def test_liquid_glass_field_fills_its_core_then_fades_without_a_boundary(self) -> None:
+        backdrop = Image.new("RGB", (240, 180), (210, 220, 215))
+        outer_box = (20, 20, 220, 160)
+        core_box = (70, 50, 190, 130)
+
+        field = liquid_glass_image(
+            backdrop,
+            outer_box,
+            radius=1,
+            tint_alpha=110,
+            feather=24,
+            boundary=False,
+            core_box=core_box,
+        )
+
+        original = backdrop.getpixel((120, 90))
+        self.assertNotEqual(field.getpixel((100, 70)), original)
+        self.assertNotEqual(field.getpixel((35, 70)), original)
+        self.assertEqual(field.getpixel((0, 0)), backdrop.getpixel((20, 20)))
 
     def test_ambient_glow_is_broad_and_fades_into_the_desktop(self) -> None:
         backdrop = Image.new("RGB", (400, 240), (25, 35, 45))

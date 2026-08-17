@@ -11,7 +11,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageGrab, ImageTk
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageGrab, ImageTk
 
 from .annotation import ScreenshotAnnotator
 from .audio import AudioRecorder
@@ -48,7 +48,8 @@ GREEN = "#42D392"
 RED = "#FF5D68"
 TRANSPARENT = "#FF00FF"
 COMMAND_MODE_TIMEOUT_MS = 30_000
-COMPANION_IDLE_HIDE_SECONDS = 0.9
+COMPANION_PIN_SECONDS = 0.32
+COMPANION_IDLE_HIDE_SECONDS = 1.4
 
 FONT_BODY = "Bahnschrift"
 FONT_DISPLAY = "Bahnschrift SemiBold"
@@ -124,6 +125,7 @@ def liquid_glass_image(
     tint_alpha: int = 178,
     feather: int = 0,
     boundary: bool = True,
+    core_box: tuple[int, int, int, int] | None = None,
 ) -> Image.Image:
     """Render a frosted, tinted crop that visually preserves the desktop behind it."""
     left, top, right, bottom = box
@@ -175,17 +177,30 @@ def liquid_glass_image(
     glass = glass.convert("RGB")
 
     mask = Image.new("L", (width, height), 0)
-    mask_inset = min(
-        max(0, feather * 2),
-        max(0, (min(width, height) - 1) // 2),
-    )
-    ImageDraw.Draw(mask).rounded_rectangle(
-        (mask_inset, mask_inset, width - 1 - mask_inset, height - 1 - mask_inset),
-        radius=max(1, radius),
-        fill=255,
-    )
-    if feather:
-        mask = mask.filter(ImageFilter.GaussianBlur(radius=feather))
+    if core_box is not None:
+        core_left, core_top, core_right, core_bottom = core_box
+        relative_core = (
+            max(0, core_left - left),
+            max(0, core_top - top),
+            min(width - 1, core_right - left - 1),
+            min(height - 1, core_bottom - top - 1),
+        )
+        ImageDraw.Draw(mask).rectangle(relative_core, fill=255)
+        if feather:
+            fade = mask.filter(ImageFilter.GaussianBlur(radius=feather))
+            mask = ImageChops.lighter(mask, fade)
+    else:
+        mask_inset = min(
+            max(0, feather * 2),
+            max(0, (min(width, height) - 1) // 2),
+        )
+        ImageDraw.Draw(mask).rounded_rectangle(
+            (mask_inset, mask_inset, width - 1 - mask_inset, height - 1 - mask_inset),
+            radius=max(1, radius),
+            fill=255,
+        )
+        if feather:
+            mask = mask.filter(ImageFilter.GaussianBlur(radius=feather))
     result = original.copy()
     result.paste(glass, (0, 0), mask)
     return result
@@ -1165,20 +1180,28 @@ class CursorPocketApp:
         legend_right = width - 18
         legend_bottom = min(height - 18, legend_top + 326)
         legend_box = (legend_left, legend_top, legend_right, legend_bottom)
+        glass_fade = 64
+        legend_glass_box = (
+            max(0, legend_left - glass_fade),
+            max(0, legend_top - glass_fade),
+            min(width, legend_right + glass_fade),
+            min(height, legend_bottom + glass_fade),
+        )
         legend_glass = ImageTk.PhotoImage(
             liquid_glass_image(
                 getattr(self, "_command_backdrop", None),
-                legend_box,
-                radius=34,
-                tint_alpha=104,
-                feather=16,
+                legend_glass_box,
+                radius=1,
+                tint_alpha=96,
+                feather=28,
                 boundary=False,
+                core_box=legend_box,
             )
         )
         self._command_glass_photos.append(legend_glass)
         canvas.create_image(
-            legend_left,
-            legend_top,
+            legend_glass_box[0],
+            legend_glass_box[1],
             image=legend_glass,
             anchor="nw",
             tags=("command_glass",),
@@ -1670,6 +1693,15 @@ class CursorPocketApp:
             if (cursor_x, cursor_y) != self._last_cursor:
                 self._last_cursor = (cursor_x, cursor_y)
                 self._last_cursor_move = now
+            idle_seconds = now - self._last_cursor_move
+            if self._companion_pinned and not self._companion_hover:
+                center_x = self._companion_x + self.COMPANION_SIZE / 2
+                center_y = self._companion_y + self.COMPANION_SIZE / 2
+                distance = math.hypot(cursor_x - center_x, cursor_y - center_y)
+                if distance > 132:
+                    self._companion_pinned = False
+            if not self._companion_pinned and idle_seconds >= COMPANION_PIN_SECONDS:
+                self._companion_pinned = True
         show_companion = companion_should_show(
             follow_ready=follow_ready,
             hovered=getattr(self, "_companion_hover", False),
@@ -1679,7 +1711,7 @@ class CursorPocketApp:
         if show_companion:
             if getattr(self, "_companion_idle_hidden", False):
                 self._show_companion_window()
-            if not self._companion_hover:
+            if not self._companion_hover and not self._companion_pinned:
                 self._companion_x, self._companion_y = self._companion_target(cursor_x, cursor_y)
             position_window(
                 self.companion,
@@ -1693,6 +1725,7 @@ class CursorPocketApp:
             "_companion_idle_hidden",
             False,
         ):
+            self._companion_pinned = False
             self._hide_companion_window()
         self.root.after(16, self._follow_tick)
 
