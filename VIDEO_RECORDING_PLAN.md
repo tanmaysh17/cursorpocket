@@ -272,6 +272,7 @@ These are deferred so the first release can make the core promise dependable: lo
 - The frozen app packages only `ffmpeg.exe`; the same executable performs media validation, avoiding a second 114 MB `ffprobe.exe` while preserving the validation gate.
 - The optional camera is a clean 16:9 picture-in-picture in v1. Device cycling, source choice, size, and corner controls are implemented in the full interface; live camera preview remains follow-up polish so camera hardware is not opened before an explicit recording action.
 - The synthetic verifier passes screen-only, screen + narration, screen + camera, combined, and forcibly interrupted fragmented-MP4 recovery fixtures.
+- A synthetic 3840 × 2160 at 60 fps Media Foundation gate produced a valid three-second H.264 MP4 in 4.03 seconds on the target machine.
 - Automated storage, lifecycle, shortcut, tray, settings compatibility, window-affinity, and synthetic H.264/AAC self-tests pass. The final computer-controlled visual click-through could not run while the Windows desktop was locked; it must be repeated after unlock before publishing a release artifact.
 
 ## Technical references
