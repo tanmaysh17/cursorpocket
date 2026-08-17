@@ -3,7 +3,9 @@ from __future__ import annotations
 import ctypes
 import os
 import sys
+import time
 from ctypes import wintypes
+from pathlib import Path
 
 
 SM_XVIRTUALSCREEN = 76
@@ -14,6 +16,26 @@ HWND_TOPMOST = -1
 SWP_NOACTIVATE = 0x0010
 SWP_SHOWWINDOW = 0x0040
 ERROR_ALREADY_EXISTS = 183
+PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+SW_RESTORE = 9
+VK_CONTROL = 0x11
+VK_ESCAPE = 0x1B
+KEYEVENTF_KEYUP = 0x0002
+GWL_EXSTYLE = -20
+WS_EX_NOACTIVATE = 0x08000000
+WS_EX_TOOLWINDOW = 0x00000080
+
+BROWSER_EXECUTABLES = frozenset(
+    {
+        "brave.exe",
+        "chrome.exe",
+        "firefox.exe",
+        "msedge.exe",
+        "opera.exe",
+        "opera_gx.exe",
+        "vivaldi.exe",
+    }
+)
 
 
 class POINT(ctypes.Structure):
@@ -65,12 +87,8 @@ def foreground_window_bounds() -> tuple[int, int, int, int] | None:
     if sys.platform != "win32":
         return None
     user32 = ctypes.windll.user32
-    hwnd = user32.GetForegroundWindow()
+    hwnd = foreground_window_handle()
     if not hwnd or user32.IsIconic(hwnd):
-        return None
-    pid = wintypes.DWORD()
-    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    if int(pid.value) == os.getpid():
         return None
     rect = RECT()
     if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
@@ -78,6 +96,170 @@ def foreground_window_bounds() -> tuple[int, int, int, int] | None:
     if rect.right <= rect.left or rect.bottom <= rect.top:
         return None
     return int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)
+
+
+def foreground_window_handle() -> int | None:
+    """Return the current external foreground window, excluding CursorPocket itself."""
+    if sys.platform != "win32":
+        return None
+    user32 = ctypes.windll.user32
+    hwnd = int(user32.GetForegroundWindow() or 0)
+    if not hwnd:
+        return None
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
+    if int(pid.value) == os.getpid():
+        return None
+    return hwnd
+
+
+def window_process_name(hwnd: int | None) -> str:
+    """Return the lowercase executable name that owns a top-level window."""
+    if sys.platform != "win32" or not hwnd:
+        return ""
+    user32 = ctypes.windll.user32
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.QueryFullProcessImageNameW.argtypes = [
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        wintypes.LPWSTR,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
+    if not pid.value:
+        return ""
+    process = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+    if not process:
+        return ""
+    try:
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(buffer))
+        if not kernel32.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(size)):
+            return ""
+        return Path(buffer.value).name.lower()
+    finally:
+        kernel32.CloseHandle(process)
+
+
+def is_supported_browser_window(hwnd: int | None) -> bool:
+    return window_process_name(hwnd) in BROWSER_EXECUTABLES
+
+
+def _activate_window(hwnd: int) -> bool:
+    if sys.platform != "win32" or not hwnd:
+        return False
+    user32 = ctypes.windll.user32
+    target = wintypes.HWND(hwnd)
+    if not user32.IsWindow(target):
+        return False
+    user32.ShowWindowAsync(target, SW_RESTORE)
+    current_thread = int(ctypes.windll.kernel32.GetCurrentThreadId())
+    target_thread = int(user32.GetWindowThreadProcessId(target, None))
+    foreground = wintypes.HWND(user32.GetForegroundWindow())
+    foreground_thread = int(user32.GetWindowThreadProcessId(foreground, None)) if foreground else 0
+    attached_threads: list[int] = []
+    for thread_id in {foreground_thread, target_thread}:
+        if (
+            thread_id
+            and thread_id != current_thread
+            and user32.AttachThreadInput(current_thread, thread_id, True)
+        ):
+            attached_threads.append(thread_id)
+    try:
+        user32.BringWindowToTop(target)
+        user32.SetForegroundWindow(target)
+    finally:
+        for thread_id in attached_threads:
+            user32.AttachThreadInput(current_thread, thread_id, False)
+    for _attempt in range(8):
+        if int(user32.GetForegroundWindow() or 0) == hwnd:
+            return True
+        time.sleep(0.025)
+    return False
+
+
+def _key_event(virtual_key: int, key_up: bool = False) -> None:
+    ctypes.windll.user32.keybd_event(
+        virtual_key,
+        0,
+        KEYEVENTF_KEYUP if key_up else 0,
+        0,
+    )
+
+
+def _copy_with_shortcut(hwnd: int, *, select_address: bool = False) -> bool:
+    """Copy from a target window and prove the clipboard was actually updated."""
+    if sys.platform == "win32":
+        user32 = ctypes.windll.user32
+        for _attempt in range(20):
+            if not any(user32.GetAsyncKeyState(key) & 0x8000 for key in (0x10, 0x11, 0x12)):
+                break
+            time.sleep(0.015)
+    if sys.platform != "win32" or not _activate_window(hwnd):
+        return False
+    user32 = ctypes.windll.user32
+    before = int(user32.GetClipboardSequenceNumber())
+    if select_address:
+        _key_event(VK_CONTROL)
+        _key_event(ord("L"))
+        _key_event(ord("L"), key_up=True)
+        _key_event(VK_CONTROL, key_up=True)
+        time.sleep(0.045)
+    _key_event(VK_CONTROL)
+    _key_event(ord("C"))
+    _key_event(ord("C"), key_up=True)
+    _key_event(VK_CONTROL, key_up=True)
+    if select_address:
+        _key_event(VK_ESCAPE)
+        _key_event(VK_ESCAPE, key_up=True)
+    for _attempt in range(12):
+        if int(user32.GetClipboardSequenceNumber()) != before:
+            return True
+        time.sleep(0.025)
+    return False
+
+
+def copy_selected_text(hwnd: int | None) -> bool:
+    """Copy only an active selection. False means no new clipboard value appeared."""
+    return bool(hwnd and _copy_with_shortcut(hwnd))
+
+
+def copy_browser_url(hwnd: int | None) -> bool:
+    """Copy the address bar only when the source window is a supported browser."""
+    return bool(
+        hwnd
+        and is_supported_browser_window(hwnd)
+        and _copy_with_shortcut(hwnd, select_address=True)
+    )
+
+
+def make_window_no_activate(window: object) -> None:
+    """Keep a utility window clickable without stealing focus from the source app."""
+    if sys.platform != "win32":
+        return
+    try:
+        window.update_idletasks()
+        user32 = ctypes.windll.user32
+        user32.GetParent.argtypes = [wintypes.HWND]
+        user32.GetParent.restype = wintypes.HWND
+        client = wintypes.HWND(int(window.winfo_id()))
+        wrapper = user32.GetParent(client) or client
+        get_style = getattr(user32, "GetWindowLongPtrW", user32.GetWindowLongW)
+        set_style = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
+        get_style.argtypes = [wintypes.HWND, ctypes.c_int]
+        get_style.restype = ctypes.c_ssize_t
+        set_style.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+        set_style.restype = ctypes.c_ssize_t
+        style = int(get_style(wrapper, GWL_EXSTYLE))
+        set_style(wrapper, GWL_EXSTYLE, style | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW)
+    except (AttributeError, OSError, TypeError):
+        return
 
 
 def monitor_bounds() -> list[tuple[int, int, int, int]]:

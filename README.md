@@ -8,7 +8,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 1. Open the capture window by clicking the green dot, choosing **Open capture window** from the tray icon, or pressing `Ctrl + Shift + Space`.
 2. Click an action, or press one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
-3. CursorPocket saves the result automatically and shows a confirmation you can click to open it.
+3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
 The capture window is a normal Windows window: drag it by its title bar, resize it from any edge, and place it wherever you like. CursorPocket remembers its size and position.
 
@@ -25,10 +25,14 @@ The capture window is a normal Windows window: drag it by its title bar, resize 
 | `D` | Discard the current audio note |
 | `F` | Open the capture folder |
 | `1`–`4` | Screenshot that numbered display |
-| `T` | Review and save clipboard text |
-| `L` | Save a copied web address |
+| `T` | Save text highlighted in the previous window |
+| `L` | Save the page currently open in your browser |
 
-For text, copy it first and press `T`. For a web page, copy its address and press `L`.
+For text, highlight what you want, open CursorPocket, and press `T`. CursorPocket copies only that active selection. For a link, leave the webpage open, open CursorPocket, and press `L`; it reads the current address from Chrome, Edge, Firefox, Brave, Vivaldi, or Opera. It creates no file when the source is not a complete `http://` or `https://` webpage.
+
+### Screenshot annotation
+
+Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highlight**, **Arrow**, **Rectangle**, or **Text**, pick a color, and draw directly on the image. `Ctrl + Z` undoes the last mark, `Enter` saves, and `Escape` cancels without creating a file.
 
 ## Where things are saved
 
@@ -105,5 +109,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packa
 - Screenshots happen only after an explicit capture action.
 - The microphone is open only while the dot and recording bar are red.
 - CursorPocket never records keystrokes or continuously records the screen.
-- Text and links come from the clipboard or quick editor; CursorPocket does not inject copy commands into other apps.
+- Text is copied only from the selection you explicitly highlighted. Link capture briefly reads the active supported browser's address bar. Both actions use the Windows clipboard and replace its current contents with the captured text or URL.
 - This project focuses on fast local capture. It does not reproduce Clicky's AI assistant or screen-reading features.

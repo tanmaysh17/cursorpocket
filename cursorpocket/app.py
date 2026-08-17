@@ -12,6 +12,7 @@ from typing import Callable
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageGrab, ImageTk
 
+from .annotation import ScreenshotAnnotator
 from .audio import AudioRecorder
 from .hotkeys import DEFAULT_HOTKEYS, GlobalHotkeyManager
 from .settings import AppSettings, SettingsStore
@@ -19,8 +20,12 @@ from .startup import StartupManager
 from .storage import CaptureRecord, CaptureStore, is_web_url
 from .tray import TrayManager
 from .windows import (
+    copy_browser_url,
+    copy_selected_text,
     cursor_position,
+    foreground_window_handle,
     foreground_window_bounds,
+    make_window_no_activate,
     monitor_bounds,
     position_window,
     virtual_screen_bounds,
@@ -73,6 +78,11 @@ def _bind_tree(widget: tk.Misc, sequence: str, callback: Callable) -> None:
     widget.bind(sequence, callback)
     for child in widget.winfo_children():
         _bind_tree(child, sequence, callback)
+
+
+def bind_toplevel_click(window: tk.Misc, callback: Callable) -> None:
+    """Bind once through Tk's toplevel bind tag so child clicks do not duplicate."""
+    window.bind("<Button-1>", callback)
 
 
 class RegionSelector:
@@ -755,6 +765,9 @@ class CursorPocketApp:
         self.recording_started_at = 0.0
         self.last_region_bounds: tuple[int, int, int, int] | None = None
         self.last_foreground_bounds: tuple[int, int, int, int] | None = None
+        self.last_foreground_handle: int | None = None
+        self.source_selected_text = ""
+        self.source_page_url = ""
         self.display_bounds = monitor_bounds()
         self.tray = TrayManager(self.events.put)
         initial_cursor = cursor_position()
@@ -808,6 +821,7 @@ class CursorPocketApp:
             cursor="hand2",
         )
         self.companion_canvas.pack()
+        make_window_no_activate(self.companion)
         self._draw_companion(False)
         self.companion_canvas.bind("<Enter>", self._companion_enter)
         self.companion_canvas.bind("<Leave>", self._companion_leave)
@@ -926,7 +940,7 @@ class CursorPocketApp:
             tuple(display_actions),
         )
 
-        self._section_label(content, "CLIPBOARD  ·  T / L").pack(anchor="w", pady=(13, 3))
+        self._section_label(content, "CURRENT CONTEXT  ·  T / L").pack(anchor="w", pady=(13, 3))
         (
             _text_glyph,
             _text_title,
@@ -936,7 +950,7 @@ class CursorPocketApp:
             content,
             "T",
             "Text snippet",
-            "Review and save text from your clipboard",
+            "Save text highlighted in the previous window",
             "T",
             self.capture_text,
         )
@@ -949,7 +963,7 @@ class CursorPocketApp:
             content,
             "L",
             "Web link",
-            "Save the copied page address",
+            "Save the page open in your browser",
             "L",
             self.capture_link,
         )
@@ -1226,6 +1240,13 @@ class CursorPocketApp:
     def show_panel(self) -> None:
         if self.capture_active:
             return
+        foreground_handle = foreground_window_handle()
+        if foreground_handle:
+            self.last_foreground_handle = foreground_handle
+            self._snapshot_source_context(foreground_handle)
+        else:
+            self.source_selected_text = ""
+            self.source_page_url = ""
         foreground = foreground_window_bounds()
         if foreground:
             self.last_foreground_bounds = foreground
@@ -1342,7 +1363,7 @@ class CursorPocketApp:
             return
         if self.recording:
             self.recording_indicator.show(self.recording_started_at)
-        self._save_screenshot(image, bounds)
+        self._annotate_screenshot(image, bounds)
 
     def _begin_screen_selection(self) -> None:
         try:
@@ -1371,7 +1392,20 @@ class CursorPocketApp:
         bounds: tuple[int, int, int, int],
     ) -> None:
         self.last_region_bounds = bounds
-        self._save_screenshot(image, bounds)
+        self._annotate_screenshot(image, bounds)
+
+    def _annotate_screenshot(
+        self,
+        image: Image.Image,
+        bounds: tuple[int, int, int, int],
+    ) -> None:
+        ScreenshotAnnotator(
+            self.root,
+            image,
+            bounds,
+            self._save_screenshot,
+            self._cancel_screenshot,
+        )
 
     def _save_screenshot(self, image: Image.Image, bounds: tuple[int, int, int, int]) -> None:
         try:
@@ -1390,10 +1424,20 @@ class CursorPocketApp:
     def capture_text(self) -> None:
         if self.capture_active:
             return
+        cached_selection = self.source_selected_text if self.panel_open else ""
+        source_window = self._capture_source_window()
         self.capture_active = True
         self.hide_panel()
-        initial = self._clipboard_text()
-        TextEditor(self.root, initial, self._save_text, self._editor_cancelled)
+        selected = cached_selection
+        if not selected and source_window and copy_selected_text(source_window):
+            selected = self._clipboard_text()
+        if not selected.strip():
+            self._nothing_captured(
+                "No highlighted text",
+                "Highlight text in another app, open CursorPocket, then press T.",
+            )
+            return
+        self._save_text(selected)
 
     def _save_text(self, value: str) -> None:
         try:
@@ -1406,13 +1450,43 @@ class CursorPocketApp:
     def capture_link(self) -> None:
         if self.capture_active:
             return
+        cached_url = self.source_page_url if self.panel_open else ""
+        source_window = self._capture_source_window()
         self.capture_active = True
         self.hide_panel()
-        initial = self._clipboard_text().strip()
-        if is_web_url(initial):
-            self._save_link(initial)
+        current_url = cached_url
+        if not current_url and source_window and copy_browser_url(source_window):
+            current_url = self._clipboard_text().strip()
+        if not is_web_url(current_url):
+            self._nothing_captured(
+                "No webpage detected",
+                "Open a page in your browser, open CursorPocket, then press L.",
+            )
             return
-        LinkEditor(self.root, initial, self._save_link, self._editor_cancelled)
+        self._save_link(current_url)
+
+    def _snapshot_source_context(self, source_window: int) -> None:
+        self.source_selected_text = ""
+        self.source_page_url = ""
+        if copy_selected_text(source_window):
+            selected = self._clipboard_text()
+            if selected.strip():
+                self.source_selected_text = selected
+        if copy_browser_url(source_window):
+            url = self._clipboard_text().strip()
+            if is_web_url(url):
+                self.source_page_url = url
+
+    def _capture_source_window(self) -> int | None:
+        current = foreground_window_handle()
+        if current:
+            self.last_foreground_handle = current
+        return current or self.last_foreground_handle
+
+    def _nothing_captured(self, title: str, detail: str) -> None:
+        self.capture_active = False
+        self._restore_companion()
+        self.show_toast(title, detail, error=True)
 
     def _save_link(self, value: str) -> None:
         try:
@@ -1689,7 +1763,7 @@ class CursorPocketApp:
         ).pack(fill="x", pady=(2, 0))
         if action is not None:
             toast.configure(cursor="hand2")
-            _bind_tree(toast, "<Button-1>", lambda _event: action())
+            bind_toplevel_click(toast, lambda _event: action())
         x, y = cursor_position()
         vx, vy, vw, vh = virtual_screen_bounds()
         width, height = 330, 68
