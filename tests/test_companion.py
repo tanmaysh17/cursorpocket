@@ -12,8 +12,10 @@ from cursorpocket.app import (
     CursorPocketApp,
     GREEN,
     RED,
+    build_scrollable_panel,
     bind_toplevel_click,
     panel_key_action,
+    panel_scroll_units,
 )
 from cursorpocket.windows import is_supported_browser_window
 
@@ -77,6 +79,30 @@ class CompanionTests(unittest.TestCase):
 
         self.assertEqual(result, "break")
         self.assertEqual(calls, ["region"])
+
+    def test_panel_wheel_delta_always_produces_a_scroll_step(self) -> None:
+        self.assertEqual(panel_scroll_units(120), -1)
+        self.assertEqual(panel_scroll_units(-120), 1)
+        self.assertEqual(panel_scroll_units(30), -1)
+        self.assertEqual(panel_scroll_units(0), 0)
+
+    def test_capture_panel_has_a_visible_working_scrollbar(self) -> None:
+        root = tk.Tk()
+        root.geometry("320x240-10000-10000")
+        try:
+            canvas, content, scrollbar = build_scrollable_panel(root)
+            for index in range(40):
+                tk.Label(content, text=f"Capture action {index}").pack()
+            root.update()
+            before = canvas.yview()
+            canvas.yview_scroll(4, "units")
+            root.update()
+
+            self.assertEqual(scrollbar.winfo_manager(), "pack")
+            self.assertLess(before[1], 1.0)
+            self.assertGreater(canvas.yview()[0], before[0])
+        finally:
+            root.destroy()
 
     def test_toplevel_click_binding_fires_once_for_a_child_click(self) -> None:
         root = tk.Tk()

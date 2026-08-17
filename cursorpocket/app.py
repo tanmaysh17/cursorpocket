@@ -85,6 +85,54 @@ def bind_toplevel_click(window: tk.Misc, callback: Callable) -> None:
     window.bind("<Button-1>", callback)
 
 
+def panel_scroll_units(delta: int) -> int:
+    """Translate a Windows mouse-wheel delta into a useful Tk scroll step."""
+    if delta == 0:
+        return 0
+    steps = max(1, abs(delta) // 120)
+    return -steps if delta > 0 else steps
+
+
+def build_scrollable_panel(parent: tk.Misc) -> tuple[tk.Canvas, tk.Frame, tk.Scrollbar]:
+    """Create the capture window's visible, vertically scrollable content area."""
+    viewport = tk.Frame(parent, bg=PANEL)
+    viewport.pack(fill="both", expand=True)
+    canvas = tk.Canvas(
+        viewport,
+        bg=PANEL,
+        highlightthickness=0,
+        bd=0,
+        relief="flat",
+    )
+    scrollbar = tk.Scrollbar(
+        viewport,
+        orient="vertical",
+        command=canvas.yview,
+        width=12,
+        bg=PANEL_RAISED,
+        activebackground=BLUE,
+        troughcolor=INK,
+        relief="flat",
+        bd=0,
+        highlightthickness=0,
+    )
+    canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    content = tk.Frame(canvas, bg=PANEL, padx=20, pady=18)
+    content_window = canvas.create_window(0, 0, anchor="nw", window=content)
+
+    def update_scroll_region(_event: tk.Event) -> None:
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    def fit_content_width(event: tk.Event) -> None:
+        canvas.itemconfigure(content_window, width=max(1, int(event.width)))
+
+    content.bind("<Configure>", update_scroll_region)
+    canvas.bind("<Configure>", fit_content_width)
+    return canvas, content, scrollbar
+
+
 class RegionSelector:
     def __init__(
         self,
@@ -857,6 +905,7 @@ class CursorPocketApp:
         self.panel.protocol("WM_DELETE_WINDOW", self.hide_panel)
         self.panel.configure(bg=LINE)
         self.panel.bind("<Escape>", lambda _event: self.hide_panel())
+        self.panel.bind("<MouseWheel>", self._scroll_panel, add="+")
         self.panel.bind_all("<KeyPress>", self._handle_panel_key, add="+")
         self.panel_positioned = False
         if self.settings.panel_geometry:
@@ -868,8 +917,7 @@ class CursorPocketApp:
 
         shell = tk.Frame(self.panel, bg=PANEL)
         shell.pack(fill="both", expand=True, padx=1, pady=1)
-        content = tk.Frame(shell, bg=PANEL, padx=20, pady=18)
-        content.pack(fill="both", expand=True)
+        self.panel_canvas, content, self.panel_scrollbar = build_scrollable_panel(shell)
 
         header = tk.Frame(content, bg=PANEL)
         header.pack(fill="x")
@@ -1014,6 +1062,15 @@ class CursorPocketApp:
             anchor="w",
         )
         self.panel_shortcut_hint.pack(fill="x", pady=(6, 0))
+
+    def _scroll_panel(self, event: tk.Event) -> str | None:
+        if not self.panel_open:
+            return None
+        units = panel_scroll_units(int(getattr(event, "delta", 0)))
+        if units == 0:
+            return None
+        self.panel_canvas.yview_scroll(units, "units")
+        return "break"
 
     def _action_row(
         self,

@@ -10,7 +10,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 2. Click an action, or press one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
-The capture window is a normal Windows window: drag it by its title bar, resize it from any edge, and place it wherever you like. CursorPocket remembers its size and position.
+The capture window is a normal Windows window: drag it by its title bar, resize it from any edge, and place it wherever you like. CursorPocket remembers its size and position. A visible scrollbar and the mouse wheel keep every action reachable at smaller window sizes.
 
 ### Keys in the capture window
 
