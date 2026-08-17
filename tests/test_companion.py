@@ -16,6 +16,7 @@ from cursorpocket.app import (
     RED,
     build_scrollable_panel,
     bind_toplevel_click,
+    monitor_for_point,
     panel_key_action,
     panel_scroll_units,
 )
@@ -35,12 +36,60 @@ class FakeCanvas:
 
 
 class CompanionTests(unittest.TestCase):
-    def test_double_circle_opens_panel_even_when_dot_is_hidden(self) -> None:
+    def test_command_mode_renders_glow_legend_and_library_pulse(self) -> None:
+        root = tk.Tk()
+        root.withdraw()
+        app = object.__new__(CursorPocketApp)
+        app.root = root
+        app._command_button_center = (0, 0)
+        try:
+            app._build_command_mode()
+            app._render_command_mode(1280, 720)
+            root.update_idletasks()
+
+            texts = {
+                app.command_canvas.itemcget(item, "text")
+                for item in app.command_canvas.find_all()
+                if app.command_canvas.type(item) == "text"
+            }
+            self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 4)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_pulse_outer")), 1)
+            self.assertIn("Tap one key", texts)
+            self.assertIn("OPEN LIBRARY", texts)
+        finally:
+            root.destroy()
+
+    def test_command_pulse_opens_full_interface_without_resnapshotting(self) -> None:
+        app = object.__new__(CursorPocketApp)
+        app._command_button_center = (100, 100)
+        calls: list[object] = []
+        app.hide_command_mode = lambda: calls.append("hide")
+        app.show_panel = lambda snapshot_context=True: calls.append(snapshot_context)
+
+        app._command_mode_click(SimpleNamespace(x=106, y=96))
+
+        self.assertEqual(calls, ["hide", False])
+
+    def test_only_current_command_session_can_auto_close(self) -> None:
+        app = object.__new__(CursorPocketApp)
+        app.command_mode_open = True
+        app._command_session = 4
+        calls: list[str] = []
+        app.hide_command_mode = lambda: calls.append("hide")
+
+        app._expire_command_mode(3)
+        self.assertEqual(calls, [])
+
+        app._expire_command_mode(4)
+        self.assertEqual(calls, ["hide"])
+
+    def test_double_circle_opens_command_mode_even_when_dot_is_hidden(self) -> None:
         app = object.__new__(CursorPocketApp)
         app.closing = False
         app.hidden_mode = True
         app.capture_active = False
         app.panel_open = False
+        app.command_mode_open = False
         app.recording = False
         app.settings_window = None
         app.settings = SimpleNamespace(mouse_gesture_enabled=True, follow_cursor=False)
@@ -50,9 +99,9 @@ class CompanionTests(unittest.TestCase):
 
         def open_panel() -> None:
             opened.append(True)
-            app.panel_open = True
+            app.command_mode_open = True
 
-        app.show_panel = open_panel
+        app.show_command_mode = open_panel
         points = [
             (
                 round(200 + 32 * math.cos(4 * math.pi * index / 90)),
@@ -73,6 +122,12 @@ class CompanionTests(unittest.TestCase):
                     break
 
         self.assertEqual(opened, [True])
+
+    def test_command_mode_uses_monitor_under_cursor(self) -> None:
+        monitors = [(-1920, 0, 0, 1080), (0, 0, 2560, 1440)]
+
+        self.assertEqual(monitor_for_point(monitors, -400, 500), monitors[0])
+        self.assertEqual(monitor_for_point(monitors, 1200, 700), monitors[1])
 
     def test_capture_window_explains_that_shortcuts_are_individual_keys(self) -> None:
         help_text = PANEL_SHORTCUT_HELP.lower()
@@ -151,6 +206,15 @@ class CompanionTests(unittest.TestCase):
         self.assertIsNone(app._handle_panel_key(SimpleNamespace(state=0x4, keysym="Q")))
         self.assertIsNone(app._handle_panel_key(SimpleNamespace(state=0x20000, keysym="Q")))
         self.assertEqual(calls, [])
+
+        app.panel_open = False
+        app.command_mode_open = True
+        app.hide_command_mode = lambda: setattr(app, "command_mode_open", False)
+        result = app._handle_panel_key(SimpleNamespace(state=8, keysym="Q"))
+
+        self.assertEqual(result, "break")
+        self.assertEqual(calls, ["region"])
+        self.assertFalse(app.command_mode_open)
 
     def test_panel_wheel_delta_always_produces_a_scroll_step(self) -> None:
         self.assertEqual(panel_scroll_units(120), -1)

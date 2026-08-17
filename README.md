@@ -6,15 +6,15 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 ## The everyday workflow
 
-1. Open the capture window by drawing two quick, small circles with the mouse, clicking the green dot, choosing **Open capture window** from the tray icon, or pressing `Ctrl + Shift + Space`.
-2. Click an action, or tap one of the plain keys shown in the window—no `Ctrl` or `Alt` needed.
+1. Enter command mode by drawing two quick, small circles with the mouse, clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
+2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
-The capture window is a normal Windows window: drag it by its title bar, resize it from any edge, and place it wherever you like. CursorPocket remembers its size and position. A visible scrollbar and the mouse wheel keep every action reachable at smaller window sizes.
+Command mode closes after one action, when you press `Escape`, or automatically after eight seconds. Click the pulsing button in its bottom-right corner when you want the full CursorPocket library and settings window. That full window can be moved and resized, and CursorPocket remembers its size and position.
 
 ### Keys in the capture window
 
-These are individual one-key actions, not combinations: keep the capture window open and tap one key at a time. For example, tap `Q` by itself for a region screenshot or `1` by itself for display 1. Do not hold `QWER`, `ASDF`, or `1234` together. The plain keys intentionally work only while the capture window is open, so CursorPocket does not interfere with normal typing in other apps.
+These are individual one-key actions, not combinations: enter command mode and tap one key at a time. For example, tap `Q` by itself for a region screenshot or `1` by itself for display 1. Do not hold `QWER`, `ASDF`, or `1234` together. The plain keys intentionally work only while command mode or the full CursorPocket window is active, so CursorPocket does not interfere with normal typing in other apps.
 
 | Key | Capture |
 | --- | --- |
@@ -58,11 +58,11 @@ CursorPocket Captures\
 
 ## Dot, tray, and hidden mode
 
-- **Green dot:** CursorPocket is ready. Click it to open the capture window.
+- **Green dot:** CursorPocket is ready. Click it to enter command mode.
 - **Red dot and Stop bar:** audio is recording. Click either one to stop and save.
 - **Tray icon:** right-click it for every capture action, Settings, the capture folder, and Quit.
 - **Hidden mode:** hides the cursor dot while leaving the tray icon and global shortcuts active. Toggle it from the capture window, tray menu, or `Ctrl + Shift + H`.
-- **Mouse gesture:** draw two quick circles, clockwise or counter-clockwise, to open the capture window. It works in hidden mode and can be disabled in Settings.
+- **Mouse gesture:** draw two quick circles, clockwise or counter-clockwise, to enter command mode. It works in hidden mode and can be disabled in Settings.
 
 The dot can also be disabled permanently in Settings. It does not replace the Windows cursor and is excluded from screenshots while capturing.
 

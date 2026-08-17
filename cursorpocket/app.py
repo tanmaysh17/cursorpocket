@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 import queue
 import sys
@@ -60,6 +61,13 @@ PANEL_SHORTCUT_HELP = (
 # Block only the state bits observed for Ctrl and Alt so plain capture keys dispatch.
 PANEL_BLOCKED_MODIFIER_MASK = 0x20004
 
+COMMAND_SHORTCUT_ROWS = (
+    ("SCREENSHOT", "Q Region  ·  W Window  ·  E All  ·  R Repeat"),
+    ("AUDIO", "A Record  ·  S Save  ·  D Discard  ·  F Folder"),
+    ("DISPLAY", "1  2  3  4   Capture numbered display"),
+    ("CONTEXT", "T Selected text  ·  L Current webpage"),
+)
+
 PANEL_KEY_ACTIONS = {
     "q": "region_screenshot",
     "w": "window_screenshot",
@@ -83,6 +91,26 @@ def panel_key_action(keysym: str) -> str | None:
     if normalized.startswith("kp_"):
         normalized = normalized[3:]
     return PANEL_KEY_ACTIONS.get(normalized)
+
+
+def monitor_for_point(
+    monitors: list[tuple[int, int, int, int]],
+    x: int,
+    y: int,
+) -> tuple[int, int, int, int]:
+    for bounds in monitors:
+        left, top, right, bottom = bounds
+        if left <= x < right and top <= y < bottom:
+            return bounds
+    if not monitors:
+        return (0, 0, 1920, 1080)
+    return min(
+        monitors,
+        key=lambda bounds: (
+            (x - (bounds[0] + bounds[2]) / 2.0) ** 2
+            + (y - (bounds[1] + bounds[3]) / 2.0) ** 2
+        ),
+    )
 
 
 def _bind_tree(widget: tk.Misc, sequence: str, callback: Callable) -> None:
@@ -676,7 +704,7 @@ class SettingsWindow:
         shortcut_frame = tk.Frame(shell, bg=PANEL)
         shortcut_frame.pack(fill="x")
         rows = (
-            ("Open capture menu", shortcuts.get("panel", "Ctrl + Shift + Space")),
+            ("Open command mode", shortcuts.get("panel", "Ctrl + Shift + Space")),
             ("Tap one screenshot key", "Q / W / E / R"),
             ("Tap one audio key", "A / S / D / F"),
             ("Tap one display key", "1 / 2 / 3 / 4"),
@@ -823,6 +851,10 @@ class CursorPocketApp:
             ),
         )
         self.panel_open = False
+        self.command_mode_open = False
+        self._command_session = 0
+        self._command_pulse_phase = 0
+        self._command_button_center = (0, 0)
         self.capture_active = False
         self.recording = False
         self.hidden_mode = not self.settings.follow_cursor
@@ -847,6 +879,7 @@ class CursorPocketApp:
         self._companion_hover = False
         self._build_icon()
         self._build_companion()
+        self._build_command_mode()
         self._build_panel()
         self.recording_indicator = RecordingIndicator(self.root, self.stop_audio_recording)
         if self.hidden_mode:
@@ -895,7 +928,7 @@ class CursorPocketApp:
         self.companion_canvas.bind("<Enter>", self._companion_enter)
         self.companion_canvas.bind("<Leave>", self._companion_leave)
         self.companion_canvas.bind("<Button-1>", lambda _event: self._companion_primary_action())
-        self.companion_canvas.bind("<Button-3>", lambda _event: self.toggle_panel())
+        self.companion_canvas.bind("<Button-3>", lambda _event: self.toggle_command_mode())
 
     def _draw_companion(self, hover: bool) -> None:
         canvas = self.companion_canvas
@@ -914,7 +947,169 @@ class CursorPocketApp:
         if self.recording:
             self.stop_audio_recording()
         else:
-            self.toggle_panel()
+            self.toggle_command_mode()
+
+    def _build_command_mode(self) -> None:
+        self.command_mode = tk.Toplevel(self.root)
+        self.command_mode.withdraw()
+        self.command_mode.overrideredirect(True)
+        self.command_mode.attributes("-topmost", True)
+        try:
+            self.command_mode.attributes("-transparentcolor", TRANSPARENT)
+        except tk.TclError:
+            pass
+        self.command_mode.configure(bg=TRANSPARENT)
+        self.command_mode.bind("<Escape>", lambda _event: self.hide_command_mode())
+        self.command_canvas = tk.Canvas(
+            self.command_mode,
+            bg=TRANSPARENT,
+            highlightthickness=0,
+            bd=0,
+            cursor="arrow",
+        )
+        self.command_canvas.pack(fill="both", expand=True)
+        self.command_canvas.bind("<Button-1>", self._command_mode_click)
+
+    def _render_command_mode(self, width: int, height: int) -> None:
+        canvas = self.command_canvas
+        canvas.configure(width=width, height=height)
+        canvas.delete("all")
+
+        glow_colors = ("#173743", "#1F5663", "#2A7B83", "#42A69A")
+        for inset, color in enumerate(glow_colors, start=1):
+            canvas.create_rectangle(
+                inset,
+                inset,
+                width - inset - 1,
+                height - inset - 1,
+                outline=color,
+                width=1,
+                tags=("command_glow",),
+            )
+
+        legend_width = max(1, min(540, width - 56))
+        legend_left = max(24, width - legend_width - 28)
+        legend_top = 28
+        legend_right = width - 28
+        legend_bottom = legend_top + 286
+        canvas.create_rectangle(
+            legend_left,
+            legend_top,
+            legend_right,
+            legend_bottom,
+            fill=PANEL,
+            outline=LINE,
+            width=1,
+        )
+        canvas.create_text(
+            legend_left + 22,
+            legend_top + 22,
+            text="CURSORPOCKET ACTIVE",
+            fill=GREEN,
+            anchor="nw",
+            font=(FONT_MONO, 9, "bold"),
+        )
+        canvas.create_text(
+            legend_left + 22,
+            legend_top + 48,
+            text="Tap one key",
+            fill=PAPER,
+            anchor="nw",
+            font=(FONT_BODY, 18, "bold"),
+        )
+        row_y = legend_top + 88
+        for label, shortcuts in COMMAND_SHORTCUT_ROWS:
+            canvas.create_text(
+                legend_left + 22,
+                row_y,
+                text=label,
+                fill=MUTED,
+                anchor="nw",
+                font=(FONT_MONO, 8, "bold"),
+            )
+            canvas.create_text(
+                legend_left + 112,
+                row_y,
+                text=shortcuts,
+                fill=PAPER,
+                anchor="nw",
+                font=(FONT_MONO, 9),
+            )
+            row_y += 39
+        canvas.create_text(
+            legend_left + 22,
+            legend_bottom - 25,
+            text="ESC  Close     •     Command mode closes automatically",
+            fill=MUTED,
+            anchor="nw",
+            font=(FONT_BODY, 8),
+        )
+
+        button_x = width - 66
+        button_y = height - 66
+        self._command_button_center = (button_x, button_y)
+        canvas.create_text(
+            button_x - 48,
+            button_y,
+            text="OPEN LIBRARY",
+            fill=MUTED,
+            anchor="e",
+            font=(FONT_MONO, 8, "bold"),
+        )
+        canvas.create_oval(
+            button_x - 34,
+            button_y - 34,
+            button_x + 34,
+            button_y + 34,
+            fill=PANEL,
+            outline="#2A7B83",
+            width=2,
+            tags=("command_pulse_outer",),
+        )
+        canvas.create_oval(
+            button_x - 23,
+            button_y - 23,
+            button_x + 23,
+            button_y + 23,
+            fill=INK,
+            outline=BLUE,
+            width=2,
+            tags=("command_pulse_inner",),
+        )
+        canvas.create_oval(
+            button_x - 8,
+            button_y - 8,
+            button_x + 8,
+            button_y + 8,
+            fill=GREEN,
+            outline="",
+        )
+
+    def _animate_command_mode(self, session: int) -> None:
+        if not self.command_mode_open or session != self._command_session:
+            return
+        self._command_pulse_phase = (self._command_pulse_phase + 1) % 40
+        pulse = (math.sin(self._command_pulse_phase / 40.0 * math.tau) + 1.0) / 2.0
+        center_x, center_y = self._command_button_center
+        radius = 34 + round(pulse * 7)
+        self.command_canvas.coords(
+            "command_pulse_outer",
+            center_x - radius,
+            center_y - radius,
+            center_x + radius,
+            center_y + radius,
+        )
+        glow = "#63B3FF" if pulse > 0.5 else "#2A7B83"
+        self.command_canvas.itemconfigure("command_pulse_outer", outline=glow)
+        self.command_mode.after(50, lambda: self._animate_command_mode(session))
+
+    def _command_mode_click(self, event: tk.Event) -> None:
+        center_x, center_y = self._command_button_center
+        if math.hypot(int(event.x) - center_x, int(event.y) - center_y) <= 48:
+            self.hide_command_mode()
+            self.show_panel(snapshot_context=False)
+            return
+        self.hide_command_mode()
 
     def _build_panel(self) -> None:
         self.panel = tk.Toplevel(self.root)
@@ -1076,7 +1271,7 @@ class CursorPocketApp:
 
         self.panel_shortcut_hint = tk.Label(
             content,
-            text=f"Open this menu anywhere: {self.registered_shortcuts['panel']}",
+            text=f"Open command mode anywhere: {self.registered_shortcuts['panel']}",
             bg=PANEL,
             fg=MUTED,
             font=(FONT_MONO, 8),
@@ -1179,7 +1374,7 @@ class CursorPocketApp:
         return buttons
 
     def _handle_panel_key(self, event: tk.Event) -> str | None:
-        if not self.panel_open:
+        if not self.panel_open and not getattr(self, "command_mode_open", False):
             return None
         if int(getattr(event, "state", 0)) & PANEL_BLOCKED_MODIFIER_MASK:
             return None
@@ -1202,6 +1397,8 @@ class CursorPocketApp:
             self.capture_monitor(int(action.removeprefix("monitor_")) - 1)
         else:
             commands[action]()
+        if getattr(self, "command_mode_open", False):
+            self.hide_command_mode()
         return "break"
 
     def _header_button(self, parent: tk.Misc, text: str, command: Callable) -> tk.Button:
@@ -1269,6 +1466,7 @@ class CursorPocketApp:
             self.settings.mouse_gesture_enabled
             and not self.capture_active
             and not self.panel_open
+            and not getattr(self, "command_mode_open", False)
             and not self.recording
             and self.settings_window is None
         )
@@ -1276,13 +1474,14 @@ class CursorPocketApp:
             not self.hidden_mode
             and not self.capture_active
             and not self.panel_open
+            and not getattr(self, "command_mode_open", False)
             and self.settings.follow_cursor
         )
         if gesture_ready or follow_ready:
             cursor_x, cursor_y = cursor_position()
             now = time.monotonic()
             if gesture_ready and self.gesture_detector.feed(cursor_x, cursor_y, now):
-                self.show_panel()
+                self.show_command_mode()
                 self.root.after(16, self._follow_tick)
                 return
             if not gesture_ready:
@@ -1321,26 +1520,19 @@ class CursorPocketApp:
         self._companion_hover = False
         self._draw_companion(False)
 
+    def toggle_command_mode(self) -> None:
+        if self.command_mode_open:
+            self.hide_command_mode()
+        else:
+            self.show_command_mode()
+
     def toggle_panel(self) -> None:
         if self.panel_open:
             self.hide_panel()
         else:
             self.show_panel()
 
-    def _show_first_run(self) -> None:
-        if self.closing:
-            return
-        self.settings.onboarding_seen = True
-        self.settings_store.save(self.settings)
-        self.show_panel()
-        self.status.configure(
-            text="Ready. Click the green dot or use the tray icon to return here.",
-            fg=BLUE,
-        )
-
-    def show_panel(self) -> None:
-        if self.capture_active:
-            return
+    def _remember_source_context(self) -> None:
         foreground_handle = foreground_window_handle()
         if foreground_handle:
             self.last_foreground_handle = foreground_handle
@@ -1351,6 +1543,77 @@ class CursorPocketApp:
         foreground = foreground_window_bounds()
         if foreground:
             self.last_foreground_bounds = foreground
+
+    def show_command_mode(self) -> None:
+        if self.capture_active:
+            return
+        if self.panel_open:
+            self.hide_panel()
+        self._remember_source_context()
+        self.display_bounds = monitor_bounds()
+        cursor_x, cursor_y = cursor_position()
+        left, top, right, bottom = monitor_for_point(
+            self.display_bounds,
+            cursor_x,
+            cursor_y,
+        )
+        width = max(1, right - left)
+        height = max(1, bottom - top)
+        self.command_mode_open = True
+        self._command_session += 1
+        session = self._command_session
+        self._command_pulse_phase = 0
+        self.companion.withdraw()
+        self.command_mode.deiconify()
+        position_window(
+            self.command_mode,
+            left,
+            top,
+            width,
+            height,
+            activate=True,
+        )
+        self._render_command_mode(width, height)
+        self.command_mode.lift()
+        self.command_mode.focus_force()
+        self._animate_command_mode(session)
+        self.command_mode.after(
+            8000,
+            lambda: self._expire_command_mode(session),
+        )
+
+    def _expire_command_mode(self, session: int) -> None:
+        if self.command_mode_open and session == self._command_session:
+            self.hide_command_mode()
+
+    def hide_command_mode(self) -> None:
+        if not self.command_mode_open:
+            return
+        self.command_mode_open = False
+        self._command_session += 1
+        self.command_mode.withdraw()
+        self._companion_pinned = False
+        self._last_cursor_move = time.monotonic()
+        if not self.hidden_mode and not self.capture_active and self.settings.follow_cursor:
+            self.companion.deiconify()
+
+    def _show_first_run(self) -> None:
+        if self.closing:
+            return
+        self.settings.onboarding_seen = True
+        self.settings_store.save(self.settings)
+        self.show_command_mode()
+        self.status.configure(
+            text="Ready. Use command mode, then tap one capture key.",
+            fg=BLUE,
+        )
+
+    def show_panel(self, snapshot_context: bool = True) -> None:
+        if self.capture_active:
+            return
+        self.hide_command_mode()
+        if snapshot_context:
+            self._remember_source_context()
         if self.hidden_mode:
             self.hidden_mode = False
             self.companion.deiconify()
@@ -1396,6 +1659,7 @@ class CursorPocketApp:
         self._last_cursor_move = time.monotonic()
         self._draw_companion(False)
         self.panel.withdraw()
+        self.hide_command_mode()
 
     def capture_screenshot(self) -> None:
         if self.capture_active:
@@ -1525,7 +1789,11 @@ class CursorPocketApp:
     def capture_text(self) -> None:
         if self.capture_active:
             return
-        cached_selection = self.source_selected_text if self.panel_open else ""
+        cached_selection = (
+            self.source_selected_text
+            if self.panel_open or getattr(self, "command_mode_open", False)
+            else ""
+        )
         source_window = self._capture_source_window()
         self.capture_active = True
         self.hide_panel()
@@ -1551,7 +1819,11 @@ class CursorPocketApp:
     def capture_link(self) -> None:
         if self.capture_active:
             return
-        cached_url = self.source_page_url if self.panel_open else ""
+        cached_url = (
+            self.source_page_url
+            if self.panel_open or getattr(self, "command_mode_open", False)
+            else ""
+        )
         source_window = self._capture_source_window()
         self.capture_active = True
         self.hide_panel()
@@ -1894,7 +2166,7 @@ class CursorPocketApp:
         if self.closing:
             return
         if self.activation_check is not None and self.activation_check():
-            self.show_panel()
+            self.show_command_mode()
         while True:
             try:
                 event = self.events.get_nowait()
@@ -1913,7 +2185,7 @@ class CursorPocketApp:
                     widget.configure(text=label)
                 if action == "panel" and hasattr(self, "panel_shortcut_hint"):
                     self.panel_shortcut_hint.configure(
-                        text=f"Open this menu anywhere: {label}"
+                        text=f"Open command mode anywhere: {label}"
                     )
                 if used_fallback:
                     if action == "panel":
@@ -1931,7 +2203,7 @@ class CursorPocketApp:
             elif event == "link":
                 self.capture_link()
             elif event == "panel":
-                self.toggle_panel()
+                self.toggle_command_mode()
             elif event == "audio":
                 self.toggle_audio_recording()
             elif event == "hidden":

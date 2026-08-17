@@ -25,7 +25,7 @@ class TrayManager:
             self._image(False),
             "CursorPocket — click to capture",
             pystray.Menu(
-                pystray.MenuItem("Open capture menu", self._action("panel"), default=True),
+                pystray.MenuItem("Open command mode", self._action("panel"), default=True),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Screenshot", self._action("screenshot")),
                 pystray.MenuItem(
