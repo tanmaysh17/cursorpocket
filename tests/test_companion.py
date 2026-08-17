@@ -11,10 +11,14 @@ from PIL import Image
 from cursorpocket.annotation import draw_arrow, draw_rectangle, draw_stroke, draw_text
 from cursorpocket.app import (
     COMMAND_MODE_TIMEOUT_MS,
+    FONT_BODY,
+    FONT_DISPLAY,
+    FONT_MONO,
     PANEL_SHORTCUT_HELP,
     CursorPocketApp,
     GREEN,
     RED,
+    ambient_edge_glow_images,
     build_scrollable_panel,
     bind_toplevel_click,
     liquid_glass_image,
@@ -54,7 +58,7 @@ class CompanionTests(unittest.TestCase):
                 for item in app.command_canvas.find_all()
                 if app.command_canvas.type(item) == "text"
             }
-            self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 5)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 4)
             self.assertEqual(len(app.command_canvas.find_withtag("command_pulse_outer")), 1)
             self.assertEqual(len(app.command_canvas.find_withtag("command_glass")), 1)
             self.assertIn("Tap one key", texts)
@@ -91,6 +95,22 @@ class CompanionTests(unittest.TestCase):
 
         self.assertEqual(glass.size, (160, 90))
         self.assertNotEqual(glass.getpixel((80, 45)), backdrop.getpixel((100, 60)))
+
+    def test_ambient_glow_is_broad_and_fades_into_the_desktop(self) -> None:
+        backdrop = Image.new("RGB", (400, 240), (25, 35, 45))
+
+        strips = ambient_edge_glow_images(backdrop, 400, 240, 80)
+
+        self.assertEqual(len(strips), 4)
+        top = strips[0][1]
+        self.assertEqual(top.size, (400, 80))
+        self.assertNotEqual(top.getpixel((200, 0)), backdrop.getpixel((200, 0)))
+        self.assertEqual(top.getpixel((200, 79)), backdrop.getpixel((200, 79)))
+
+    def test_product_typography_uses_one_bahnschrift_family(self) -> None:
+        self.assertTrue(FONT_BODY.startswith("Bahnschrift"))
+        self.assertTrue(FONT_DISPLAY.startswith("Bahnschrift"))
+        self.assertTrue(FONT_MONO.startswith("Bahnschrift"))
 
     def test_only_current_command_session_can_auto_close(self) -> None:
         app = object.__new__(CursorPocketApp)

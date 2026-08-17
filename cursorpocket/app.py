@@ -49,9 +49,9 @@ RED = "#FF5D68"
 TRANSPARENT = "#FF00FF"
 COMMAND_MODE_TIMEOUT_MS = 15_000
 
-FONT_BODY = "Segoe UI"
-FONT_DISPLAY = "Segoe UI Variable Display"
-FONT_MONO = "Cascadia Mono"
+FONT_BODY = "Bahnschrift"
+FONT_DISPLAY = "Bahnschrift SemiBold"
+FONT_MONO = "Bahnschrift SemiCondensed"
 
 PANEL_SHORTCUT_HELP = (
     "Tap one key at a time while this window is open: Q, W, E, or R for screenshots; "
@@ -119,6 +119,10 @@ def liquid_glass_image(
     backdrop: Image.Image | None,
     box: tuple[int, int, int, int],
     radius: int,
+    *,
+    tint_alpha: int = 178,
+    feather: int = 0,
+    boundary: bool = True,
 ) -> Image.Image:
     """Render a frosted, tinted crop that visually preserves the desktop behind it."""
     left, top, right, bottom = box
@@ -150,32 +154,77 @@ def liquid_glass_image(
     if glass.size != (width, height):
         glass = glass.resize((width, height), Image.Resampling.BILINEAR)
 
-    tint = Image.new("RGBA", (width, height), (8, 17, 24, 178))
+    tint = Image.new("RGBA", (width, height), (8, 17, 24, tint_alpha))
     glass = Image.alpha_composite(glass, tint)
-    sheen = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    sheen_draw = ImageDraw.Draw(sheen)
-    sheen_draw.rounded_rectangle(
-        (1, 1, width - 2, height - 2),
-        radius=max(1, radius - 1),
-        outline=(172, 255, 234, 72),
-        width=1,
-    )
-    sheen_draw.line(
-        (radius, 2, max(radius, width - radius), 2),
-        fill=(220, 255, 247, 58),
-        width=1,
-    )
-    glass = Image.alpha_composite(glass, sheen).convert("RGB")
+    if boundary:
+        sheen = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+        sheen_draw = ImageDraw.Draw(sheen)
+        sheen_draw.rounded_rectangle(
+            (1, 1, width - 2, height - 2),
+            radius=max(1, radius - 1),
+            outline=(172, 255, 234, 72),
+            width=1,
+        )
+        sheen_draw.line(
+            (radius, 2, max(radius, width - radius), 2),
+            fill=(220, 255, 247, 58),
+            width=1,
+        )
+        glass = Image.alpha_composite(glass, sheen)
+    glass = glass.convert("RGB")
 
     mask = Image.new("L", (width, height), 0)
+    mask_inset = min(
+        max(0, feather * 2),
+        max(0, (min(width, height) - 1) // 2),
+    )
     ImageDraw.Draw(mask).rounded_rectangle(
-        (0, 0, width - 1, height - 1),
+        (mask_inset, mask_inset, width - 1 - mask_inset, height - 1 - mask_inset),
         radius=max(1, radius),
         fill=255,
     )
+    if feather:
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=feather))
     result = original.copy()
     result.paste(glass, (0, 0), mask)
     return result
+
+
+def ambient_edge_glow_images(
+    backdrop: Image.Image | None,
+    width: int,
+    height: int,
+    depth: int,
+) -> list[tuple[tuple[int, int], Image.Image]]:
+    """Build broad, soft screenshot-matched glows for each display edge."""
+    if backdrop is None:
+        backdrop = Image.new("RGB", (width, height), INK)
+    source = backdrop.convert("RGB")
+    strips: list[tuple[tuple[int, int], Image.Image]] = []
+    definitions = (
+        ("top", (0, 0, width, depth), (0, 0)),
+        ("bottom", (0, height - depth, width, height), (0, height - depth)),
+        ("left", (0, 0, depth, height), (0, 0)),
+        ("right", (width - depth, 0, width, height), (width - depth, 0)),
+    )
+    for edge, box, position in definitions:
+        original = source.crop(box)
+        softened = original.filter(ImageFilter.GaussianBlur(radius=12))
+        color = Image.new("RGB", original.size, (38, 194, 167))
+        glowing = Image.blend(softened, color, 0.48)
+        mask = Image.new("L", original.size, 0)
+        mask_draw = ImageDraw.Draw(mask)
+        axis_length = original.height if edge in {"top", "bottom"} else original.width
+        for offset in range(axis_length):
+            distance = offset if edge in {"top", "left"} else axis_length - 1 - offset
+            strength = max(0.0, 1.0 - distance / max(1, axis_length - 1))
+            alpha = round(118 * strength**2)
+            if edge in {"top", "bottom"}:
+                mask_draw.line((0, offset, original.width, offset), fill=alpha)
+            else:
+                mask_draw.line((offset, 0, offset, original.height), fill=alpha)
+        strips.append((position, Image.composite(glowing, original, mask)))
+    return strips
 
 
 def _bind_tree(widget: tk.Misc, sequence: str, callback: Callable) -> None:
@@ -1043,26 +1092,38 @@ class CursorPocketApp:
         canvas.delete("all")
         self._command_glass_photos = []
 
-        glow_colors = ("#11272F", "#183944", "#20525C", "#2A777A", "#55BFA6")
-        for inset, color in enumerate(glow_colors, start=1):
-            canvas.create_rectangle(
-                inset,
-                inset,
-                width - inset - 1,
-                height - inset - 1,
-                outline=color,
-                width=1,
+        glow_depth = max(72, min(132, min(width, height) // 8))
+        for position, glow_image in ambient_edge_glow_images(
+            getattr(self, "_command_backdrop", None),
+            width,
+            height,
+            glow_depth,
+        ):
+            glow_photo = ImageTk.PhotoImage(glow_image)
+            self._command_glass_photos.append(glow_photo)
+            canvas.create_image(
+                position[0],
+                position[1],
+                image=glow_photo,
+                anchor="nw",
                 tags=("command_glow",),
             )
 
-        legend_width = max(1, min(548, width - 56))
-        legend_left = max(24, width - legend_width - 28)
-        legend_top = 28
-        legend_right = width - 28
-        legend_bottom = min(height - 28, legend_top + 310)
+        legend_width = max(1, min(590, width - 36))
+        legend_left = max(18, width - legend_width - 18)
+        legend_top = 18
+        legend_right = width - 18
+        legend_bottom = min(height - 18, legend_top + 326)
         legend_box = (legend_left, legend_top, legend_right, legend_bottom)
         legend_glass = ImageTk.PhotoImage(
-            liquid_glass_image(getattr(self, "_command_backdrop", None), legend_box, radius=28)
+            liquid_glass_image(
+                getattr(self, "_command_backdrop", None),
+                legend_box,
+                radius=34,
+                tint_alpha=104,
+                feather=16,
+                boundary=False,
+            )
         )
         self._command_glass_photos.append(legend_glass)
         canvas.create_image(
@@ -1075,39 +1136,39 @@ class CursorPocketApp:
 
         self._command_logo_photo = ImageTk.PhotoImage(load_logo(42))
         canvas.create_image(
-            legend_left + 24,
-            legend_top + 20,
+            legend_left + 42,
+            legend_top + 32,
             image=self._command_logo_photo,
             anchor="nw",
         )
         canvas.create_text(
-            legend_left + 76,
-            legend_top + 23,
+            legend_left + 94,
+            legend_top + 35,
             text="CURSORPOCKET",
             fill=PAPER,
             anchor="nw",
             font=(FONT_DISPLAY, 11, "bold"),
         )
         canvas.create_text(
-            legend_left + 76,
-            legend_top + 43,
+            legend_left + 94,
+            legend_top + 55,
             text="COMMAND MODE  •  ACTIVE",
             fill=GREEN,
             anchor="nw",
             font=(FONT_MONO, 8, "bold"),
         )
         canvas.create_text(
-            legend_left + 24,
-            legend_top + 76,
+            legend_left + 42,
+            legend_top + 92,
             text="Tap one key",
             fill=PAPER,
             anchor="nw",
             font=(FONT_BODY, 18, "bold"),
         )
-        row_y = legend_top + 117
+        row_y = legend_top + 136
         for label, shortcuts in COMMAND_SHORTCUT_ROWS:
             canvas.create_text(
-                legend_left + 24,
+                legend_left + 42,
                 row_y,
                 text=label,
                 fill="#82AFA9",
@@ -1115,7 +1176,7 @@ class CursorPocketApp:
                 font=(FONT_MONO, 8, "bold"),
             )
             canvas.create_text(
-                legend_left + 124,
+                legend_left + 142,
                 row_y,
                 text=shortcuts,
                 fill=PAPER,
@@ -1124,8 +1185,8 @@ class CursorPocketApp:
             )
             row_y += 38
         canvas.create_text(
-            legend_left + 24,
-            legend_bottom - 27,
+            legend_left + 42,
+            legend_bottom - 41,
             text="ESC  CLOSE     •     AUTO-CLOSES IN 15 SECONDS",
             fill="#8CA0AA",
             anchor="nw",
