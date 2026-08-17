@@ -24,6 +24,15 @@ class CaptureRecord:
     metadata: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class VideoReservation:
+    id: str
+    created_at: str
+    partial_path: Path
+    metadata_path: Path
+    final_path: Path
+
+
 def is_web_url(value: str) -> bool:
     """Return True only for ordinary HTTP(S) links with a host."""
     try:
@@ -67,6 +76,7 @@ class CaptureStore:
             "text": "text",
             "link": "links",
             "audio": "audio",
+            "video": "videos",
         }.get(kind, kind)
         day_dir = self.base_dir / now.strftime("%Y-%m-%d") / category
         day_dir.mkdir(parents=True, exist_ok=True)
@@ -161,6 +171,121 @@ class CaptureStore:
             )
             self._append(record)
         return record
+
+    def reserve_video(
+        self,
+        metadata: dict[str, Any] | None = None,
+        now: datetime | None = None,
+    ) -> VideoReservation:
+        now = now or datetime.now().astimezone()
+        with self._lock:
+            capture_id, final_path = self._destination("video", ".mp4", now)
+            in_progress = self.base_dir / ".in-progress"
+            in_progress.mkdir(parents=True, exist_ok=True)
+            partial_path = in_progress / f"{capture_id}.partial.mp4"
+            metadata_path = in_progress / f"{capture_id}.json"
+            reservation = VideoReservation(
+                id=capture_id,
+                created_at=now.isoformat(timespec="seconds"),
+                partial_path=partial_path,
+                metadata_path=metadata_path,
+                final_path=final_path,
+            )
+            payload = {
+                "id": reservation.id,
+                "created_at": reservation.created_at,
+                "partial_path": partial_path.relative_to(self.base_dir).as_posix(),
+                "final_path": final_path.relative_to(self.base_dir).as_posix(),
+                "metadata": metadata or {},
+            }
+            temp_metadata = metadata_path.with_suffix(".tmp")
+            temp_metadata.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            temp_metadata.replace(metadata_path)
+        return reservation
+
+    def finalize_video(
+        self,
+        reservation: VideoReservation,
+        duration_seconds: float,
+        width: int,
+        height: int,
+        fps: float,
+        metadata: dict[str, Any] | None = None,
+    ) -> CaptureRecord:
+        if not reservation.partial_path.exists() or reservation.partial_path.stat().st_size < 1024:
+            raise ValueError("Video capture is empty.")
+        if duration_seconds <= 0 or width < 2 or height < 2:
+            raise ValueError("Video capture is empty.")
+        with self._lock:
+            reservation.final_path.parent.mkdir(parents=True, exist_ok=True)
+            reservation.partial_path.replace(reservation.final_path)
+            try:
+                whole_seconds = max(1, round(duration_seconds))
+                minutes, seconds = divmod(whole_seconds, 60)
+                created_at = datetime.fromisoformat(reservation.created_at)
+                video_metadata: dict[str, Any] = {
+                    "duration_seconds": round(duration_seconds, 3),
+                    "width": width,
+                    "height": height,
+                    "fps": round(fps, 3),
+                }
+                video_metadata.update(metadata or {})
+                record = self._record(
+                    reservation.id,
+                    "video",
+                    reservation.final_path,
+                    f"Video · {minutes}:{seconds:02d}",
+                    created_at,
+                    video_metadata,
+                )
+                self._append(record)
+                reservation.metadata_path.unlink(missing_ok=True)
+            except Exception:
+                if reservation.final_path.exists() and not reservation.partial_path.exists():
+                    reservation.final_path.replace(reservation.partial_path)
+                raise
+        return record
+
+    def discard_video(self, reservation: VideoReservation) -> None:
+        with self._lock:
+            reservation.partial_path.unlink(missing_ok=True)
+            reservation.metadata_path.unlink(missing_ok=True)
+
+    def pending_videos(self) -> list[VideoReservation]:
+        in_progress = self.base_dir / ".in-progress"
+        if not in_progress.exists():
+            return []
+        reservations: list[VideoReservation] = []
+        for metadata_path in sorted(in_progress.glob("*.json")):
+            try:
+                payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+                partial_path = self._safe_relative_path(str(payload["partial_path"]))
+                final_path = self._safe_relative_path(str(payload["final_path"]))
+                reservations.append(
+                    VideoReservation(
+                        id=str(payload["id"]),
+                        created_at=str(payload["created_at"]),
+                        partial_path=partial_path,
+                        metadata_path=metadata_path,
+                        final_path=final_path,
+                    )
+                )
+            except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+                continue
+        return reservations
+
+    def _safe_relative_path(self, value: str) -> Path:
+        relative = Path(value)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("Capture metadata contains an unsafe path.")
+        base = self.base_dir.resolve()
+        candidate = (base / relative).resolve()
+        if candidate != base and base not in candidate.parents:
+            raise ValueError("Capture metadata contains an unsafe path.")
+        return candidate
 
     def recent(self, limit: int = 6) -> list[CaptureRecord]:
         if limit <= 0 or not self.manifest_path.exists():

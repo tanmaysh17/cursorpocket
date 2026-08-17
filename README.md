@@ -1,6 +1,6 @@
 # CursorPocket
 
-CursorPocket is a small, local-first Windows capture utility. A tiny green dot follows the pointer, giving you quick access to screenshots, audio notes, text snippets, and web links. The dot turns red while the microphone is recording.
+CursorPocket is a small, local-first Windows capture utility. A tiny green dot follows the pointer, giving you quick access to screenshots, screen walkthroughs, audio notes, text snippets, and web links. The dot turns red while audio or video is recording.
 
 Everything is saved to one organized folder on your computer. CursorPocket has no account, analytics, cloud upload, or AI service.
 
@@ -18,6 +18,8 @@ These are individual one-key actions, not combinations: enter command mode and t
 
 | Key | Capture |
 | --- | --- |
+| `V` | Start or stop a screen walkthrough |
+| `C` | Include or remove the webcam from the next walkthrough |
 | `Q` | Select a screenshot region |
 | `W` | Screenshot the window you were using |
 | `E` | Screenshot all displays together |
@@ -36,6 +38,12 @@ For text, highlight what you want, open CursorPocket, and press `T`. CursorPocke
 
 Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highlight**, **Arrow**, **Rectangle**, or **Text**, pick a color, and draw directly on the image. `Ctrl + Z` undoes the last mark, `Enter` saves, and `Escape` cancels without creating a file.
 
+### Screen walkthroughs
+
+Open command mode and press `V` to record the display under your pointer. Microphone narration is on by default. Press `C` before starting to add your webcam in the bottom-right corner; press `C` again to turn it off. A three-second countdown gives you time to return to your work. Press `V` again, click the red cursor dot, use the red **Stop** bar, or choose **Stop and save walkthrough** from the tray menu to finish.
+
+CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
+
 ## Where things are saved
 
 The default location is `Documents\CursorPocket Captures`. Change it from **Settings** in the capture window or tray menu.
@@ -48,18 +56,20 @@ CursorPocket Captures\
     │   └── 14-05-09_screenshot_a1b2c3.png
     ├── audio\
     │   └── 14-08-33_audio_1a2b3c.wav
+    ├── videos\
+    │   └── 14-10-41_video_7f8e9d.mp4
     ├── text\
     │   └── 14-06-12_text_d4e5f6.txt
     └── links\
         └── 14-07-21_link_9a8b7c.url
 ```
 
-`captures.jsonl` is a local index used for recent captures. The actual files remain normal PNG, WAV, TXT, and URL files.
+`captures.jsonl` is a local index used for recent captures. The actual files remain normal PNG, MP4, WAV, TXT, and URL files.
 
 ## Dot, tray, and hidden mode
 
 - **Green dot:** CursorPocket is ready. It follows while the mouse is moving and disappears after a short idle pause, so it never hangs on the screen. Click it to enter command mode.
-- **Red dot and Stop bar:** audio is recording. Click either one to stop and save.
+- **Red dot and Stop bar:** audio or video is recording. Click either one to stop and save.
 - **Tray icon:** right-click it for every capture action, Settings, the capture folder, and Quit.
 - **Hidden mode:** hides the cursor dot while leaving the tray icon and global shortcuts active. Toggle it from the capture window, tray menu, or `Ctrl + Shift + H`.
 - **Mouse gesture:** draw two quick circles, clockwise or counter-clockwise, to enter command mode. It works in hidden mode and can be disabled in Settings.
@@ -75,6 +85,7 @@ Open **Settings** from the top-right of the capture window or from the tray menu
 - choose the single folder that holds all captures;
 - show or hide the cursor dot;
 - turn **Start CursorPocket when I sign in** on or off.
+- choose whether screen walkthroughs start with microphone, webcam, and a countdown.
 
 Starting with Windows is off until you enable it. CursorPocket uses the current Windows user's startup setting and does not require administrator access.
 
@@ -121,7 +132,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packa
 ## Privacy and current scope
 
 - Screenshots happen only after an explicit capture action.
-- The microphone is open only while the dot and recording bar are red.
+- The screen, microphone, and webcam are accessed only after you explicitly start a walkthrough; active capture is shown with a red dot and recording bar.
 - CursorPocket never records keystrokes or continuously records the screen.
 - Text is copied only from the selection you explicitly highlighted. Link capture briefly reads the active supported browser's address bar. Both actions use the Windows clipboard and replace its current contents with the captured text or URL.
 - This project focuses on fast local capture. It does not reproduce Clicky's AI assistant or screen-reading features.

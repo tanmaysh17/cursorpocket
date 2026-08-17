@@ -1,6 +1,6 @@
 # CursorPocket Screen + Webcam Recording Plan
 
-Status: proposed, not yet implemented  
+Status: implemented; final visual click-through pending an unlocked Windows desktop
 Target: Windows 10 22H2 and Windows 11, x64  
 Primary user outcome: start a narrated screen walkthrough in two actions, optionally include a webcam bubble, and always find the finished video beside the rest of the day's captures.
 
@@ -263,6 +263,15 @@ Disk space is checked before start and monitored while recording. At less than 1
 - macOS/Linux support.
 
 These are deferred so the first release can make the core promise dependable: local screen walkthroughs with synchronized narration and an optional webcam, started and found as easily as every other CursorPocket capture.
+
+## Implementation record
+
+- The legal/backend gate uses BtbN `autobuild-2026-08-17-13-05`, artifact `ffmpeg-n8.1.2-44-g7c533d0f86-win64-lgpl-8.1.zip`, archive SHA-256 `BDA492675BDB354AC55F93B96AF2DBB35BABEF7DE264C37D4FF83E022831B19D`, and executable SHA-256 `E8E106D6F6A4166747FBD7374FBF47FFC4D2DD883520C3558FEEAC0281A2712D`.
+- Four real-device 15-second gates passed on the target machine: screen, screen + microphone, screen + webcam, and screen + microphone + webcam. The combined gate produced 449 of 450 expected frames with 15.04 seconds of audio.
+- DirectShow microphone and camera inputs are intentionally separate and opened before Desktop Duplication. The planned combined DirectShow input hung during shutdown on the target hardware; the separate-input pipeline stopped cleanly and synchronized correctly.
+- The frozen app packages only `ffmpeg.exe`; the same executable performs media validation, avoiding a second 114 MB `ffprobe.exe` while preserving the validation gate.
+- The optional camera is a clean 16:9 picture-in-picture in v1. Live camera preview and advanced size/corner selectors remain follow-up polish; the everyday `C` toggle and remembered corner are implemented.
+- Automated storage, lifecycle, shortcut, tray, settings compatibility, window-affinity, and synthetic H.264/AAC self-tests pass. The final computer-controlled visual click-through could not run while the Windows desktop was locked; it must be repeated after unlock before publishing a release artifact.
 
 ## Technical references
 

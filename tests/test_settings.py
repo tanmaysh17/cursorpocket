@@ -18,6 +18,13 @@ class SettingsStoreTests(unittest.TestCase):
                 mouse_gesture_enabled=False,
                 onboarding_seen=True,
                 panel_geometry="560x740+100+80",
+                video_microphone_enabled=False,
+                video_camera_enabled=True,
+                video_microphone_name="Desk mic",
+                video_camera_name="Integrated camera",
+                video_camera_position="top-right",
+                video_fps=60,
+                video_countdown_seconds=0,
             )
 
             store.save(expected)
@@ -36,6 +43,10 @@ class SettingsStoreTests(unittest.TestCase):
             self.assertTrue(settings.mouse_gesture_enabled)
             self.assertFalse(settings.onboarding_seen)
             self.assertEqual(settings.panel_geometry, "")
+            self.assertTrue(settings.video_microphone_enabled)
+            self.assertFalse(settings.video_camera_enabled)
+            self.assertEqual(settings.video_fps, 30)
+            self.assertEqual(settings.video_countdown_seconds, 3)
             self.assertIn("CursorPocket Captures", settings.capture_dir)
 
     def test_older_settings_file_gets_safe_onboarding_default(self) -> None:

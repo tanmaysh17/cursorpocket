@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Windows users who want to capture material throughout the day without interrupting their work. They save screenshots, audio notes, text snippets, and web links, with screenshots and audio used most often.
+Windows users who want to capture material throughout the day without interrupting their work. They save screenshots, narrated screen walkthroughs, audio notes, text snippets, and web links, with screenshots and audio used most often.
 
 ## Product Purpose
 
@@ -27,6 +27,7 @@ Avoid dashboard-like control centers, decorative productivity UI, floating widge
 3. Stay quiet by default: minimal persistent chrome, no decorative motion, and no interruption of the user’s current task.
 4. Make recovery effortless: always show where a capture was saved and provide a direct path to the folder.
 5. Prefer recognition over recall: visible actions and configurable shortcuts beat memorized key combinations.
+6. Make recording unambiguous: screen, microphone, and webcam capture starts only after an explicit action and stays named on screen until it is saved or discarded.
 
 ## Accessibility & Inclusion
 

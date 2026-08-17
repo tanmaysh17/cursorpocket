@@ -27,9 +27,13 @@ For UI changes, also verify the packaged app on Windows with one and multiple di
 - `cursorpocket/hotkeys.py` — global Windows shortcuts
 - `cursorpocket/storage.py` — organized local file storage and index
 - `cursorpocket/audio.py` — WAV recording
+- `cursorpocket/video.py` — FFmpeg command construction and recorder lifecycle
+- `cursorpocket/media_devices.py` — Windows camera and microphone discovery
 - `cursorpocket/tray.py` — system tray menu and state
 - `cursorpocket/settings.py` — persisted user preferences
 - `cursorpocket/startup.py` — per-user Windows startup toggle
 - `tests/` — unit and interaction-level regression checks
 
 Do not commit `.venv`, `build`, `dist`, user settings, or captures. Distribute compiled executables through a versioned GitHub Release instead of checking binaries into source control.
+
+`build.ps1` downloads a checksum-pinned LGPL FFmpeg sidecar through `tools/fetch_ffmpeg.ps1`. Do not update its URL or hashes without repeating the real-device screen, microphone, webcam, and combined capture gates and updating `THIRD_PARTY_NOTICES.md`.

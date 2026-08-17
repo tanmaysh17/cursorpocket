@@ -7,11 +7,22 @@ import unittest
 import uuid
 from ctypes import wintypes
 
-from cursorpocket.windows import SingleInstance, position_window
+from cursorpocket.windows import SingleInstance, exclude_window_from_capture, position_window
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows-only positioning test")
 class WindowPositionTests(unittest.TestCase):
+    def test_top_level_can_be_excluded_from_supported_screen_capture(self) -> None:
+        root = tk.Tk()
+        root.withdraw()
+        window = tk.Toplevel(root)
+        window.overrideredirect(True)
+        try:
+            self.assertTrue(exclude_window_from_capture(window))
+        finally:
+            window.destroy()
+            root.destroy()
+
     def test_position_window_moves_the_tk_toplevel_wrapper(self) -> None:
         root = tk.Tk()
         root.withdraw()

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-08-17
+
+- Added local H.264/AAC screen walkthrough recording with `V` to start or stop.
+- Added optional synchronized webcam picture-in-picture with `C` and microphone narration on by default.
+- Added a visible countdown, named screen/microphone/camera recording state, red dot and tray state, safe Stop/Discard flows, and save-on-quit handling.
+- Added crash-tolerant fragmented MP4 storage, startup recovery, validation, and dated `videos` folders under the existing capture location.
+- Added a checksum-pinned LGPL FFmpeg sidecar with license/notices, capability validation, and an end-to-end packaged self-test.
+- Excluded CursorPocket’s dot, command overlay, settings, toast, and recording bar windows from supported Windows screen captures.
+- Made Settings movable, resizable, and vertically scrollable so all recording and startup controls remain reachable on smaller displays.
+
 ## 0.2.0 — 2026-08-16
 
 - Added a movable, resizable capture window that remembers its placement.

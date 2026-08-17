@@ -16,6 +16,7 @@ class TrayManager:
     def __init__(self, emit: Callable[[str], None]) -> None:
         self.emit = emit
         self.recording = False
+        self.video_recording = False
         self.hidden = False
         self.icon: object | None = None
 
@@ -31,8 +32,16 @@ class TrayManager:
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Screenshot", self._action("screenshot")),
                 pystray.MenuItem(
-                    lambda _item: "Stop recording" if self.recording else "Record audio",
+                    lambda _item: "Stop audio note" if self.recording else "Record audio note",
                     self._action("audio"),
+                ),
+                pystray.MenuItem(
+                    lambda _item: (
+                        "Stop and save walkthrough"
+                        if self.video_recording
+                        else "Record screen walkthrough"
+                    ),
+                    self._action("video"),
                 ),
                 pystray.MenuItem("Text snippet", self._action("text")),
                 pystray.MenuItem("Web link", self._action("link")),
@@ -55,15 +64,21 @@ class TrayManager:
             self.icon.stop()  # type: ignore[union-attr]
             self.icon = None
 
-    def set_state(self, *, recording: bool, hidden: bool) -> None:
+    def set_state(self, *, recording: bool, hidden: bool, video: bool = False) -> None:
         self.recording = recording
+        self.video_recording = video
         self.hidden = hidden
         if self.icon is None:
             return
-        self.icon.icon = self._image(recording)  # type: ignore[union-attr]
-        self.icon.title = (  # type: ignore[union-attr]
-            "CursorPocket — recording audio" if recording else "CursorPocket — click to capture"
-        )
+        active = recording or video
+        self.icon.icon = self._image(active)  # type: ignore[union-attr]
+        if video:
+            title = "CursorPocket — recording screen"
+        elif recording:
+            title = "CursorPocket — recording audio"
+        else:
+            title = "CursorPocket — click to capture"
+        self.icon.title = title  # type: ignore[union-attr]
         self.icon.update_menu()  # type: ignore[union-attr]
 
     def _action(self, action: str) -> Callable:

@@ -3,7 +3,9 @@ from __future__ import annotations
 import math
 import os
 import queue
+import shutil
 import sys
+import threading
 import time
 import tkinter as tk
 from datetime import datetime
@@ -18,14 +20,26 @@ from .audio import AudioRecorder
 from .branding import load_logo
 from .gesture import DoubleCircleGestureDetector
 from .hotkeys import DEFAULT_HOTKEYS, GlobalHotkeyManager
+from .media_devices import MediaDevice, list_directshow_devices
 from .settings import AppSettings, SettingsStore
 from .startup import StartupManager
-from .storage import CaptureRecord, CaptureStore, is_web_url
+from .storage import CaptureRecord, CaptureStore, VideoReservation, is_web_url
 from .tray import TrayManager
+from .video import (
+    FFmpegVideoRecorder,
+    VideoCapabilities,
+    VideoOptions,
+    VideoProcessResult,
+    VideoSourceKind,
+    bundled_ffmpeg_path,
+    inspect_video_file,
+    probe_video_capabilities,
+)
 from .windows import (
     copy_browser_url,
     copy_selected_text,
     cursor_position,
+    exclude_window_from_capture,
     foreground_window_handle,
     foreground_window_bounds,
     make_window_no_activate,
@@ -56,7 +70,8 @@ FONT_DISPLAY = "Bahnschrift SemiBold"
 FONT_MONO = "Bahnschrift SemiCondensed"
 
 PANEL_SHORTCUT_HELP = (
-    "Tap one key at a time while this window is open: Q, W, E, or R for screenshots; "
+    "Tap one key at a time while this window is open: V for a screen walkthrough; "
+    "C to include the camera; Q, W, E, or R for screenshots; "
     "A, S, D, or F for audio; 1, 2, 3, or 4 for a display. These are individual "
     "keys—do not hold a row together."
 )
@@ -66,6 +81,7 @@ PANEL_SHORTCUT_HELP = (
 PANEL_BLOCKED_MODIFIER_MASK = 0x20004
 
 COMMAND_SHORTCUT_ROWS = (
+    ("VIDEO", "V Record display  ·  C Camera on/off"),
     ("SCREENSHOT", "Q Region  ·  W Window  ·  E All  ·  R Repeat"),
     ("AUDIO", "A Record  ·  S Save  ·  D Discard  ·  F Folder"),
     ("DISPLAY", "1  2  3  4   Capture numbered display"),
@@ -73,6 +89,8 @@ COMMAND_SHORTCUT_ROWS = (
 )
 
 PANEL_KEY_ACTIONS = {
+    "v": "toggle_video",
+    "c": "toggle_video_camera",
     "q": "region_screenshot",
     "w": "window_screenshot",
     "e": "all_screens",
@@ -726,6 +744,8 @@ class LinkEditor:
 class RecordingIndicator:
     def __init__(self, root: tk.Tk, on_stop: Callable[[], None]) -> None:
         self.started_at = 0.0
+        self.mode_label = "Audio"
+        self.static_text = ""
         self.visible = False
         self.window = tk.Toplevel(root)
         self.window.withdraw()
@@ -764,17 +784,30 @@ class RecordingIndicator:
             cursor="hand2",
             font=(FONT_BODY, 8, "bold"),
         ).pack(side="right")
+        exclude_window_from_capture(self.window)
 
-    def show(self, started_at: float | None = None) -> None:
+    def show(self, started_at: float | None = None, label: str = "Audio") -> None:
         if started_at is not None:
             self.started_at = started_at
+        self.mode_label = label
+        self.static_text = ""
         self.visible = True
-        width, height = 210, 48
+        width, height = 410, 48
         vx, vy, vw, _vh = virtual_screen_bounds()
         position_window(self.window, vx + vw - width - 16, vy + 16, width, height)
         self.window.deiconify()
         self.window.lift()
         self._tick()
+
+    def show_message(self, text: str) -> None:
+        self.static_text = text
+        self.visible = True
+        width, height = 410, 48
+        vx, vy, vw, _vh = virtual_screen_bounds()
+        position_window(self.window, vx + vw - width - 16, vy + 16, width, height)
+        self.label.configure(text=text)
+        self.window.deiconify()
+        self.window.lift()
 
     def hide(self) -> None:
         self.visible = False
@@ -783,15 +816,17 @@ class RecordingIndicator:
     def _tick(self) -> None:
         if not self.visible:
             return
+        if self.static_text:
+            return
         elapsed = max(0, int(time.monotonic() - self.started_at))
         minutes, seconds = divmod(elapsed, 60)
-        self.label.configure(text=f"Recording {minutes:02d}:{seconds:02d}")
+        self.label.configure(text=f"{self.mode_label}  {minutes:02d}:{seconds:02d}")
         self.window.after(500, self._tick)
 
 
 class SettingsWindow:
-    WIDTH = 500
-    HEIGHT = 570
+    WIDTH = 540
+    HEIGHT = 760
 
     def __init__(
         self,
@@ -809,13 +844,17 @@ class SettingsWindow:
         self.window = tk.Toplevel(root)
         self.window.title("CursorPocket settings")
         self.window.attributes("-topmost", True)
-        self.window.resizable(False, False)
+        self.window.resizable(True, True)
+        self.window.minsize(500, 560)
         self.window.configure(bg=LINE)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.window.bind("<Escape>", lambda _event: self.close())
+        self.window.bind("<MouseWheel>", self._scroll, add="+")
+        exclude_window_from_capture(self.window)
 
-        shell = tk.Frame(self.window, bg=PANEL, padx=24, pady=22)
-        shell.pack(fill="both", expand=True, padx=1, pady=1)
+        frame = tk.Frame(self.window, bg=PANEL)
+        frame.pack(fill="both", expand=True, padx=1, pady=1)
+        self.settings_canvas, shell, self.settings_scrollbar = build_scrollable_panel(frame)
         tk.Label(
             shell,
             text="Settings",
@@ -834,6 +873,9 @@ class SettingsWindow:
         self.startup_var = tk.BooleanVar(value=startup_enabled)
         self.follow_var = tk.BooleanVar(value=settings.follow_cursor)
         self.gesture_var = tk.BooleanVar(value=settings.mouse_gesture_enabled)
+        self.video_microphone_var = tk.BooleanVar(value=settings.video_microphone_enabled)
+        self.video_camera_var = tk.BooleanVar(value=settings.video_camera_enabled)
+        self.video_countdown_var = tk.BooleanVar(value=settings.video_countdown_seconds > 0)
         self._check(
             shell,
             "Start CursorPocket when I sign in",
@@ -851,6 +893,26 @@ class SettingsWindow:
             "Open CursorPocket with two quick mouse circles",
             "Draw two small circles in either direction. Turn this off if it triggers accidentally.",
             self.gesture_var,
+        )
+
+        self._section_label(shell, "SCREEN RECORDING").pack(anchor="w", pady=(16, 5))
+        self._check(
+            shell,
+            "Include microphone narration by default",
+            "CursorPocket names the active microphone before recording starts.",
+            self.video_microphone_var,
+        )
+        self._check(
+            shell,
+            "Include my webcam in the next walkthrough",
+            "Adds a camera bubble in the remembered corner. Toggle quickly with C.",
+            self.video_camera_var,
+        )
+        self._check(
+            shell,
+            "Show a three-second recording countdown",
+            "Gives you time to return to the screen before capture begins.",
+            self.video_countdown_var,
         )
 
         self._section_label(shell, "SAVE LOCATION").pack(anchor="w", pady=(19, 7))
@@ -874,6 +936,7 @@ class SettingsWindow:
         shortcut_frame.pack(fill="x")
         rows = (
             ("Open command mode", shortcuts.get("panel", "Ctrl + Shift + Space")),
+            ("Screen walkthrough", "V record/stop · C camera"),
             ("Tap one screenshot key", "Q / W / E / R"),
             ("Tap one audio key", "A / S / D / F"),
             ("Tap one display key", "1 / 2 / 3 / 4"),
@@ -892,11 +955,18 @@ class SettingsWindow:
 
         self.window.update_idletasks()
         vx, vy, vw, vh = virtual_screen_bounds()
+        height = min(self.HEIGHT, max(560, vh - 48))
         px = vx + max(12, (vw - self.WIDTH) // 2)
-        py = vy + max(12, (vh - self.HEIGHT) // 2)
-        position_window(self.window, px, py, self.WIDTH, self.HEIGHT, activate=True)
+        py = vy + max(12, (vh - height) // 2)
+        position_window(self.window, px, py, self.WIDTH, height, activate=True)
         self.window.lift()
         self.window.focus_force()
+
+    def _scroll(self, event: tk.Event) -> str:
+        units = panel_scroll_units(int(getattr(event, "delta", 0)))
+        if units:
+            self.settings_canvas.yview_scroll(units, "units")
+        return "break"
 
     def _check(
         self,
@@ -976,6 +1046,13 @@ class SettingsWindow:
             mouse_gesture_enabled=self.gesture_var.get(),
             onboarding_seen=self.settings.onboarding_seen,
             panel_geometry=self.settings.panel_geometry,
+            video_microphone_enabled=self.video_microphone_var.get(),
+            video_camera_enabled=self.video_camera_var.get(),
+            video_microphone_name=self.settings.video_microphone_name,
+            video_camera_name=self.settings.video_camera_name,
+            video_camera_position=self.settings.video_camera_position,
+            video_fps=self.settings.video_fps,
+            video_countdown_seconds=3 if self.video_countdown_var.get() else 0,
         )
         self.on_save(updated, self.startup_var.get())
         self._destroy()
@@ -1007,8 +1084,20 @@ class CursorPocketApp:
         self.settings = self.settings_store.load()
         self.store = CaptureStore(self.settings.capture_dir)
         self.audio_recorder = AudioRecorder()
-        self.startup_manager = StartupManager()
         self.events: queue.SimpleQueue[object] = queue.SimpleQueue()
+        self.ffmpeg_path = bundled_ffmpeg_path()
+        self.video_recorder = FFmpegVideoRecorder(self.ffmpeg_path, self.events.put)
+        self.video_capabilities: VideoCapabilities | None = None
+        self.video_devices: list[MediaDevice] = []
+        self.video_available = False
+        self.video_recording = False
+        self.video_finalizing = False
+        self.video_reservation: VideoReservation | None = None
+        self.video_options: VideoOptions | None = None
+        self.video_recording_started_at = 0.0
+        self.video_countdown_session = 0
+        self._quit_after_video = False
+        self.startup_manager = StartupManager()
         self.registered_shortcuts = {
             hotkey.action: hotkey.label for hotkey in DEFAULT_HOTKEYS
         }
@@ -1056,7 +1145,7 @@ class CursorPocketApp:
         self._build_companion()
         self._build_command_mode()
         self._build_panel()
-        self.recording_indicator = RecordingIndicator(self.root, self.stop_audio_recording)
+        self.recording_indicator = RecordingIndicator(self.root, self.stop_active_recording)
         if self.hidden_mode:
             self._hide_companion_window()
         self.hotkeys.start()
@@ -1065,6 +1154,11 @@ class CursorPocketApp:
         self._refresh_history()
         self.root.after(16, self._follow_tick)
         self.root.after(50, self._poll_events)
+        threading.Thread(
+            target=self._probe_video_backend,
+            name="CursorPocketVideoProbe",
+            daemon=True,
+        ).start()
         if not self.settings.onboarding_seen:
             self.root.after(850, self._show_first_run)
 
@@ -1094,6 +1188,7 @@ class CursorPocketApp:
         )
         self.companion_canvas.pack()
         make_window_no_activate(self.companion)
+        exclude_window_from_capture(self.companion)
         self._draw_companion(False)
         self.companion_canvas.bind("<Enter>", self._companion_enter)
         self.companion_canvas.bind("<Leave>", self._companion_leave)
@@ -1103,7 +1198,7 @@ class CursorPocketApp:
     def _draw_companion(self, hover: bool) -> None:
         canvas = self.companion_canvas
         canvas.delete("all")
-        dot_color = RED if self.recording else GREEN
+        dot_color = RED if self.recording or getattr(self, "video_recording", False) else GREEN
         inset = (self.COMPANION_SIZE - self.COMPANION_DOT_SIZE) // 2
         edge = inset + self.COMPANION_DOT_SIZE
         canvas.create_oval(inset, inset, edge, edge, fill=dot_color, outline="")
@@ -1122,8 +1217,8 @@ class CursorPocketApp:
         return cursor_x + offset_x, cursor_y + offset_y
 
     def _companion_primary_action(self) -> None:
-        if self.recording:
-            self.stop_audio_recording()
+        if self.recording or self.video_recording:
+            self.stop_active_recording()
         else:
             self.toggle_command_mode()
 
@@ -1147,6 +1242,7 @@ class CursorPocketApp:
         )
         self.command_canvas.pack(fill="both", expand=True)
         self.command_canvas.bind("<Button-1>", self._command_mode_click)
+        exclude_window_from_capture(self.command_mode)
         self._command_glass_photos = []
         self._command_logo_photo = None
         self._command_launcher_frames = []
@@ -1178,7 +1274,17 @@ class CursorPocketApp:
         legend_left = max(18, width - legend_width - 18)
         legend_top = 18
         legend_right = width - 18
-        legend_bottom = min(height - 18, legend_top + 326)
+        video_is_recording = getattr(self, "video_recording", False)
+        command_rows = COMMAND_SHORTCUT_ROWS
+        if video_is_recording:
+            mic = "Mic on" if self.video_options and self.video_options.include_microphone else "Muted"
+            camera = "Camera on" if self.video_options and self.video_options.include_camera else "Camera off"
+            command_rows = (
+                ("RECORDING", "V Stop & save  ·  D Discard"),
+                ("STATUS", f"Screen  ·  {mic}  ·  {camera}"),
+            )
+        legend_height = 238 if video_is_recording else 378
+        legend_bottom = min(height - 18, legend_top + legend_height)
         legend_box = (legend_left, legend_top, legend_right, legend_bottom)
         glass_fade = 64
         legend_glass_box = (
@@ -1225,21 +1331,21 @@ class CursorPocketApp:
         canvas.create_text(
             legend_left + 94,
             legend_top + 55,
-            text="COMMAND MODE  •  ACTIVE",
-            fill=GREEN,
+            text="RECORDING  •  ACTIVE" if video_is_recording else "COMMAND MODE  •  ACTIVE",
+            fill=RED if video_is_recording else GREEN,
             anchor="nw",
             font=(FONT_MONO, 8, "bold"),
         )
         canvas.create_text(
             legend_left + 42,
             legend_top + 92,
-            text="Tap one key",
+            text="Walkthrough recording" if video_is_recording else "Tap one key",
             fill=PAPER,
             anchor="nw",
             font=(FONT_BODY, 18, "bold"),
         )
         row_y = legend_top + 136
-        for label, shortcuts in COMMAND_SHORTCUT_ROWS:
+        for label, shortcuts in command_rows:
             canvas.create_text(
                 legend_left + 42,
                 row_y,
@@ -1260,7 +1366,11 @@ class CursorPocketApp:
         canvas.create_text(
             legend_left + 42,
             legend_bottom - 41,
-            text="ESC  CLOSE     •     AUTO-CLOSES IN 30 SECONDS",
+            text=(
+                "ESC  CLOSE     •     RECORDING CONTINUES"
+                if video_is_recording
+                else "ESC  CLOSE     •     AUTO-CLOSES IN 30 SECONDS"
+            ),
             fill="#8CA0AA",
             anchor="nw",
             font=(FONT_MONO, 8, "bold"),
@@ -1323,6 +1433,7 @@ class CursorPocketApp:
         self.panel.bind("<Escape>", lambda _event: self.hide_panel())
         self.panel.bind("<MouseWheel>", self._scroll_panel, add="+")
         self.panel.bind_all("<KeyPress>", self._handle_panel_key, add="+")
+        exclude_window_from_capture(self.panel)
         self.panel_positioned = False
         if self.settings.panel_geometry:
             try:
@@ -1366,6 +1477,40 @@ class CursorPocketApp:
             wraplength=470,
             font=(FONT_BODY, 10),
         ).pack(anchor="w", pady=(8, 12))
+
+        self._section_label(content, "VIDEO WALKTHROUGH  ·  V / C").pack(
+            anchor="w",
+            pady=(2, 3),
+        )
+        (
+            _video_glyph,
+            _video_title,
+            self.video_description,
+            self.video_shortcut,
+        ) = self._action_row(
+            content,
+            "V",
+            "Record this display",
+            "Preparing the local video recorder…",
+            "V",
+            self.toggle_video_recording,
+            accent=GREEN,
+            priority=True,
+        )
+        video_options = tk.Frame(content, bg=PANEL)
+        video_options.pack(fill="x", pady=(2, 7))
+        self.video_mic_button = self._small_button(
+            video_options,
+            "Mic on",
+            self.toggle_video_microphone,
+        )
+        self.video_mic_button.pack(side="left")
+        self.video_camera_button = self._small_button(
+            video_options,
+            "Camera off",
+            self.toggle_video_camera,
+        )
+        self.video_camera_button.pack(side="left", padx=(6, 0))
 
         self.screenshot_buttons = self._keyboard_group(
             content,
@@ -1581,7 +1726,22 @@ class CursorPocketApp:
         action = panel_key_action(str(getattr(event, "keysym", "")))
         if action is None:
             return None
+        if getattr(self, "video_recording", False):
+            if action == "toggle_video":
+                self.stop_video_recording()
+            elif action == "discard_audio":
+                self.discard_video_recording()
+            else:
+                self.show_toast(
+                    "Walkthrough is recording",
+                    "Press V to stop and save, or D to discard.",
+                )
+            if getattr(self, "command_mode_open", False):
+                self.hide_command_mode()
+            return "break"
         commands: dict[str, Callable[[], None]] = {
+            "toggle_video": self.toggle_video_recording,
+            "toggle_video_camera": self.toggle_video_camera,
             "region_screenshot": self.capture_screenshot,
             "window_screenshot": self.capture_active_window,
             "all_screens": self.capture_all_screens,
@@ -1669,11 +1829,12 @@ class CursorPocketApp:
             and not self.panel_open
             and not getattr(self, "command_mode_open", False)
             and not self.recording
+            and not getattr(self, "video_recording", False)
             and self.settings_window is None
         )
         follow_ready = (
             not self.hidden_mode
-            and not self.capture_active
+            and (not self.capture_active or getattr(self, "video_recording", False))
             and not self.panel_open
             and not getattr(self, "command_mode_open", False)
             and self.settings.follow_cursor
@@ -1705,7 +1866,7 @@ class CursorPocketApp:
         show_companion = companion_should_show(
             follow_ready=follow_ready,
             hovered=getattr(self, "_companion_hover", False),
-            recording=self.recording,
+            recording=self.recording or getattr(self, "video_recording", False),
             idle_seconds=now - getattr(self, "_last_cursor_move", now),
         )
         if show_companion:
@@ -1763,7 +1924,7 @@ class CursorPocketApp:
             self.last_foreground_bounds = foreground
 
     def show_command_mode(self) -> None:
-        if self.capture_active:
+        if self.capture_active and not getattr(self, "video_recording", False):
             return
         if self.panel_open:
             self.hide_panel()
@@ -1825,7 +1986,11 @@ class CursorPocketApp:
         self._command_launcher_frames = []
         self._companion_pinned = False
         self._last_cursor_move = time.monotonic()
-        if not self.hidden_mode and not self.capture_active and self.settings.follow_cursor:
+        if (
+            not self.hidden_mode
+            and (not self.capture_active or getattr(self, "video_recording", False))
+            and self.settings.follow_cursor
+        ):
             self._show_companion_window()
 
     def _show_first_run(self) -> None:
@@ -1848,7 +2013,11 @@ class CursorPocketApp:
         if self.hidden_mode:
             self.hidden_mode = False
             self._show_companion_window()
-            self.tray.set_state(recording=self.recording, hidden=False)
+            self.tray.set_state(
+                recording=self.recording,
+                hidden=False,
+                video=getattr(self, "video_recording", False),
+            )
         self.panel_open = True
         self._hide_companion_window()
         self._draw_companion(True)
@@ -2116,6 +2285,302 @@ class CursorPocketApp:
         if not self.hidden_mode:
             self._show_companion_window()
 
+    def _probe_video_backend(self) -> None:
+        try:
+            if not self.ffmpeg_path.exists():
+                raise FileNotFoundError("CursorPocket's video component is not installed.")
+            capabilities = probe_video_capabilities(self.ffmpeg_path)
+            if not capabilities.ready:
+                raise RuntimeError("The installed video component is missing required Windows capture features.")
+            devices = list_directshow_devices(self.ffmpeg_path)
+            self.events.put(("video_backend_ready", capabilities, devices))
+        except Exception as error:
+            self.events.put(("video_backend_error", str(error)))
+
+    def _device_name(self, kind: str, saved_name: str) -> str:
+        devices = [device for device in self.video_devices if device.kind == kind]
+        if saved_name and any(device.name == saved_name for device in devices):
+            return saved_name
+        return devices[0].name if devices else ""
+
+    def _update_video_ui(self) -> None:
+        mic_name = self._device_name("audio", self.settings.video_microphone_name)
+        camera_name = self._device_name("video", self.settings.video_camera_name)
+        if hasattr(self, "video_mic_button"):
+            self.video_mic_button.configure(
+                text="Mic on" if self.settings.video_microphone_enabled else "Mic off"
+            )
+            self.video_camera_button.configure(
+                text="Camera on" if self.settings.video_camera_enabled else "Camera off"
+            )
+        if hasattr(self, "video_description"):
+            if not self.video_available:
+                description = "Video recorder unavailable · screenshots and audio still work"
+            elif self.video_recording:
+                description = "Recording now · press V or click the red dot to stop and save"
+            else:
+                mic = mic_name if self.settings.video_microphone_enabled else "Off"
+                camera = camera_name if self.settings.video_camera_enabled else "Off"
+                description = f"This display · Mic: {mic} · Camera: {camera}"
+            self.video_description.configure(text=description)
+
+    def toggle_video_microphone(self) -> None:
+        if self.video_recording:
+            self.show_toast("Microphone choice is locked", "Stop this walkthrough before changing it.")
+            return
+        self.settings.video_microphone_enabled = not self.settings.video_microphone_enabled
+        self.settings_store.save(self.settings)
+        self._update_video_ui()
+
+    def toggle_video_camera(self) -> None:
+        if self.video_recording:
+            self.show_toast("Camera choice is locked", "Stop this walkthrough before changing it.")
+            return
+        enabling = not self.settings.video_camera_enabled
+        if enabling and not self._device_name("video", self.settings.video_camera_name):
+            self.show_toast(
+                "No camera is available",
+                "Connect a webcam or allow desktop camera access in Windows Settings.",
+                error=True,
+                action=lambda: os.startfile("ms-settings:privacy-webcam"),  # type: ignore[attr-defined]
+            )
+            return
+        self.settings.video_camera_enabled = enabling
+        self.settings_store.save(self.settings)
+        self._update_video_ui()
+        state = "included" if enabling else "off"
+        self.show_toast("Webcam " + state, "This choice applies to the next walkthrough.")
+
+    def toggle_video_recording(self) -> None:
+        if self.video_recording:
+            self.stop_video_recording()
+        else:
+            self.start_video_recording()
+
+    def start_video_recording(self) -> None:
+        if self.recording:
+            self.show_toast("Audio note is already recording", "Save or discard it before recording the screen.", error=True)
+            return
+        if self.capture_active:
+            self.show_toast("Finish the current capture first", "Screen recording did not start.", error=True)
+            return
+        if self.settings_window is not None:
+            self.show_toast(
+                "Close Settings first",
+                "Recording choices are locked when a walkthrough starts.",
+            )
+            return
+        if not self.video_available:
+            self.show_toast(
+                "Video recorder isn’t ready",
+                "Repair or reinstall CursorPocket's local video component.",
+                error=True,
+            )
+            return
+        try:
+            free_bytes = shutil.disk_usage(self.store.base_dir).free
+        except OSError:
+            free_bytes = 0
+        if free_bytes and free_bytes < 512 * 1024 * 1024:
+            self.show_toast(
+                "Not enough free space",
+                "Free at least 512 MB in the capture folder before recording.",
+                error=True,
+                action=self.open_folder,
+            )
+            return
+        microphone_name = self._device_name("audio", self.settings.video_microphone_name)
+        camera_name = self._device_name("video", self.settings.video_camera_name)
+        if self.settings.video_microphone_enabled and not microphone_name:
+            self.show_toast(
+                "Microphone couldn’t start",
+                "No microphone is available. Turn Mic off to record a muted walkthrough.",
+                error=True,
+                action=lambda: os.startfile("ms-settings:privacy-microphone"),  # type: ignore[attr-defined]
+            )
+            return
+        if self.settings.video_camera_enabled and not camera_name:
+            self.show_toast(
+                "Camera couldn’t start",
+                "Turn Camera off or allow desktop camera access in Windows Settings.",
+                error=True,
+                action=lambda: os.startfile("ms-settings:privacy-webcam"),  # type: ignore[attr-defined]
+            )
+            return
+        self.display_bounds = monitor_bounds()
+        cursor_x, cursor_y = cursor_position()
+        selected_bounds = monitor_for_point(self.display_bounds, cursor_x, cursor_y)
+        display_index = self.display_bounds.index(selected_bounds) if selected_bounds in self.display_bounds else 0
+        options = VideoOptions(
+            source_kind=VideoSourceKind.DISPLAY,
+            display_index=display_index,
+            bounds=selected_bounds,
+            fps=self.settings.video_fps,
+            include_microphone=self.settings.video_microphone_enabled,
+            microphone_name=microphone_name,
+            include_camera=self.settings.video_camera_enabled,
+            camera_name=camera_name,
+            camera_position=self.settings.video_camera_position,
+        )
+        metadata = {
+            "source_kind": options.source_kind.value,
+            "display_index": display_index,
+            "display_bounds": list(selected_bounds),
+            "include_microphone": options.include_microphone,
+            "microphone_name": microphone_name,
+            "include_camera": options.include_camera,
+            "camera_name": camera_name,
+            "camera_position": options.camera_position,
+        }
+        try:
+            reservation = self.store.reserve_video(metadata)
+        except OSError as error:
+            self.show_toast("Recording couldn’t start", str(error), error=True)
+            return
+        self.settings.video_microphone_name = microphone_name
+        self.settings.video_camera_name = camera_name
+        self.settings_store.save(self.settings)
+        self.video_options = options
+        self.video_reservation = reservation
+        self.video_recording = True
+        self.capture_active = True
+        self.video_countdown_session += 1
+        session = self.video_countdown_session
+        self.hide_panel()
+        self.hide_command_mode()
+        self._hide_companion_window()
+        self._update_video_ui()
+        countdown = self.settings.video_countdown_seconds
+        if countdown:
+            self._video_countdown_tick(session, countdown)
+        else:
+            self._begin_video_process(session)
+
+    def _video_countdown_tick(self, session: int, remaining: int) -> None:
+        if session != self.video_countdown_session or not self.video_recording:
+            return
+        if remaining <= 0:
+            self._begin_video_process(session)
+            return
+        camera = " · Camera" if self.video_options and self.video_options.include_camera else ""
+        self.recording_indicator.show_message(f"Screen{camera} starts in {remaining}")
+        self.root.after(1000, lambda: self._video_countdown_tick(session, remaining - 1))
+
+    def _begin_video_process(self, session: int) -> None:
+        if session != self.video_countdown_session or not self.video_recording:
+            return
+        if not self.video_options or not self.video_reservation:
+            return
+        self.recording_indicator.show_message("Starting screen recorder…")
+        try:
+            self.video_recorder.start(self.video_options, self.video_reservation.partial_path)
+        except Exception as error:
+            self.store.discard_video(self.video_reservation)
+            self._reset_video_state()
+            self.show_toast("Screen recording didn’t start", str(error), error=True)
+
+    def stop_active_recording(self) -> None:
+        if self.video_recording:
+            self.stop_video_recording()
+        else:
+            self.stop_audio_recording()
+
+    def stop_video_recording(self, *, discard: bool = False) -> None:
+        if not self.video_recording:
+            return
+        if self.video_finalizing:
+            return
+        self.video_countdown_session += 1
+        if not self.video_recorder.is_recording:
+            if self.video_reservation:
+                self.store.discard_video(self.video_reservation)
+            self._reset_video_state()
+            self.show_toast("Recording cancelled", "No video file was created.")
+            return
+        self.recording_indicator.show_message("Discarding video…" if discard else "Saving video…")
+        self.video_recorder.stop(discard=discard)
+
+    def discard_video_recording(self) -> None:
+        if not self.video_recording:
+            return
+        if messagebox.askyesno(
+            "Discard walkthrough?",
+            "Discard the current screen recording without saving it?",
+            icon="warning",
+            parent=self.recording_indicator.window,
+        ):
+            self.stop_video_recording(discard=True)
+
+    def _finalize_video_worker(
+        self,
+        result: VideoProcessResult,
+        reservation: VideoReservation,
+        options: VideoOptions,
+    ) -> None:
+        try:
+            if result.discard_requested:
+                self.store.discard_video(reservation)
+                self.events.put(("video_discarded",))
+                return
+            inspection = inspect_video_file(self.ffmpeg_path, result.output_path)
+            record = self.store.finalize_video(
+                reservation,
+                inspection.duration_seconds,
+                inspection.width,
+                inspection.height,
+                inspection.fps or options.fps,
+                metadata={
+                    "has_audio": inspection.has_audio,
+                    "source_kind": options.source_kind.value,
+                    "display_index": options.display_index,
+                    "source_bounds": list(options.bounds) if options.bounds else None,
+                    "draw_cursor": options.draw_cursor,
+                    "include_microphone": options.include_microphone,
+                    "microphone_name": options.microphone_name,
+                    "include_camera": options.include_camera,
+                    "camera_name": options.camera_name,
+                    "camera_position": options.camera_position,
+                    "video_codec": "h264",
+                    "audio_codec": "aac" if inspection.has_audio else None,
+                    "recovered": result.forced or result.return_code != 0,
+                },
+            )
+            self.events.put(("video_saved", record))
+        except Exception as error:
+            self.events.put(("video_save_error", str(error), result.error_detail))
+
+    def _reset_video_state(self) -> None:
+        self.video_recording = False
+        self.video_finalizing = False
+        self.capture_active = False
+        self.video_options = None
+        self.video_reservation = None
+        self._companion_pinned = False
+        self.recording_indicator.hide()
+        self.tray.set_state(recording=self.recording, hidden=self.hidden_mode, video=False)
+        self._update_video_ui()
+        if hasattr(self, "companion_canvas"):
+            self._draw_companion(False)
+        self._restore_companion()
+
+    def _recover_pending_videos(self) -> None:
+        for reservation in self.store.pending_videos():
+            if not reservation.partial_path.exists():
+                continue
+            try:
+                inspection = inspect_video_file(self.ffmpeg_path, reservation.partial_path)
+                record = self.store.finalize_video(
+                    reservation,
+                    inspection.duration_seconds,
+                    inspection.width,
+                    inspection.height,
+                    inspection.fps or 30.0,
+                    metadata={"has_audio": inspection.has_audio, "recovered": True},
+                )
+                self.events.put(("video_recovered", record))
+            except Exception as error:
+                self.events.put(("video_recovery_error", str(error)))
+
     def toggle_audio_recording(self) -> None:
         if self.recording:
             self.stop_audio_recording()
@@ -2220,14 +2685,22 @@ class CursorPocketApp:
             self._companion_pinned = False
             self._last_cursor_move = time.monotonic()
             self._show_companion_window()
-            self.tray.set_state(recording=self.recording, hidden=False)
+            self.tray.set_state(
+                recording=self.recording,
+                hidden=False,
+                video=getattr(self, "video_recording", False),
+            )
             shortcut = self.registered_shortcuts.get("hidden", "Ctrl + Shift + H")
             self.show_toast("Dot visible", f"{shortcut} toggles the dot")
             return
         self.hide_panel()
         self.hidden_mode = True
         self._hide_companion_window()
-        self.tray.set_state(recording=self.recording, hidden=True)
+        self.tray.set_state(
+            recording=self.recording,
+            hidden=True,
+            video=getattr(self, "video_recording", False),
+        )
         shortcut = self.registered_shortcuts.get("hidden", "Ctrl + Shift + H")
         self.show_toast("Dot hidden", f"Use the tray icon or press {shortcut} to bring it back")
 
@@ -2256,7 +2729,13 @@ class CursorPocketApp:
                 font=(FONT_BODY, 9),
             ).pack(anchor="w")
             return
-        glyphs = {"screenshot": "▣", "text": "¶", "link": "↗", "audio": "●"}
+        glyphs = {
+            "screenshot": "▣",
+            "text": "¶",
+            "link": "↗",
+            "audio": "●",
+            "video": "▶",
+        }
         for record in records:
             row = tk.Frame(self.history_frame, bg=INK, padx=10, pady=7, cursor="hand2")
             row.pack(fill="x", pady=2)
@@ -2264,7 +2743,7 @@ class CursorPocketApp:
                 row,
                 text=glyphs.get(record.kind, "•"),
                 bg=INK,
-                fg=GREEN if record.kind == "audio" else BLUE,
+                fg=GREEN if record.kind in {"audio", "video"} else BLUE,
                 width=2,
                 font=("Segoe UI Symbol", 10, "bold"),
             ).pack(side="left")
@@ -2298,6 +2777,12 @@ class CursorPocketApp:
             self.show_toast("Couldn’t open folder", str(error), error=True)
 
     def open_settings(self) -> None:
+        if self.recording or self.video_recording:
+            self.show_toast(
+                "Settings are locked while recording",
+                "Stop and save or discard the recording first.",
+            )
+            return
         if self.settings_window is not None:
             self.settings_window.window.lift()
             self.settings_window.window.focus_force()
@@ -2326,7 +2811,11 @@ class CursorPocketApp:
             else:
                 self.hidden_mode = True
                 self._hide_companion_window()
-            self.tray.set_state(recording=self.recording, hidden=self.hidden_mode)
+            self.tray.set_state(
+                recording=self.recording,
+                hidden=self.hidden_mode,
+                video=getattr(self, "video_recording", False),
+            )
             self._refresh_history()
             startup_text = "starts with Windows" if startup_enabled else "opens when you launch it"
             self.show_toast("Settings saved", f"CursorPocket {startup_text}")
@@ -2347,6 +2836,7 @@ class CursorPocketApp:
         toast.overrideredirect(True)
         toast.attributes("-topmost", True)
         toast.configure(bg=ORANGE if error else BLUE)
+        exclude_window_from_capture(toast)
         inner = tk.Frame(toast, bg=PANEL, padx=14, pady=10)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
         tk.Label(
@@ -2394,6 +2884,119 @@ class CursorPocketApp:
             return
         toast.after(28, lambda: self._fade_toast(toast, opacity - 0.10))
 
+    def _handle_video_event(self, event: tuple[object, ...]) -> bool:
+        kind = str(event[0])
+        if kind == "video_backend_ready":
+            self.video_capabilities = event[1]  # type: ignore[assignment]
+            self.video_devices = list(event[2])  # type: ignore[arg-type]
+            self.video_available = True
+            self._update_video_ui()
+            self.status.configure(text="Ready · video walkthroughs available", fg=BLUE)
+            threading.Thread(
+                target=self._recover_pending_videos,
+                name="CursorPocketVideoRecovery",
+                daemon=True,
+            ).start()
+            return True
+        if kind == "video_backend_error":
+            self.video_available = False
+            self._update_video_ui()
+            self.status.configure(text="Video recorder unavailable · other captures still work", fg=ORANGE)
+            return True
+        if kind == "video_started":
+            if self.video_recording:
+                self.video_recording_started_at = time.monotonic()
+                status_parts = ["Screen"]
+                status_parts.append(
+                    "Mic on" if self.video_options and self.video_options.include_microphone else "Muted"
+                )
+                status_parts.append(
+                    "Camera on" if self.video_options and self.video_options.include_camera else "Camera off"
+                )
+                self.recording_indicator.show(
+                    self.video_recording_started_at,
+                    " · ".join(status_parts),
+                )
+                self.tray.set_state(recording=False, hidden=self.hidden_mode, video=True)
+                self._draw_companion(False)
+                self._update_video_ui()
+                camera = " with webcam" if self.video_options and self.video_options.include_camera else ""
+                self.show_toast(
+                    "Recording screen" + camera,
+                    "Press V, use the red Stop bar, or click the red cursor dot to save.",
+                )
+            return True
+        if kind == "video_progress":
+            return True
+        if kind == "video_finished":
+            result = event[1]
+            if not isinstance(result, VideoProcessResult):
+                return True
+            reservation = self.video_reservation
+            options = self.video_options
+            if reservation is None or options is None:
+                self._reset_video_state()
+                return True
+            self.video_finalizing = True
+            self.recording_indicator.show_message(
+                "Discarding video…" if result.discard_requested else "Saving video…"
+            )
+            threading.Thread(
+                target=self._finalize_video_worker,
+                args=(result, reservation, options),
+                name="CursorPocketVideoFinalize",
+                daemon=True,
+            ).start()
+            return True
+        if kind == "video_saved":
+            record = event[1]
+            self._reset_video_state()
+            self._refresh_history()
+            if isinstance(record, CaptureRecord):
+                self.show_toast(
+                    "Walkthrough saved",
+                    f"{record.preview} · Click to open",
+                    action=lambda target=record: self.open_capture(target),
+                )
+            if self._quit_after_video:
+                self._quit_after_video = False
+                self.root.after(0, self.quit)
+            return True
+        if kind == "video_discarded":
+            self._reset_video_state()
+            self.show_toast("Walkthrough discarded", "No video was saved.")
+            if self._quit_after_video:
+                self._quit_after_video = False
+                self.root.after(0, self.quit)
+            return True
+        if kind == "video_save_error":
+            message = str(event[1])
+            self._reset_video_state()
+            self.show_toast(
+                "Video needs recovery",
+                f"{message} · The partial recording remains in .in-progress.",
+                error=True,
+                action=self.open_folder,
+            )
+            if self._quit_after_video:
+                self._quit_after_video = False
+                self.root.after(0, self.quit)
+            return True
+        if kind == "video_recovered":
+            record = event[1]
+            self._refresh_history()
+            if isinstance(record, CaptureRecord):
+                self.show_toast(
+                    "Recovered an interrupted video",
+                    f"{record.preview} · Click to open",
+                    action=lambda target=record: self.open_capture(target),
+                )
+            return True
+        if kind == "video_recovery_error":
+            self.status.configure(text="An interrupted video is waiting in .in-progress", fg=ORANGE)
+            return True
+        return False
+
     def _poll_events(self) -> None:
         if self.closing:
             return
@@ -2404,6 +3007,8 @@ class CursorPocketApp:
                 event = self.events.get_nowait()
             except queue.Empty:
                 break
+            if isinstance(event, tuple) and event and self._handle_video_event(event):
+                continue
             if isinstance(event, tuple) and event and event[0] == "error":
                 message = str(event[1])
                 self.status.configure(text=message)
@@ -2438,6 +3043,8 @@ class CursorPocketApp:
                 self.toggle_command_mode()
             elif event == "audio":
                 self.toggle_audio_recording()
+            elif event == "video":
+                self.toggle_video_recording()
             elif event == "hidden":
                 self.toggle_hidden_mode()
             elif event == "folder":
@@ -2459,6 +3066,26 @@ class CursorPocketApp:
 
     def quit(self) -> None:
         if self.closing:
+            return
+        if self.video_recording:
+            if self.video_finalizing:
+                self._quit_after_video = True
+                self.recording_indicator.show_message("Saving video before closing…")
+                return
+            decision = messagebox.askyesnocancel(
+                "Close CursorPocket?",
+                "Save the screen recording before closing?\n\nYes saves it. No discards it.",
+                icon="warning",
+                parent=self.recording_indicator.window,
+            )
+            if decision is None:
+                return
+            self._quit_after_video = True
+            was_running = self.video_recorder.is_recording
+            self.stop_video_recording(discard=not decision)
+            if not was_running:
+                self._quit_after_video = False
+                self.root.after(0, self.quit)
             return
         self.closing = True
         if self.recording:

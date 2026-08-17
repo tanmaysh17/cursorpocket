@@ -25,6 +25,7 @@ KEYEVENTF_KEYUP = 0x0002
 GWL_EXSTYLE = -20
 WS_EX_NOACTIVATE = 0x08000000
 WS_EX_TOOLWINDOW = 0x00000080
+WDA_EXCLUDEFROMCAPTURE = 0x00000011
 
 BROWSER_EXECUTABLES = frozenset(
     {
@@ -261,6 +262,24 @@ def make_window_no_activate(window: object) -> None:
         set_style(wrapper, GWL_EXSTYLE, style | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW)
     except (AttributeError, OSError, TypeError):
         return
+
+
+def exclude_window_from_capture(window: object) -> bool:
+    """Ask Windows to omit one CursorPocket top-level window from screen capture."""
+    if sys.platform != "win32":
+        return False
+    try:
+        window.update_idletasks()
+        user32 = ctypes.windll.user32
+        user32.GetParent.argtypes = [wintypes.HWND]
+        user32.GetParent.restype = wintypes.HWND
+        user32.SetWindowDisplayAffinity.argtypes = [wintypes.HWND, wintypes.DWORD]
+        user32.SetWindowDisplayAffinity.restype = wintypes.BOOL
+        client = wintypes.HWND(int(window.winfo_id()))
+        wrapper = user32.GetParent(client) or client
+        return bool(user32.SetWindowDisplayAffinity(wrapper, WDA_EXCLUDEFROMCAPTURE))
+    except (AttributeError, OSError, TypeError):
+        return False
 
 
 def monitor_bounds() -> list[tuple[int, int, int, int]]:

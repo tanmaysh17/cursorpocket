@@ -54,6 +54,70 @@ class CaptureStoreTests(unittest.TestCase):
         self.assertFalse(Path(payload["path"]).is_absolute())
         self.assertEqual(Path(payload["path"]).parts[:2], ("2026-08-16", "text"))
 
+    def test_video_is_reserved_finalized_and_recoverable(self) -> None:
+        reservation = self.store.reserve_video(
+            {"source_kind": "display", "include_camera": True},
+            now=self.now,
+        )
+        reservation.partial_path.write_bytes(b"fragmented-mp4" * 200)
+
+        self.assertEqual(
+            [item.id for item in self.store.pending_videos()],
+            [reservation.id],
+        )
+
+        record = self.store.finalize_video(
+            reservation,
+            duration_seconds=65.4,
+            width=1920,
+            height=1080,
+            fps=29.97,
+            metadata={"has_audio": True, "include_camera": True},
+        )
+
+        self.assertEqual(record.kind, "video")
+        self.assertEqual(record.preview, "Video · 1:05")
+        self.assertTrue(self.store.absolute_path(record).exists())
+        self.assertFalse(reservation.partial_path.exists())
+        self.assertFalse(reservation.metadata_path.exists())
+        self.assertEqual(self.store.pending_videos(), [])
+        self.assertEqual(record.metadata["width"], 1920)
+
+    def test_discard_video_removes_partial_and_metadata(self) -> None:
+        reservation = self.store.reserve_video(now=self.now)
+        reservation.partial_path.write_bytes(b"not-finished")
+
+        self.store.discard_video(reservation)
+
+        self.assertFalse(reservation.partial_path.exists())
+        self.assertFalse(reservation.metadata_path.exists())
+
+    def test_video_move_is_rolled_back_when_manifest_write_fails(self) -> None:
+        reservation = self.store.reserve_video(now=self.now)
+        reservation.partial_path.write_bytes(b"fragmented-mp4" * 200)
+        self.store._append = lambda _record: (_ for _ in ()).throw(OSError("disk full"))  # type: ignore[method-assign]
+
+        with self.assertRaisesRegex(OSError, "disk full"):
+            self.store.finalize_video(
+                reservation,
+                duration_seconds=2.0,
+                width=640,
+                height=360,
+                fps=30.0,
+            )
+
+        self.assertTrue(reservation.partial_path.exists())
+        self.assertFalse(reservation.final_path.exists())
+        self.assertTrue(reservation.metadata_path.exists())
+
+    def test_recovery_ignores_metadata_paths_outside_the_capture_folder(self) -> None:
+        reservation = self.store.reserve_video(now=self.now)
+        payload = json.loads(reservation.metadata_path.read_text(encoding="utf-8"))
+        payload["partial_path"] = "../outside.mp4"
+        reservation.metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+
+        self.assertEqual(self.store.pending_videos(), [])
+
     def test_recent_skips_a_corrupt_manifest_line(self) -> None:
         record = self.store.save_text("still readable", now=self.now)
         with self.store.manifest_path.open("a", encoding="utf-8") as manifest:

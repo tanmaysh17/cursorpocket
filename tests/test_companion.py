@@ -288,6 +288,8 @@ class CompanionTests(unittest.TestCase):
     def test_panel_keyboard_rows_are_case_and_numpad_independent(self) -> None:
         self.assertEqual(panel_key_action("q"), "region_screenshot")
         self.assertEqual(panel_key_action("Q"), "region_screenshot")
+        self.assertEqual(panel_key_action("V"), "toggle_video")
+        self.assertEqual(panel_key_action("c"), "toggle_video_camera")
         self.assertEqual(panel_key_action("A"), "toggle_audio")
         self.assertEqual(panel_key_action("KP_1"), "monitor_1")
         self.assertEqual(panel_key_action("4"), "monitor_4")
@@ -297,6 +299,8 @@ class CompanionTests(unittest.TestCase):
         app = object.__new__(CursorPocketApp)
         app.panel_open = True
         calls: list[str] = []
+        app.toggle_video_recording = lambda: calls.append("video")
+        app.toggle_video_camera = lambda: calls.append("camera")
         app.capture_screenshot = lambda: calls.append("region")
         app.capture_active_window = lambda: calls.append("window")
         app.capture_all_screens = lambda: calls.append("all")
@@ -310,6 +314,8 @@ class CompanionTests(unittest.TestCase):
         app.capture_monitor = lambda index: calls.append(f"monitor-{index}")
 
         expected = {
+            "V": "video",
+            "C": "camera",
             "Q": "region",
             "W": "window",
             "E": "all",
@@ -346,6 +352,27 @@ class CompanionTests(unittest.TestCase):
         self.assertEqual(result, "break")
         self.assertEqual(calls, ["region"])
         self.assertFalse(app.command_mode_open)
+
+        app.video_recording = True
+        app.command_mode_open = True
+        app.stop_video_recording = lambda: calls.append("video-stop")
+        app.discard_video_recording = lambda: calls.append("video-discard")
+        app.show_toast = lambda *_args, **_kwargs: None
+        app.hide_command_mode = lambda: setattr(app, "command_mode_open", False)
+        calls.clear()
+        self.assertEqual(
+            app._handle_panel_key(SimpleNamespace(state=8, keysym="V")),
+            "break",
+        )
+        self.assertEqual(calls, ["video-stop"])
+
+        app.command_mode_open = True
+        calls.clear()
+        self.assertEqual(
+            app._handle_panel_key(SimpleNamespace(state=8, keysym="D")),
+            "break",
+        )
+        self.assertEqual(calls, ["video-discard"])
 
     def test_panel_wheel_delta_always_produces_a_scroll_step(self) -> None:
         self.assertEqual(panel_scroll_units(120), -1)

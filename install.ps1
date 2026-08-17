@@ -7,7 +7,10 @@ $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $sourceExe = Join-Path $projectRoot "dist\CursorPocket.exe"
-if (-not (Test-Path -LiteralPath $sourceExe)) {
+$sourceFfmpeg = Join-Path $projectRoot "dist\ffmpeg.exe"
+$sourceFfmpegLicense = Join-Path $projectRoot "dist\FFMPEG-LICENSE.txt"
+$sourceNotices = Join-Path $projectRoot "dist\THIRD_PARTY_NOTICES.md"
+if (-not (Test-Path -LiteralPath $sourceExe) -or -not (Test-Path -LiteralPath $sourceFfmpeg)) {
     throw "Build CursorPocket first: powershell -ExecutionPolicy Bypass -File .\build.ps1"
 }
 
@@ -36,6 +39,9 @@ $copyDeadline = [DateTime]::UtcNow.AddSeconds(5)
 while ($true) {
     try {
         Copy-Item -LiteralPath $sourceExe -Destination $installedExe -Force
+        Copy-Item -LiteralPath $sourceFfmpeg -Destination (Join-Path $installDir "ffmpeg.exe") -Force
+        Copy-Item -LiteralPath $sourceFfmpegLicense -Destination (Join-Path $installDir "FFMPEG-LICENSE.txt") -Force
+        Copy-Item -LiteralPath $sourceNotices -Destination (Join-Path $installDir "THIRD_PARTY_NOTICES.md") -Force
         break
     } catch [System.IO.IOException] {
         if ([DateTime]::UtcNow -ge $copyDeadline) {
@@ -50,7 +56,7 @@ $shortcut = $wshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $installedExe
 $shortcut.WorkingDirectory = $installDir
 $shortcut.IconLocation = "$installedExe,0"
-$shortcut.Description = "Capture screenshots, audio, selected text, and webpages"
+$shortcut.Description = "Capture screenshots, screen walkthroughs, audio, selected text, and webpages"
 $shortcut.Save()
 
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"

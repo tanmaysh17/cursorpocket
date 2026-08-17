@@ -4,3 +4,6 @@ __pycache__/
 build/
 dist/
 *.spec
+third_party/ffmpeg/bin/*.exe
+third_party/ffmpeg/cache/
+third_party/ffmpeg/LICENSE.txt
