@@ -55,6 +55,10 @@ PANEL_SHORTCUT_HELP = (
     "keys—do not hold a row together."
 )
 
+# Windows/Tk can include Mod1 (0x8) on an otherwise plain injected key event.
+# Block only the state bits observed for Ctrl and Alt so plain capture keys dispatch.
+PANEL_BLOCKED_MODIFIER_MASK = 0x20004
+
 PANEL_KEY_ACTIONS = {
     "q": "region_screenshot",
     "w": "window_screenshot",
@@ -1167,7 +1171,7 @@ class CursorPocketApp:
     def _handle_panel_key(self, event: tk.Event) -> str | None:
         if not self.panel_open:
             return None
-        if int(getattr(event, "state", 0)) & 0x2000C:
+        if int(getattr(event, "state", 0)) & PANEL_BLOCKED_MODIFIER_MASK:
             return None
         action = panel_key_action(str(getattr(event, "keysym", "")))
         if action is None:

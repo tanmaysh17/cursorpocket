@@ -102,9 +102,14 @@ class CompanionTests(unittest.TestCase):
         for key, expected_call in expected.items():
             with self.subTest(key=key):
                 calls.clear()
-                result = app._handle_panel_key(SimpleNamespace(state=0, keysym=key))
+                result = app._handle_panel_key(SimpleNamespace(state=8, keysym=key))
                 self.assertEqual(result, "break")
                 self.assertEqual(calls, [expected_call])
+
+        calls.clear()
+        self.assertIsNone(app._handle_panel_key(SimpleNamespace(state=0x4, keysym="Q")))
+        self.assertIsNone(app._handle_panel_key(SimpleNamespace(state=0x20000, keysym="Q")))
+        self.assertEqual(calls, [])
 
     def test_panel_wheel_delta_always_produces_a_scroll_step(self) -> None:
         self.assertEqual(panel_scroll_units(120), -1)

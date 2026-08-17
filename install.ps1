@@ -32,7 +32,18 @@ $managedProcessIds | ForEach-Object {
 
 New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 New-Item -ItemType Directory -Path $startMenuDir -Force | Out-Null
-Copy-Item -LiteralPath $sourceExe -Destination $installedExe -Force
+$copyDeadline = [DateTime]::UtcNow.AddSeconds(5)
+while ($true) {
+    try {
+        Copy-Item -LiteralPath $sourceExe -Destination $installedExe -Force
+        break
+    } catch [System.IO.IOException] {
+        if ([DateTime]::UtcNow -ge $copyDeadline) {
+            throw
+        }
+        Start-Sleep -Milliseconds 250
+    }
+}
 
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
