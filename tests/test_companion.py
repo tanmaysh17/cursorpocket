@@ -21,6 +21,8 @@ from cursorpocket.app import (
     ambient_edge_glow_images,
     build_scrollable_panel,
     bind_toplevel_click,
+    companion_should_show,
+    launcher_logo_frames,
     liquid_glass_image,
     monitor_for_point,
     panel_key_action,
@@ -59,11 +61,13 @@ class CompanionTests(unittest.TestCase):
                 if app.command_canvas.type(item) == "text"
             }
             self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 4)
-            self.assertEqual(len(app.command_canvas.find_withtag("command_pulse_outer")), 1)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_pulse_outer")), 0)
             self.assertEqual(len(app.command_canvas.find_withtag("command_glass")), 1)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_launcher_glass")), 0)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_launcher_logo")), 1)
             self.assertIn("Tap one key", texts)
-            self.assertIn("OPEN LIBRARY", texts)
-            self.assertIn("ESC  CLOSE     •     AUTO-CLOSES IN 15 SECONDS", texts)
+            self.assertNotIn("OPEN LIBRARY", texts)
+            self.assertIn("ESC  CLOSE     •     AUTO-CLOSES IN 30 SECONDS", texts)
         finally:
             root.destroy()
 
@@ -79,8 +83,73 @@ class CompanionTests(unittest.TestCase):
 
         self.assertEqual(calls, ["hide", False])
 
-    def test_command_mode_timeout_is_fifteen_seconds(self) -> None:
-        self.assertEqual(COMMAND_MODE_TIMEOUT_MS, 15_000)
+    def test_command_mode_timeout_is_thirty_seconds(self) -> None:
+        self.assertEqual(COMMAND_MODE_TIMEOUT_MS, 30_000)
+
+    def test_launcher_heartbeat_changes_only_the_boundaryless_logo_image(self) -> None:
+        mark = Image.new("RGBA", (64, 64), (22, 30, 38, 0))
+        for x in range(18, 46):
+            for y in range(18, 46):
+                mark.putpixel((x, y), (66, 211, 146, 255))
+
+        frames = launcher_logo_frames(mark, canvas_size=96, frame_count=36)
+
+        self.assertEqual(len(frames), 36)
+        self.assertEqual(frames[0].size, (96, 96))
+        self.assertNotEqual(frames[4].tobytes(), frames[18].tobytes())
+
+    def test_companion_hides_when_idle_or_a_full_surface_is_open(self) -> None:
+        self.assertFalse(
+            companion_should_show(
+                follow_ready=False,
+                hovered=False,
+                recording=False,
+                idle_seconds=0.0,
+            )
+        )
+        self.assertFalse(
+            companion_should_show(
+                follow_ready=True,
+                hovered=False,
+                recording=False,
+                idle_seconds=1.0,
+            )
+        )
+        self.assertTrue(
+            companion_should_show(
+                follow_ready=True,
+                hovered=False,
+                recording=True,
+                idle_seconds=4.0,
+            )
+        )
+
+    def test_open_library_surface_withdraws_the_companion_dot(self) -> None:
+        app = object.__new__(CursorPocketApp)
+        app.closing = False
+        app.capture_active = False
+        app.panel_open = True
+        app.command_mode_open = False
+        app.recording = False
+        app.hidden_mode = False
+        app.settings_window = None
+        app.settings = SimpleNamespace(mouse_gesture_enabled=False, follow_cursor=True)
+        app.gesture_detector = SimpleNamespace(reset=lambda: None)
+        app._companion_hover = False
+        app._companion_idle_hidden = False
+        app._last_cursor_move = 0.0
+        calls: list[str] = []
+        app.companion = SimpleNamespace(
+            withdraw=lambda: calls.append("withdraw"),
+            deiconify=lambda: calls.append("show"),
+        )
+        app.root = SimpleNamespace(after=lambda *_args: None)
+
+        with patch("cursorpocket.app.time.monotonic", return_value=2.0):
+            app._follow_tick()
+
+        self.assertEqual(calls, ["withdraw"])
+        self.assertTrue(app._companion_idle_hidden)
 
     def test_liquid_glass_preserves_size_and_frosts_the_panel(self) -> None:
         backdrop = Image.new("RGB", (200, 120), "#E8E8E8")

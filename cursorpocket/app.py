@@ -47,7 +47,8 @@ ORANGE = "#FFB86B"
 GREEN = "#42D392"
 RED = "#FF5D68"
 TRANSPARENT = "#FF00FF"
-COMMAND_MODE_TIMEOUT_MS = 15_000
+COMMAND_MODE_TIMEOUT_MS = 30_000
+COMPANION_IDLE_HIDE_SECONDS = 0.9
 
 FONT_BODY = "Bahnschrift"
 FONT_DISPLAY = "Bahnschrift SemiBold"
@@ -225,6 +226,45 @@ def ambient_edge_glow_images(
                 mask_draw.line((offset, 0, offset, original.height), fill=alpha)
         strips.append((position, Image.composite(glowing, original, mask)))
     return strips
+
+
+def companion_should_show(
+    *,
+    follow_ready: bool,
+    hovered: bool,
+    recording: bool,
+    idle_seconds: float,
+) -> bool:
+    return follow_ready and (
+        hovered or recording or idle_seconds < COMPANION_IDLE_HIDE_SECONDS
+    )
+
+
+def launcher_logo_frames(
+    mark: Image.Image,
+    canvas_size: int = 112,
+    frame_count: int = 36,
+) -> list[Image.Image]:
+    """Build a soft two-beat green pulse with no disc, label, or boundary."""
+    frames: list[Image.Image] = []
+    for index in range(frame_count):
+        phase = index / frame_count
+        first_beat = math.exp(-((phase - 0.12) / 0.055) ** 2)
+        second_beat = 0.68 * math.exp(-((phase - 0.29) / 0.075) ** 2)
+        beat = min(1.0, first_beat + second_beat)
+        mark_size = round(canvas_size * (0.58 + beat * 0.045))
+        resized = mark.resize((mark_size, mark_size), Image.Resampling.LANCZOS)
+        alpha = resized.getchannel("A")
+        glow_mask = alpha.filter(ImageFilter.GaussianBlur(radius=7 + beat * 4))
+        glow_mask = glow_mask.point(lambda value: round(value * (0.25 + beat * 0.62)))
+        glow = Image.new("RGBA", resized.size, (62, 236, 183, 0))
+        glow.putalpha(glow_mask)
+        frame = Image.new("RGBA", (canvas_size, canvas_size), (0, 0, 0, 0))
+        position = ((canvas_size - mark_size) // 2, (canvas_size - mark_size) // 2)
+        frame.alpha_composite(glow, position)
+        frame.alpha_composite(resized, position)
+        frames.append(frame)
+    return frames
 
 
 def _bind_tree(widget: tk.Misc, sequence: str, callback: Callable) -> None:
@@ -970,10 +1010,10 @@ class CursorPocketApp:
         self._command_pulse_phase = 0
         self._command_button_center = (0, 0)
         self._command_button_bounds = (0, 0, 0, 0)
-        self._command_started_at = 0.0
         self._command_backdrop: Image.Image | None = None
         self._command_glass_photos: list[ImageTk.PhotoImage] = []
         self._command_logo_photo: ImageTk.PhotoImage | None = None
+        self._command_launcher_frames: list[ImageTk.PhotoImage] = []
         self.capture_active = False
         self.recording = False
         self.hidden_mode = not self.settings.follow_cursor
@@ -996,13 +1036,14 @@ class CursorPocketApp:
         self.gesture_detector = DoubleCircleGestureDetector()
         self._companion_pinned = False
         self._companion_hover = False
+        self._companion_idle_hidden = False
         self._build_icon()
         self._build_companion()
         self._build_command_mode()
         self._build_panel()
         self.recording_indicator = RecordingIndicator(self.root, self.stop_audio_recording)
         if self.hidden_mode:
-            self.companion.withdraw()
+            self._hide_companion_window()
         self.hotkeys.start()
         self.tray.start()
         self.tray.set_state(recording=False, hidden=self.hidden_mode)
@@ -1052,6 +1093,14 @@ class CursorPocketApp:
         edge = inset + self.COMPANION_DOT_SIZE
         canvas.create_oval(inset, inset, edge, edge, fill=dot_color, outline="")
 
+    def _show_companion_window(self) -> None:
+        self.companion.deiconify()
+        self._companion_idle_hidden = False
+
+    def _hide_companion_window(self) -> None:
+        self.companion.withdraw()
+        self._companion_idle_hidden = True
+
     @classmethod
     def _companion_target(cls, cursor_x: int, cursor_y: int) -> tuple[int, int]:
         offset_x, offset_y = cls.COMPANION_OFFSET
@@ -1085,6 +1134,7 @@ class CursorPocketApp:
         self.command_canvas.bind("<Button-1>", self._command_mode_click)
         self._command_glass_photos = []
         self._command_logo_photo = None
+        self._command_launcher_frames = []
 
     def _render_command_mode(self, width: int, height: int) -> None:
         canvas = self.command_canvas
@@ -1187,90 +1237,29 @@ class CursorPocketApp:
         canvas.create_text(
             legend_left + 42,
             legend_bottom - 41,
-            text="ESC  CLOSE     •     AUTO-CLOSES IN 15 SECONDS",
+            text="ESC  CLOSE     •     AUTO-CLOSES IN 30 SECONDS",
             fill="#8CA0AA",
             anchor="nw",
             font=(FONT_MONO, 8, "bold"),
         )
 
-        button_x = max(56, width - 74)
-        button_y = max(56, height - 74)
+        button_x = max(60, width - 72)
+        button_y = max(60, height - 72)
         self._command_button_center = (button_x, button_y)
-        label_left = max(18, button_x - 242)
-        label_box = (label_left, button_y - 29, button_x - 52, button_y + 29)
-        orb_box = (button_x - 46, button_y - 46, button_x + 46, button_y + 46)
         self._command_button_bounds = (
-            label_box[0],
-            min(label_box[1], orb_box[1]),
-            orb_box[2],
-            max(label_box[3], orb_box[3]),
+            button_x - 56,
+            button_y - 56,
+            button_x + 56,
+            button_y + 56,
         )
-
-        label_glass = ImageTk.PhotoImage(
-            liquid_glass_image(getattr(self, "_command_backdrop", None), label_box, radius=29)
-        )
-        orb_glass = ImageTk.PhotoImage(
-            liquid_glass_image(getattr(self, "_command_backdrop", None), orb_box, radius=46)
-        )
-        self._command_glass_photos.extend((label_glass, orb_glass))
-        canvas.create_image(
-            label_box[0],
-            label_box[1],
-            image=label_glass,
-            anchor="nw",
-            tags=("command_launcher_glass",),
-        )
-        canvas.create_image(
-            orb_box[0],
-            orb_box[1],
-            image=orb_glass,
-            anchor="nw",
-            tags=("command_launcher_glass",),
-        )
-        canvas.create_text(
-            button_x - 70,
-            button_y - 12,
-            text="OPEN LIBRARY",
-            fill=PAPER,
-            anchor="e",
-            font=(FONT_DISPLAY, 10, "bold"),
-        )
-        canvas.create_text(
-            button_x - 70,
-            button_y + 8,
-            text="Library & settings",
-            fill="#8CA0AA",
-            anchor="e",
-            font=(FONT_BODY, 8),
-        )
-        canvas.create_oval(
-            button_x - 49,
-            button_y - 49,
-            button_x + 49,
-            button_y + 49,
-            fill="",
-            outline="#3C8F88",
-            width=1,
-            tags=("command_pulse_outer",),
-        )
-        canvas.create_arc(
-            button_x - 43,
-            button_y - 43,
-            button_x + 43,
-            button_y + 43,
-            start=90,
-            extent=-359.9,
-            style="arc",
-            outline=GREEN,
-            width=2,
-            tags=("command_timeout_arc",),
-        )
-        launcher_logo = ImageTk.PhotoImage(load_logo(56))
-        self._command_glass_photos.append(launcher_logo)
+        self._command_launcher_frames = [
+            ImageTk.PhotoImage(frame)
+            for frame in launcher_logo_frames(load_logo(76))
+        ]
         canvas.create_image(
             button_x,
             button_y,
-            image=launcher_logo,
+            image=self._command_launcher_frames[0],
             anchor="center",
             tags=("command_launcher_logo",),
         )
@@ -1278,26 +1267,18 @@ class CursorPocketApp:
     def _animate_command_mode(self, session: int) -> None:
         if not self.command_mode_open or session != self._command_session:
             return
-        self._command_pulse_phase = (self._command_pulse_phase + 1) % 40
-        pulse = (math.sin(self._command_pulse_phase / 40.0 * math.tau) + 1.0) / 2.0
-        center_x, center_y = self._command_button_center
-        radius = 49 + round(pulse * 5)
-        self.command_canvas.coords(
-            "command_pulse_outer",
-            center_x - radius,
-            center_y - radius,
-            center_x + radius,
-            center_y + radius,
+        if self._command_launcher_frames:
+            self._command_pulse_phase = (
+                self._command_pulse_phase + 1
+            ) % len(self._command_launcher_frames)
+            self.command_canvas.itemconfigure(
+                "command_launcher_logo",
+                image=self._command_launcher_frames[self._command_pulse_phase],
+            )
+        self.command_mode.after(
+            50,
+            lambda: self._animate_command_mode(session),
         )
-        glow = "#77E7CB" if pulse > 0.5 else "#3C8F88"
-        self.command_canvas.itemconfigure("command_pulse_outer", outline=glow)
-        elapsed = max(0.0, time.monotonic() - self._command_started_at)
-        remaining = max(0.0, 1.0 - elapsed / (COMMAND_MODE_TIMEOUT_MS / 1000.0))
-        self.command_canvas.itemconfigure(
-            "command_timeout_arc",
-            extent=-359.9 * remaining,
-        )
-        self.command_mode.after(50, lambda: self._animate_command_mode(session))
 
     def _command_mode_click(self, event: tk.Event) -> None:
         left, top, right, bottom = self._command_button_bounds
@@ -1658,6 +1639,7 @@ class CursorPocketApp:
     def _follow_tick(self) -> None:
         if self.closing:
             return
+        now = time.monotonic()
         gesture_ready = (
             self.settings.mouse_gesture_enabled
             and not self.capture_active
@@ -1675,7 +1657,6 @@ class CursorPocketApp:
         )
         if gesture_ready or follow_ready:
             cursor_x, cursor_y = cursor_position()
-            now = time.monotonic()
             if gesture_ready and self.gesture_detector.feed(cursor_x, cursor_y, now):
                 self.show_command_mode()
                 self.root.after(16, self._follow_tick)
@@ -1689,14 +1670,16 @@ class CursorPocketApp:
             if (cursor_x, cursor_y) != self._last_cursor:
                 self._last_cursor = (cursor_x, cursor_y)
                 self._last_cursor_move = now
-            if not self._companion_pinned and now - self._last_cursor_move >= 0.48:
-                self._companion_pinned = True
-            center_x = self._companion_x + self.COMPANION_SIZE / 2
-            center_y = self._companion_y + self.COMPANION_SIZE / 2
-            distance = ((cursor_x - center_x) ** 2 + (cursor_y - center_y) ** 2) ** 0.5
-            if self._companion_pinned and not self._companion_hover and distance > 132:
-                self._companion_pinned = False
-            if not self._companion_pinned:
+        show_companion = companion_should_show(
+            follow_ready=follow_ready,
+            hovered=getattr(self, "_companion_hover", False),
+            recording=self.recording,
+            idle_seconds=now - getattr(self, "_last_cursor_move", now),
+        )
+        if show_companion:
+            if getattr(self, "_companion_idle_hidden", False):
+                self._show_companion_window()
+            if not self._companion_hover:
                 self._companion_x, self._companion_y = self._companion_target(cursor_x, cursor_y)
             position_window(
                 self.companion,
@@ -1705,6 +1688,12 @@ class CursorPocketApp:
                 self.COMPANION_SIZE,
                 self.COMPANION_SIZE,
             )
+        elif hasattr(self, "companion") and not getattr(
+            self,
+            "_companion_idle_hidden",
+            False,
+        ):
+            self._hide_companion_window()
         self.root.after(16, self._follow_tick)
 
     def _companion_enter(self, _event: tk.Event) -> None:
@@ -1759,7 +1748,7 @@ class CursorPocketApp:
         self._command_session += 1
         session = self._command_session
         self._command_pulse_phase = 0
-        self.companion.withdraw()
+        self._hide_companion_window()
         self.root.update_idletasks()
         try:
             backdrop = ImageGrab.grab(
@@ -1771,7 +1760,6 @@ class CursorPocketApp:
             self._command_backdrop = backdrop
         except (OSError, ValueError):
             self._command_backdrop = None
-        self._command_started_at = time.monotonic()
         self._render_command_mode(width, height)
         position_window(
             self.command_mode,
@@ -1801,10 +1789,11 @@ class CursorPocketApp:
         self.command_mode.withdraw()
         self._command_backdrop = None
         self._command_glass_photos = []
+        self._command_launcher_frames = []
         self._companion_pinned = False
         self._last_cursor_move = time.monotonic()
         if not self.hidden_mode and not self.capture_active and self.settings.follow_cursor:
-            self.companion.deiconify()
+            self._show_companion_window()
 
     def _show_first_run(self) -> None:
         if self.closing:
@@ -1825,9 +1814,10 @@ class CursorPocketApp:
             self._remember_source_context()
         if self.hidden_mode:
             self.hidden_mode = False
-            self.companion.deiconify()
+            self._show_companion_window()
             self.tray.set_state(recording=self.recording, hidden=False)
         self.panel_open = True
+        self._hide_companion_window()
         self._draw_companion(True)
         self._refresh_history()
         self.panel.deiconify()
@@ -1875,7 +1865,7 @@ class CursorPocketApp:
             return
         self.capture_active = True
         self.hide_panel()
-        self.companion.withdraw()
+        self._hide_companion_window()
         if self.recording:
             self.recording_indicator.hide()
         self.root.after(180, self._begin_screen_selection)
@@ -1920,7 +1910,7 @@ class CursorPocketApp:
             return
         self.capture_active = True
         self.hide_panel()
-        self.companion.withdraw()
+        self._hide_companion_window()
         if self.recording:
             self.recording_indicator.hide()
         self.root.after(180, lambda: self._grab_fixed_bounds(bounds))
@@ -2091,7 +2081,7 @@ class CursorPocketApp:
 
     def _restore_companion(self) -> None:
         if not self.hidden_mode:
-            self.companion.deiconify()
+            self._show_companion_window()
 
     def toggle_audio_recording(self) -> None:
         if self.recording:
@@ -2196,14 +2186,14 @@ class CursorPocketApp:
             self.hidden_mode = False
             self._companion_pinned = False
             self._last_cursor_move = time.monotonic()
-            self.companion.deiconify()
+            self._show_companion_window()
             self.tray.set_state(recording=self.recording, hidden=False)
             shortcut = self.registered_shortcuts.get("hidden", "Ctrl + Shift + H")
             self.show_toast("Dot visible", f"{shortcut} toggles the dot")
             return
         self.hide_panel()
         self.hidden_mode = True
-        self.companion.withdraw()
+        self._hide_companion_window()
         self.tray.set_state(recording=self.recording, hidden=True)
         shortcut = self.registered_shortcuts.get("hidden", "Ctrl + Shift + H")
         self.show_toast("Dot hidden", f"Use the tray icon or press {shortcut} to bring it back")
@@ -2299,10 +2289,10 @@ class CursorPocketApp:
             if updated.follow_cursor:
                 self.hidden_mode = False
                 self._companion_pinned = False
-                self.companion.deiconify()
+                self._show_companion_window()
             else:
                 self.hidden_mode = True
-                self.companion.withdraw()
+                self._hide_companion_window()
             self.tray.set_state(recording=self.recording, hidden=self.hidden_mode)
             self._refresh_history()
             startup_text = "starts with Windows" if startup_enabled else "opens when you launch it"
