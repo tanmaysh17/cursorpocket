@@ -11,10 +11,11 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageGrab, ImageTk
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageGrab, ImageTk
 
 from .annotation import ScreenshotAnnotator
 from .audio import AudioRecorder
+from .branding import load_logo
 from .gesture import DoubleCircleGestureDetector
 from .hotkeys import DEFAULT_HOTKEYS, GlobalHotkeyManager
 from .settings import AppSettings, SettingsStore
@@ -46,6 +47,7 @@ ORANGE = "#FFB86B"
 GREEN = "#42D392"
 RED = "#FF5D68"
 TRANSPARENT = "#FF00FF"
+COMMAND_MODE_TIMEOUT_MS = 15_000
 
 FONT_BODY = "Segoe UI"
 FONT_DISPLAY = "Segoe UI Variable Display"
@@ -111,6 +113,69 @@ def monitor_for_point(
             + (y - (bounds[1] + bounds[3]) / 2.0) ** 2
         ),
     )
+
+
+def liquid_glass_image(
+    backdrop: Image.Image | None,
+    box: tuple[int, int, int, int],
+    radius: int,
+) -> Image.Image:
+    """Render a frosted, tinted crop that visually preserves the desktop behind it."""
+    left, top, right, bottom = box
+    width = max(1, right - left)
+    height = max(1, bottom - top)
+    if backdrop is None:
+        backdrop = Image.new("RGB", (max(right, width), max(bottom, height)), INK)
+    source = backdrop.convert("RGB")
+    original = source.crop((left, top, right, bottom))
+    if original.size != (width, height):
+        original = original.resize((width, height), Image.Resampling.BILINEAR)
+
+    blur_padding = 48
+    expanded_box = (
+        max(0, left - blur_padding),
+        max(0, top - blur_padding),
+        min(source.width, right + blur_padding),
+        min(source.height, bottom + blur_padding),
+    )
+    expanded = source.crop(expanded_box).filter(ImageFilter.GaussianBlur(radius=20))
+    glass = expanded.crop(
+        (
+            left - expanded_box[0],
+            top - expanded_box[1],
+            right - expanded_box[0],
+            bottom - expanded_box[1],
+        )
+    ).convert("RGBA")
+    if glass.size != (width, height):
+        glass = glass.resize((width, height), Image.Resampling.BILINEAR)
+
+    tint = Image.new("RGBA", (width, height), (8, 17, 24, 178))
+    glass = Image.alpha_composite(glass, tint)
+    sheen = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    sheen_draw = ImageDraw.Draw(sheen)
+    sheen_draw.rounded_rectangle(
+        (1, 1, width - 2, height - 2),
+        radius=max(1, radius - 1),
+        outline=(172, 255, 234, 72),
+        width=1,
+    )
+    sheen_draw.line(
+        (radius, 2, max(radius, width - radius), 2),
+        fill=(220, 255, 247, 58),
+        width=1,
+    )
+    glass = Image.alpha_composite(glass, sheen).convert("RGB")
+
+    mask = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, width - 1, height - 1),
+        radius=max(1, radius),
+        fill=255,
+    )
+    result = original.copy()
+    result.paste(glass, (0, 0), mask)
+    return result
 
 
 def _bind_tree(widget: tk.Misc, sequence: str, callback: Callable) -> None:
@@ -855,6 +920,11 @@ class CursorPocketApp:
         self._command_session = 0
         self._command_pulse_phase = 0
         self._command_button_center = (0, 0)
+        self._command_button_bounds = (0, 0, 0, 0)
+        self._command_started_at = 0.0
+        self._command_backdrop: Image.Image | None = None
+        self._command_glass_photos: list[ImageTk.PhotoImage] = []
+        self._command_logo_photo: ImageTk.PhotoImage | None = None
         self.capture_active = False
         self.recording = False
         self.hidden_mode = not self.settings.follow_cursor
@@ -897,12 +967,7 @@ class CursorPocketApp:
         self.root.mainloop()
 
     def _build_icon(self) -> None:
-        icon = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(icon)
-        draw.rounded_rectangle((5, 5, 59, 59), radius=16, fill=PANEL)
-        draw.ellipse((13, 13, 51, 51), fill="#0B1119", outline="#2D3A4B", width=3)
-        draw.ellipse((22, 22, 42, 42), fill=GREEN)
-        self.icon_photo = ImageTk.PhotoImage(icon)
+        self.icon_photo = ImageTk.PhotoImage(load_logo(64))
         self.root.iconphoto(True, self.icon_photo)
 
     def _build_companion(self) -> None:
@@ -969,13 +1034,16 @@ class CursorPocketApp:
         )
         self.command_canvas.pack(fill="both", expand=True)
         self.command_canvas.bind("<Button-1>", self._command_mode_click)
+        self._command_glass_photos = []
+        self._command_logo_photo = None
 
     def _render_command_mode(self, width: int, height: int) -> None:
         canvas = self.command_canvas
         canvas.configure(width=width, height=height)
         canvas.delete("all")
+        self._command_glass_photos = []
 
-        glow_colors = ("#173743", "#1F5663", "#2A7B83", "#42A69A")
+        glow_colors = ("#11272F", "#183944", "#20525C", "#2A777A", "#55BFA6")
         for inset, color in enumerate(glow_colors, start=1):
             canvas.create_rectangle(
                 inset,
@@ -987,102 +1055,163 @@ class CursorPocketApp:
                 tags=("command_glow",),
             )
 
-        legend_width = max(1, min(540, width - 56))
+        legend_width = max(1, min(548, width - 56))
         legend_left = max(24, width - legend_width - 28)
         legend_top = 28
         legend_right = width - 28
-        legend_bottom = legend_top + 286
-        canvas.create_rectangle(
+        legend_bottom = min(height - 28, legend_top + 310)
+        legend_box = (legend_left, legend_top, legend_right, legend_bottom)
+        legend_glass = ImageTk.PhotoImage(
+            liquid_glass_image(getattr(self, "_command_backdrop", None), legend_box, radius=28)
+        )
+        self._command_glass_photos.append(legend_glass)
+        canvas.create_image(
             legend_left,
             legend_top,
-            legend_right,
-            legend_bottom,
-            fill=PANEL,
-            outline=LINE,
-            width=1,
+            image=legend_glass,
+            anchor="nw",
+            tags=("command_glass",),
+        )
+
+        self._command_logo_photo = ImageTk.PhotoImage(load_logo(42))
+        canvas.create_image(
+            legend_left + 24,
+            legend_top + 20,
+            image=self._command_logo_photo,
+            anchor="nw",
         )
         canvas.create_text(
-            legend_left + 22,
-            legend_top + 22,
-            text="CURSORPOCKET ACTIVE",
+            legend_left + 76,
+            legend_top + 23,
+            text="CURSORPOCKET",
+            fill=PAPER,
+            anchor="nw",
+            font=(FONT_DISPLAY, 11, "bold"),
+        )
+        canvas.create_text(
+            legend_left + 76,
+            legend_top + 43,
+            text="COMMAND MODE  •  ACTIVE",
             fill=GREEN,
             anchor="nw",
-            font=(FONT_MONO, 9, "bold"),
+            font=(FONT_MONO, 8, "bold"),
         )
         canvas.create_text(
-            legend_left + 22,
-            legend_top + 48,
+            legend_left + 24,
+            legend_top + 76,
             text="Tap one key",
             fill=PAPER,
             anchor="nw",
             font=(FONT_BODY, 18, "bold"),
         )
-        row_y = legend_top + 88
+        row_y = legend_top + 117
         for label, shortcuts in COMMAND_SHORTCUT_ROWS:
             canvas.create_text(
-                legend_left + 22,
+                legend_left + 24,
                 row_y,
                 text=label,
-                fill=MUTED,
+                fill="#82AFA9",
                 anchor="nw",
                 font=(FONT_MONO, 8, "bold"),
             )
             canvas.create_text(
-                legend_left + 112,
+                legend_left + 124,
                 row_y,
                 text=shortcuts,
                 fill=PAPER,
                 anchor="nw",
                 font=(FONT_MONO, 9),
             )
-            row_y += 39
+            row_y += 38
         canvas.create_text(
-            legend_left + 22,
-            legend_bottom - 25,
-            text="ESC  Close     •     Command mode closes automatically",
-            fill=MUTED,
+            legend_left + 24,
+            legend_bottom - 27,
+            text="ESC  CLOSE     •     AUTO-CLOSES IN 15 SECONDS",
+            fill="#8CA0AA",
             anchor="nw",
-            font=(FONT_BODY, 8),
-        )
-
-        button_x = width - 66
-        button_y = height - 66
-        self._command_button_center = (button_x, button_y)
-        canvas.create_text(
-            button_x - 48,
-            button_y,
-            text="OPEN LIBRARY",
-            fill=MUTED,
-            anchor="e",
             font=(FONT_MONO, 8, "bold"),
         )
+
+        button_x = max(56, width - 74)
+        button_y = max(56, height - 74)
+        self._command_button_center = (button_x, button_y)
+        label_left = max(18, button_x - 242)
+        label_box = (label_left, button_y - 29, button_x - 52, button_y + 29)
+        orb_box = (button_x - 46, button_y - 46, button_x + 46, button_y + 46)
+        self._command_button_bounds = (
+            label_box[0],
+            min(label_box[1], orb_box[1]),
+            orb_box[2],
+            max(label_box[3], orb_box[3]),
+        )
+
+        label_glass = ImageTk.PhotoImage(
+            liquid_glass_image(getattr(self, "_command_backdrop", None), label_box, radius=29)
+        )
+        orb_glass = ImageTk.PhotoImage(
+            liquid_glass_image(getattr(self, "_command_backdrop", None), orb_box, radius=46)
+        )
+        self._command_glass_photos.extend((label_glass, orb_glass))
+        canvas.create_image(
+            label_box[0],
+            label_box[1],
+            image=label_glass,
+            anchor="nw",
+            tags=("command_launcher_glass",),
+        )
+        canvas.create_image(
+            orb_box[0],
+            orb_box[1],
+            image=orb_glass,
+            anchor="nw",
+            tags=("command_launcher_glass",),
+        )
+        canvas.create_text(
+            button_x - 70,
+            button_y - 12,
+            text="OPEN LIBRARY",
+            fill=PAPER,
+            anchor="e",
+            font=(FONT_DISPLAY, 10, "bold"),
+        )
+        canvas.create_text(
+            button_x - 70,
+            button_y + 8,
+            text="Library & settings",
+            fill="#8CA0AA",
+            anchor="e",
+            font=(FONT_BODY, 8),
+        )
         canvas.create_oval(
-            button_x - 34,
-            button_y - 34,
-            button_x + 34,
-            button_y + 34,
-            fill=PANEL,
-            outline="#2A7B83",
-            width=2,
+            button_x - 49,
+            button_y - 49,
+            button_x + 49,
+            button_y + 49,
+            fill="",
+            outline="#3C8F88",
+            width=1,
             tags=("command_pulse_outer",),
         )
-        canvas.create_oval(
-            button_x - 23,
-            button_y - 23,
-            button_x + 23,
-            button_y + 23,
-            fill=INK,
-            outline=BLUE,
+        canvas.create_arc(
+            button_x - 43,
+            button_y - 43,
+            button_x + 43,
+            button_y + 43,
+            start=90,
+            extent=-359.9,
+            style="arc",
+            outline=GREEN,
             width=2,
-            tags=("command_pulse_inner",),
+            tags=("command_timeout_arc",),
         )
-        canvas.create_oval(
-            button_x - 8,
-            button_y - 8,
-            button_x + 8,
-            button_y + 8,
-            fill=GREEN,
-            outline="",
+        launcher_logo = ImageTk.PhotoImage(load_logo(56))
+        self._command_glass_photos.append(launcher_logo)
+        canvas.create_image(
+            button_x,
+            button_y,
+            image=launcher_logo,
+            anchor="center",
+            tags=("command_launcher_logo",),
         )
 
     def _animate_command_mode(self, session: int) -> None:
@@ -1091,7 +1220,7 @@ class CursorPocketApp:
         self._command_pulse_phase = (self._command_pulse_phase + 1) % 40
         pulse = (math.sin(self._command_pulse_phase / 40.0 * math.tau) + 1.0) / 2.0
         center_x, center_y = self._command_button_center
-        radius = 34 + round(pulse * 7)
+        radius = 49 + round(pulse * 5)
         self.command_canvas.coords(
             "command_pulse_outer",
             center_x - radius,
@@ -1099,13 +1228,19 @@ class CursorPocketApp:
             center_x + radius,
             center_y + radius,
         )
-        glow = "#63B3FF" if pulse > 0.5 else "#2A7B83"
+        glow = "#77E7CB" if pulse > 0.5 else "#3C8F88"
         self.command_canvas.itemconfigure("command_pulse_outer", outline=glow)
+        elapsed = max(0.0, time.monotonic() - self._command_started_at)
+        remaining = max(0.0, 1.0 - elapsed / (COMMAND_MODE_TIMEOUT_MS / 1000.0))
+        self.command_canvas.itemconfigure(
+            "command_timeout_arc",
+            extent=-359.9 * remaining,
+        )
         self.command_mode.after(50, lambda: self._animate_command_mode(session))
 
     def _command_mode_click(self, event: tk.Event) -> None:
-        center_x, center_y = self._command_button_center
-        if math.hypot(int(event.x) - center_x, int(event.y) - center_y) <= 48:
+        left, top, right, bottom = self._command_button_bounds
+        if left <= int(event.x) <= right and top <= int(event.y) <= bottom:
             self.hide_command_mode()
             self.show_panel(snapshot_context=False)
             return
@@ -1564,7 +1699,19 @@ class CursorPocketApp:
         session = self._command_session
         self._command_pulse_phase = 0
         self.companion.withdraw()
-        self.command_mode.deiconify()
+        self.root.update_idletasks()
+        try:
+            backdrop = ImageGrab.grab(
+                bbox=(left, top, right, bottom),
+                all_screens=True,
+            ).convert("RGB")
+            if backdrop.size != (width, height):
+                backdrop = backdrop.resize((width, height), Image.Resampling.BILINEAR)
+            self._command_backdrop = backdrop
+        except (OSError, ValueError):
+            self._command_backdrop = None
+        self._command_started_at = time.monotonic()
+        self._render_command_mode(width, height)
         position_window(
             self.command_mode,
             left,
@@ -1573,12 +1720,11 @@ class CursorPocketApp:
             height,
             activate=True,
         )
-        self._render_command_mode(width, height)
         self.command_mode.lift()
         self.command_mode.focus_force()
         self._animate_command_mode(session)
         self.command_mode.after(
-            8000,
+            COMMAND_MODE_TIMEOUT_MS,
             lambda: self._expire_command_mode(session),
         )
 
@@ -1592,6 +1738,8 @@ class CursorPocketApp:
         self.command_mode_open = False
         self._command_session += 1
         self.command_mode.withdraw()
+        self._command_backdrop = None
+        self._command_glass_photos = []
         self._companion_pinned = False
         self._last_cursor_move = time.monotonic()
         if not self.hidden_mode and not self.capture_active and self.settings.follow_cursor:

@@ -10,12 +10,14 @@ from PIL import Image
 
 from cursorpocket.annotation import draw_arrow, draw_rectangle, draw_stroke, draw_text
 from cursorpocket.app import (
+    COMMAND_MODE_TIMEOUT_MS,
     PANEL_SHORTCUT_HELP,
     CursorPocketApp,
     GREEN,
     RED,
     build_scrollable_panel,
     bind_toplevel_click,
+    liquid_glass_image,
     monitor_for_point,
     panel_key_action,
     panel_scroll_units,
@@ -52,16 +54,19 @@ class CompanionTests(unittest.TestCase):
                 for item in app.command_canvas.find_all()
                 if app.command_canvas.type(item) == "text"
             }
-            self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 4)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_glow")), 5)
             self.assertEqual(len(app.command_canvas.find_withtag("command_pulse_outer")), 1)
+            self.assertEqual(len(app.command_canvas.find_withtag("command_glass")), 1)
             self.assertIn("Tap one key", texts)
             self.assertIn("OPEN LIBRARY", texts)
+            self.assertIn("ESC  CLOSE     •     AUTO-CLOSES IN 15 SECONDS", texts)
         finally:
             root.destroy()
 
     def test_command_pulse_opens_full_interface_without_resnapshotting(self) -> None:
         app = object.__new__(CursorPocketApp)
         app._command_button_center = (100, 100)
+        app._command_button_bounds = (20, 50, 150, 150)
         calls: list[object] = []
         app.hide_command_mode = lambda: calls.append("hide")
         app.show_panel = lambda snapshot_context=True: calls.append(snapshot_context)
@@ -69,6 +74,23 @@ class CompanionTests(unittest.TestCase):
         app._command_mode_click(SimpleNamespace(x=106, y=96))
 
         self.assertEqual(calls, ["hide", False])
+
+    def test_command_mode_timeout_is_fifteen_seconds(self) -> None:
+        self.assertEqual(COMMAND_MODE_TIMEOUT_MS, 15_000)
+
+    def test_liquid_glass_preserves_size_and_frosts_the_panel(self) -> None:
+        backdrop = Image.new("RGB", (200, 120), "#E8E8E8")
+        for x in range(0, 200, 8):
+            for y in range(0, 120, 8):
+                color = (27, 38, 51) if (x // 8 + y // 8) % 2 else (220, 234, 229)
+                for px in range(x, min(x + 8, 200)):
+                    for py in range(y, min(y + 8, 120)):
+                        backdrop.putpixel((px, py), color)
+
+        glass = liquid_glass_image(backdrop, (20, 15, 180, 105), radius=22)
+
+        self.assertEqual(glass.size, (160, 90))
+        self.assertNotEqual(glass.getpixel((80, 45)), backdrop.getpixel((100, 60)))
 
     def test_only_current_command_session_can_auto_close(self) -> None:
         app = object.__new__(CursorPocketApp)

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PIL import Image, ImageDraw
+from PIL import Image
+
+from .branding import tray_icon
 
 try:
     import pystray
@@ -72,8 +74,4 @@ class TrayManager:
 
     @staticmethod
     def _image(recording: bool) -> Image.Image:
-        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((5, 5, 59, 59), radius=15, fill="#18212D")
-        draw.ellipse((20, 20, 44, 44), fill="#FF5D68" if recording else "#42D392")
-        return image
+        return tray_icon(recording)

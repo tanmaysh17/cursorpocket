@@ -22,6 +22,7 @@ if ($LASTEXITCODE -ne 0) {
     --onefile `
     --windowed `
     --name CursorPocket `
+    --add-data "assets\cursorpocket-logo.png;assets" `
     --icon assets\cursorpocket.ico `
     main.py
 if ($LASTEXITCODE -ne 0) {

@@ -10,7 +10,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a compact annotation window; press `Enter` to save immediately or add pen, highlight, arrow, rectangle, or text markup first. Other captures save immediately.
 
-Command mode closes after one action, when you press `Escape`, or automatically after eight seconds. Click the pulsing button in its bottom-right corner when you want the full CursorPocket library and settings window. That full window can be moved and resized, and CursorPocket remembers its size and position.
+Command mode closes after one action, when you press `Escape`, or automatically after fifteen seconds. Click the pulsing glass button in its bottom-right corner when you want the full CursorPocket library and settings window. That full window can be moved and resized, and CursorPocket remembers its size and position.
 
 ### Keys in the capture window
 
