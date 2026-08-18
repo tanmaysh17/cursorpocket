@@ -50,6 +50,35 @@ internal static class WindowPlacement
             presenter.IsAlwaysOnTop = topmost;
         }
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        // WinUI's OverlappedPresenter can leave the one-pixel DWM non-client
+        // frame visible even after hiding its title bar. Strip those styles and
+        // explicitly disable the Windows 11 border color so transient surfaces
+        // render as the surface itself, not a bright rectangular HWND.
+        var style = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlStyle).ToInt64();
+        style &= ~(NativeMethods.WsCaption |
+            NativeMethods.WsThickFrame |
+            NativeMethods.WsMinimizeBox |
+            NativeMethods.WsMaximizeBox |
+            NativeMethods.WsSysMenu);
+        style |= NativeMethods.WsPopup;
+        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlStyle, new nint(style));
+        NativeMethods.SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SwpNoMove |
+            NativeMethods.SwpNoSize |
+            NativeMethods.SwpNoActivate |
+            NativeMethods.SwpFrameChanged);
+        var borderColor = NativeMethods.DwmColorNone;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd,
+            NativeMethods.DwmwaBorderColor,
+            ref borderColor,
+            sizeof(int));
         var cornerPreference = NativeMethods.DwmWindowCornerPreferenceRound;
         NativeMethods.DwmSetWindowAttribute(
             hwnd,

@@ -20,14 +20,21 @@ internal static class NativeMethods
     internal const int WhMouseLl = 14;
     internal const int WmMouseMove = 0x0200;
     internal const int GwlExStyle = -20;
+    internal const int GwlStyle = -16;
     internal const long WsExLayered = 0x00080000L;
     internal const long WsExNoActivate = 0x08000000L;
     internal const long WsExToolWindow = 0x00000080L;
     internal const uint WsPopup = 0x80000000;
+    internal const long WsCaption = 0x00C00000L;
+    internal const long WsThickFrame = 0x00040000L;
+    internal const long WsMinimizeBox = 0x00020000L;
+    internal const long WsMaximizeBox = 0x00010000L;
+    internal const long WsSysMenu = 0x00080000L;
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;
     internal const uint SwpNoActivate = 0x0010;
     internal const uint SwpShowWindow = 0x0040;
+    internal const uint SwpFrameChanged = 0x0020;
     internal const uint UlwAlpha = 0x00000002;
     internal const byte AcSrcOver = 0x00;
     internal const byte AcSrcAlpha = 0x01;
@@ -37,6 +44,8 @@ internal static class NativeMethods
     internal const uint LwaColorKey = 0x00000001;
     internal const int DwmwaWindowCornerPreference = 33;
     internal const int DwmWindowCornerPreferenceRound = 2;
+    internal const int DwmwaBorderColor = 34;
+    internal const int DwmColorNone = unchecked((int)0xFFFFFFFE);
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Point

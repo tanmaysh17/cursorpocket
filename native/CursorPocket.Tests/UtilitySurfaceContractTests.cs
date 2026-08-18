@@ -95,6 +95,11 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("BorderBrush=", receipt, StringComparison.Ordinal);
         Assert.Contains("DwmSetWindowAttribute", placement, StringComparison.Ordinal);
         Assert.Contains("DwmWindowCornerPreferenceRound", placement, StringComparison.Ordinal);
+        Assert.Contains("DwmwaBorderColor", placement, StringComparison.Ordinal);
+        Assert.Contains("DwmColorNone", placement, StringComparison.Ordinal);
+        Assert.Contains("GwlStyle", placement, StringComparison.Ordinal);
+        Assert.Contains("WsCaption", placement, StringComparison.Ordinal);
+        Assert.Contains("SwpFrameChanged", placement, StringComparison.Ordinal);
     }
 
     [Fact]
