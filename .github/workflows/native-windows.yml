@@ -26,6 +26,10 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      - name: Fetch verified LGPL FFmpeg
+        shell: pwsh
+        run: ./tools/fetch_ffmpeg.ps1
+
       - name: Test Python behavioral reference
         shell: pwsh
         run: |
@@ -44,10 +48,6 @@ jobs:
       - name: Test native services and compatibility
         shell: pwsh
         run: dotnet test native/CursorPocket.Tests/CursorPocket.Tests.csproj -c Release --no-restore
-
-      - name: Fetch verified LGPL FFmpeg
-        shell: pwsh
-        run: ./tools/fetch_ffmpeg.ps1
 
       - name: Install Inno Setup
         shell: pwsh
@@ -98,4 +98,5 @@ jobs:
             artifacts/CursorPocket-portable-win-x64.zip
             artifacts/CursorPocket-Setup-x64.exe
           if-no-files-found: error
+
 
