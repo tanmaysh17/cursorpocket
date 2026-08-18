@@ -15,41 +15,38 @@ public sealed partial class CommandPaletteWindow : Window
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
 
-    public CommandPaletteWindow(long sourceWindow, string? initialMode = null)
+    public CommandPaletteWindow()
     {
-        SourceWindow = sourceWindow;
         InitializeComponent();
-        var bounds = WindowPlacement.MonitorUnderPointer();
-        BackdropImage.Source = DesktopSnapshot.Capture(bounds);
         WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
-        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
-        _timeout.Tick += (_, _) => ClosePalette();
+        _timeout.Tick += (_, _) => HidePalette();
         _commandKeys.Invoked += CommandKeys_Invoked;
-        Closed += (_, _) =>
-        {
-            _commandKeys.Invoked -= CommandKeys_Invoked;
-            _commandKeys.Dispose();
-            if (_restoreSourceOnClose)
-            {
-                App.Services.Context.RestoreFocus(SourceWindow);
-            }
-        };
         Activated += (_, _) =>
         {
             FocusCommandSurface();
             ResetTimeout();
         };
-        if (initialMode == "screenshot")
-        {
-            ShowScreenshotCommands();
-        }
+    }
+
+    public void Show(long sourceWindow, string? initialMode = null)
+    {
+        SourceWindow = sourceWindow;
+        _restoreSourceOnClose = true;
+        var bounds = WindowPlacement.MonitorUnderPointer();
+        BackdropImage.Source = DesktopSnapshot.Capture(bounds);
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
         AudioDeviceHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
             ? "Starts with the default microphone"
             : $"Starts with {App.Services.Settings.VideoMicrophoneName}";
+        if (initialMode == "screenshot") ShowScreenshotCommands(); else ShowPrimaryCommands();
+        _commandKeys.SetEnabled(true);
+        AppWindow.Show(false);
+        Activate();
     }
 
-    public long SourceWindow { get; }
+    public long SourceWindow { get; private set; }
     public event EventHandler<string>? CommandRequested;
+    public event EventHandler? PaletteHidden;
 
     private void Command_Click(object sender, RoutedEventArgs eventArgs)
     {
@@ -88,7 +85,7 @@ public sealed partial class CommandPaletteWindow : Window
         ResetTimeout();
         if (key == VirtualKey.Escape)
         {
-            if (_screenshotMode) ShowPrimaryCommands(); else ClosePalette();
+            if (_screenshotMode) ShowPrimaryCommands(); else HidePalette();
             return true;
         }
         var command = _screenshotMode ? key switch
@@ -154,7 +151,7 @@ public sealed partial class CommandPaletteWindow : Window
         // bury it again. Transient capture commands still return to source.
         _restoreSourceOnClose = command != "library";
         CommandRequested?.Invoke(this, command);
-        Close();
+        HidePalette();
     }
 
     private void ResetTimeout()
@@ -163,10 +160,16 @@ public sealed partial class CommandPaletteWindow : Window
         _timeout.Start();
     }
 
-    private void ClosePalette()
+    private void HidePalette()
     {
         _timeout.Stop();
-        Close();
+        _commandKeys.SetEnabled(false);
+        AppWindow.Hide();
+        if (_restoreSourceOnClose)
+        {
+            App.Services.Context.RestoreFocus(SourceWindow);
+        }
+        PaletteHidden?.Invoke(this, EventArgs.Empty);
     }
 
     private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs) => ResetTimeout();
@@ -176,6 +179,6 @@ public sealed partial class CommandPaletteWindow : Window
         FocusCommandSurface();
     }
     private void FocusCommandSurface() => (_screenshotMode ? RegionCommand : ScreenshotCommand).Focus(FocusState.Programmatic);
-    private void Close_Click(object sender, RoutedEventArgs eventArgs) => ClosePalette();
+    private void Close_Click(object sender, RoutedEventArgs eventArgs) => HidePalette();
     private void LibraryPulse_Click(object sender, RoutedEventArgs eventArgs) => Request("library");
 }

@@ -7,12 +7,29 @@ internal sealed class PaletteHotkeyService : IDisposable
     private const int FirstId = 0xC20;
     private const uint ModShift = 0x0004;
     private const uint ModNoRepeat = 0x4000;
+    private const uint WmSetEnabled = 0x8001;
     private readonly ManualResetEventSlim _ready = new(false);
     private readonly Thread _thread;
     private readonly NativeMethods.WindowProc _windowProcedure;
     private readonly Dictionary<int, (VirtualKey Key, bool Shift)> _commands = new();
     private nint _window;
     private bool _disposed;
+    private bool _enabled;
+    private static readonly (VirtualKey Key, bool Shift)[] Definitions =
+    [
+        (VirtualKey.S, false),
+        (VirtualKey.V, false),
+        (VirtualKey.V, true),
+        (VirtualKey.A, false),
+        (VirtualKey.T, false),
+        (VirtualKey.L, false),
+        (VirtualKey.O, false),
+        (VirtualKey.R, false),
+        (VirtualKey.W, false),
+        (VirtualKey.D, false),
+        (VirtualKey.P, false),
+        (VirtualKey.Escape, false),
+    ];
 
     public PaletteHotkeyService()
     {
@@ -29,6 +46,16 @@ internal sealed class PaletteHotkeyService : IDisposable
 
     public event EventHandler<PaletteHotkeyEventArgs>? Invoked;
 
+    public void SetEnabled(bool enabled)
+    {
+        if (_disposed || _enabled == enabled)
+        {
+            return;
+        }
+        _enabled = enabled;
+        NativeMethods.PostMessage(_window, WmSetEnabled, enabled ? 1u : 0u, 0);
+    }
+
     private void RunMessageWindow()
     {
         var className = $"CursorPocket.CommandKeys.{Environment.ProcessId}.{Guid.NewGuid():N}";
@@ -41,31 +68,6 @@ internal sealed class PaletteHotkeyService : IDisposable
         NativeMethods.RegisterClass(ref windowClass);
         _window = NativeMethods.CreateWindowEx(0, className, className, 0, 0, 0, 0, 0, -3, 0, windowClass.Instance, 0);
 
-        var definitions = new (VirtualKey Key, bool Shift)[]
-        {
-            (VirtualKey.S, false),
-            (VirtualKey.V, false),
-            (VirtualKey.V, true),
-            (VirtualKey.A, false),
-            (VirtualKey.T, false),
-            (VirtualKey.L, false),
-            (VirtualKey.O, false),
-            (VirtualKey.R, false),
-            (VirtualKey.W, false),
-            (VirtualKey.D, false),
-            (VirtualKey.P, false),
-            (VirtualKey.Escape, false),
-        };
-        for (var index = 0; index < definitions.Length; index++)
-        {
-            var id = FirstId + index;
-            var definition = definitions[index];
-            var modifiers = ModNoRepeat | (definition.Shift ? ModShift : 0);
-            if (NativeMethods.RegisterHotKey(_window, id, modifiers, (uint)definition.Key))
-            {
-                _commands[id] = definition;
-            }
-        }
         _ready.Set();
 
         while (NativeMethods.GetMessage(out var message, 0, 0, 0))
@@ -82,17 +84,42 @@ internal sealed class PaletteHotkeyService : IDisposable
             Invoked?.Invoke(this, new PaletteHotkeyEventArgs(command.Key, command.Shift));
             return 0;
         }
+        if (message == WmSetEnabled)
+        {
+            if (wParam != 0) RegisterCommands(hwnd); else UnregisterCommands(hwnd);
+            return 0;
+        }
         if (message == NativeMethods.WmClose)
         {
-            foreach (var id in _commands.Keys)
-            {
-                NativeMethods.UnregisterHotKey(hwnd, id);
-            }
-            _commands.Clear();
+            UnregisterCommands(hwnd);
             NativeMethods.DestroyWindow(hwnd);
             return 0;
         }
         return NativeMethods.DefWindowProc(hwnd, message, wParam, lParam);
+    }
+
+    private void RegisterCommands(nint hwnd)
+    {
+        UnregisterCommands(hwnd);
+        for (var index = 0; index < Definitions.Length; index++)
+        {
+            var id = FirstId + index;
+            var definition = Definitions[index];
+            var modifiers = ModNoRepeat | (definition.Shift ? ModShift : 0);
+            if (NativeMethods.RegisterHotKey(hwnd, id, modifiers, (uint)definition.Key))
+            {
+                _commands[id] = definition;
+            }
+        }
+    }
+
+    private void UnregisterCommands(nint hwnd)
+    {
+        foreach (var id in _commands.Keys)
+        {
+            NativeMethods.UnregisterHotKey(hwnd, id);
+        }
+        _commands.Clear();
     }
 
     public void Dispose()

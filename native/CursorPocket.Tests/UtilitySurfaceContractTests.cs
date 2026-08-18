@@ -115,6 +115,22 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Command_palette_is_warm_reused_and_scopes_bare_hotkeys_to_visibility()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var palette = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
+        var hotkeys = ReadFixture("PaletteHotkeyService.cs.txt");
+
+        Assert.Contains("InitializeCommandPalette();", main, StringComparison.Ordinal);
+        Assert.Contains("_palette!.Show", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("new CommandPaletteWindow(_lastSourceWindow", main, StringComparison.Ordinal);
+        Assert.Contains("_commandKeys.SetEnabled(true)", palette, StringComparison.Ordinal);
+        Assert.Contains("_commandKeys.SetEnabled(false)", palette, StringComparison.Ordinal);
+        Assert.Contains("AppWindow.Hide()", palette, StringComparison.Ordinal);
+        Assert.Contains("WmSetEnabled", hotkeys, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Preview_generation_is_serialized_atomic_and_non_fatal()
     {
         var code = ReadFixture("PreviewService.cs.txt");

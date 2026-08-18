@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
         RestoreGeometry();
         AppWindow.Closing += AppWindow_Closing;
         RootFrame.Navigate(typeof(MainPage));
+        InitializeCommandPalette();
         InitializeCompanion();
         InitializeTray();
         SubscribeToRecordingState();
@@ -87,28 +88,26 @@ public sealed partial class MainWindow : Window
 
     public void ShowCommandPalette(string? initialMode = null)
     {
-        if (_palette is not null)
-        {
-            _palette.Activate();
-            return;
-        }
         var source = App.Services.Context.SnapshotForegroundWindow();
         if (source != 0)
         {
             _lastSourceWindow = source;
         }
-        _palette = new CommandPaletteWindow(_lastSourceWindow, initialMode);
+        _palette!.Show(_lastSourceWindow, initialMode);
+    }
+
+    private void InitializeCommandPalette()
+    {
+        _palette = new CommandPaletteWindow();
         _palette.CommandRequested += Palette_CommandRequested;
-        _palette.Closed += (_, _) =>
+        _palette.PaletteHidden += (_, _) =>
         {
-            _palette = null;
             if (_openLibraryAfterPaletteCloses)
             {
                 _openLibraryAfterPaletteCloses = false;
                 ShowLibrary();
             }
         };
-        _palette.Activate();
     }
 
     public void ShowVideoPreflight()
