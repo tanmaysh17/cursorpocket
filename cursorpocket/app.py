@@ -975,7 +975,10 @@ class SettingsWindow:
         shortcut_frame.pack(fill="x")
         rows = (
             ("Open command mode", shortcuts.get("panel", "Ctrl + Shift + Space")),
-            ("Screen walkthrough", "V record/stop · C camera"),
+            (
+                "Screen walkthrough",
+                f"V in menu · {shortcuts.get('video', 'Ctrl + Shift + V')} anywhere",
+            ),
             ("Tap one screenshot key", "Q / W / E / R"),
             ("Tap one audio key", "A / S / D / F"),
             ("Tap one display key", "1 / 2 / 3 / 4"),

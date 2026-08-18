@@ -26,6 +26,7 @@ class HotkeySpec:
     label: str
     fallback_modifiers: int = 0
     fallback_label: str = ""
+    additional_fallbacks: tuple[tuple[int, int, str], ...] = ()
 
 
 DEFAULT_HOTKEYS = (
@@ -64,6 +65,13 @@ DEFAULT_HOTKEYS = (
         "Ctrl + Shift + Space",
         MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
         "Ctrl + Alt + Space",
+        (
+            (
+                MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+                0x7B,
+                "Ctrl + Shift + F12",
+            ),
+        ),
     ),
     HotkeySpec(
         0xC005,
@@ -89,6 +97,22 @@ DEFAULT_HOTKEYS = (
         ord("1"),
         "full_screenshot",
         "Ctrl + Shift + 1",
+    ),
+    HotkeySpec(
+        0xC008,
+        MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+        ord("V"),
+        "video",
+        "Ctrl + Shift + V",
+        MOD_CONTROL | MOD_ALT | MOD_NOREPEAT,
+        "Ctrl + Alt + V",
+        (
+            (
+                MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+                0x7A,
+                "Ctrl + Shift + F11",
+            ),
+        ),
     ),
 )
 
@@ -152,26 +176,40 @@ class GlobalHotkeyManager:
         for hotkey in self.hotkeys:
             used_fallback = False
             registered_label = hotkey.label
-            success = user32.RegisterHotKey(
-                None, hotkey.identifier, hotkey.modifiers, hotkey.virtual_key
-            )
-            if not success and hotkey.fallback_modifiers:
+            candidates = [
+                (hotkey.modifiers, hotkey.virtual_key, hotkey.label),
+            ]
+            if hotkey.fallback_modifiers:
+                candidates.append(
+                    (
+                        hotkey.fallback_modifiers,
+                        hotkey.virtual_key,
+                        hotkey.fallback_label,
+                    )
+                )
+            candidates.extend(hotkey.additional_fallbacks)
+            success = False
+            for index, (modifiers, virtual_key, label) in enumerate(candidates):
                 success = user32.RegisterHotKey(
                     None,
                     hotkey.identifier,
-                    hotkey.fallback_modifiers,
-                    hotkey.virtual_key,
+                    modifiers,
+                    virtual_key,
                 )
                 if success:
-                    used_fallback = True
-                    registered_label = hotkey.fallback_label
+                    used_fallback = index > 0
+                    registered_label = label
+                    break
             if success:
                 registered.append(hotkey)
                 if self.status_callback:
                     self.status_callback(hotkey.action, registered_label, used_fallback)
             elif self.error_callback:
+                alternative_labels = [label for _modifiers, _key, label in candidates[1:]]
                 alternatives = (
-                    f" and {hotkey.fallback_label}" if hotkey.fallback_label else ""
+                    ", " + ", ".join(alternative_labels)
+                    if alternative_labels
+                    else ""
                 )
                 self.error_callback(
                     f"{hotkey.label}{alternatives} are already used by another app."
