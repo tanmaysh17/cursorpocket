@@ -9,6 +9,7 @@ internal sealed class PaletteHotkeyService : IDisposable
     private const uint ModNoRepeat = 0x4000;
     private const uint WmSetEnabled = 0x8001;
     private readonly ManualResetEventSlim _ready = new(false);
+    private readonly ManualResetEventSlim _enabledChanged = new(false);
     private readonly Thread _thread;
     private readonly NativeMethods.WindowProc _windowProcedure;
     private readonly Dictionary<int, (VirtualKey Key, bool Shift)> _commands = new();
@@ -53,7 +54,12 @@ internal sealed class PaletteHotkeyService : IDisposable
             return;
         }
         _enabled = enabled;
-        NativeMethods.PostMessage(_window, WmSetEnabled, enabled ? 1u : 0u, 0);
+        _enabledChanged.Reset();
+        if (!NativeMethods.PostMessage(_window, WmSetEnabled, enabled ? 1u : 0u, 0) ||
+            !_enabledChanged.Wait(TimeSpan.FromMilliseconds(500)))
+        {
+            throw new InvalidOperationException("CursorPocket could not update its command keys.");
+        }
     }
 
     private void RunMessageWindow()
@@ -87,6 +93,7 @@ internal sealed class PaletteHotkeyService : IDisposable
         if (message == WmSetEnabled)
         {
             if (wParam != 0) RegisterCommands(hwnd); else UnregisterCommands(hwnd);
+            _enabledChanged.Set();
             return 0;
         }
         if (message == NativeMethods.WmClose)
@@ -135,6 +142,7 @@ internal sealed class PaletteHotkeyService : IDisposable
         }
         _thread.Join(TimeSpan.FromSeconds(2));
         _ready.Dispose();
+        _enabledChanged.Dispose();
     }
 }
 

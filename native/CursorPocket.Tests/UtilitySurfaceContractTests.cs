@@ -100,6 +100,9 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("GwlStyle", placement, StringComparison.Ordinal);
         Assert.Contains("WsCaption", placement, StringComparison.Ordinal);
         Assert.Contains("SwpFrameChanged", placement, StringComparison.Ordinal);
+        Assert.Contains("DwmNcRenderingDisabled", placement, StringComparison.Ordinal);
+        Assert.Contains("SetWindowRgn", placement, StringComparison.Ordinal);
+        Assert.Contains("ClipToRoundedRegion", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -133,6 +136,21 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("_commandKeys.SetEnabled(false)", palette, StringComparison.Ordinal);
         Assert.Contains("AppWindow.Hide()", palette, StringComparison.Ordinal);
         Assert.Contains("WmSetEnabled", hotkeys, StringComparison.Ordinal);
+        Assert.Contains("_enabledChanged.Wait", hotkeys, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Escape_is_scoped_to_recording_and_screenshot_surfaces()
+    {
+        var service = ReadFixture("ScopedEscapeHotkeyService.cs.txt");
+
+        Assert.Contains("RegisterHotKey", service, StringComparison.Ordinal);
+        Assert.Contains("VirtualKeyEscape", service, StringComparison.Ordinal);
+        Assert.Contains("UnregisterHotKey", service, StringComparison.Ordinal);
+        Assert.Contains("EscapeHotkey.Capture", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("EscapeHotkey.Capture", ReadFixture("RegionSelectorWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("EscapeHotkey.Capture", ReadFixture("AnnotationWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("StopAsync(false)", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
     }
 
     [Fact]

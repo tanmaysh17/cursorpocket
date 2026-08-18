@@ -17,6 +17,7 @@ public sealed class AppServices : IDisposable
         Recording = new RecordingService(captureStore, ffmpegPath);
         Context = new WindowContextService();
         Hotkey = new GlobalHotkeyService();
+        EscapeHotkey = new ScopedEscapeHotkeyService();
         Startup = new StartupService();
         Previews = new PreviewService(captureStore, ffmpegPath);
         CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
@@ -30,6 +31,7 @@ public sealed class AppServices : IDisposable
     public RecordingService Recording { get; private set; }
     public WindowContextService Context { get; }
     public GlobalHotkeyService Hotkey { get; }
+    public ScopedEscapeHotkeyService EscapeHotkey { get; }
     public StartupService Startup { get; }
     public PreviewService Previews { get; private set; }
     public string FfmpegPath { get; }
@@ -96,6 +98,7 @@ public sealed class AppServices : IDisposable
     {
         CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
         Hotkey.Dispose();
+        EscapeHotkey.Dispose();
         Recording.Dispose();
     }
 

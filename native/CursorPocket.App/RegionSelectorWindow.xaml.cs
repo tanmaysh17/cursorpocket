@@ -12,6 +12,7 @@ namespace CursorPocket_App;
 
 public sealed partial class RegionSelectorWindow : Window
 {
+    private readonly IDisposable _escapeLease;
     private Point _start;
     private bool _dragging;
     private int _virtualLeft;
@@ -33,7 +34,9 @@ public sealed partial class RegionSelectorWindow : Window
             Bottom = _virtualTop + height,
         });
         AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
+        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
         Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
+        Closed += (_, _) => _escapeLease.Dispose();
     }
 
     public event EventHandler<CaptureBounds>? RegionSelected;
@@ -99,7 +102,9 @@ public sealed partial class RegionSelectorWindow : Window
         if (eventArgs.Key == VirtualKey.Escape)
         {
             eventArgs.Handled = true;
-            Close();
+            Cancel();
         }
     }
+
+    private void Cancel() => Close();
 }

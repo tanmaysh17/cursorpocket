@@ -79,6 +79,12 @@ internal static class WindowPlacement
             NativeMethods.DwmwaBorderColor,
             ref borderColor,
             sizeof(int));
+        var nonClientPolicy = NativeMethods.DwmNcRenderingDisabled;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd,
+            NativeMethods.DwmwaNcRenderingPolicy,
+            ref nonClientPolicy,
+            sizeof(int));
         var cornerPreference = NativeMethods.DwmWindowCornerPreferenceRound;
         NativeMethods.DwmSetWindowAttribute(
             hwnd,
@@ -137,6 +143,23 @@ internal static class WindowPlacement
         var pixelHeight = ToPixels(height, scale);
         var pixelMargin = ToPixels(margin, scale);
         window.AppWindow.MoveAndResize(new RectInt32(bounds.Left + (bounds.Right - bounds.Left - pixelWidth) / 2, bounds.Top + pixelMargin, pixelWidth, pixelHeight));
+    }
+
+    public static void ClipToRoundedRegion(Window window, int width, int height, int radius)
+    {
+        var scale = ScaleFor(window);
+        var pixelWidth = ToPixels(width, scale);
+        var pixelHeight = ToPixels(height, scale);
+        var pixelDiameter = ToPixels(radius * 2, scale);
+        var region = NativeMethods.CreateRoundRectRgn(0, 0, pixelWidth + 1, pixelHeight + 1, pixelDiameter, pixelDiameter);
+        if (region == 0)
+        {
+            return;
+        }
+        if (NativeMethods.SetWindowRgn(WinRT.Interop.WindowNative.GetWindowHandle(window), region, true) == 0)
+        {
+            NativeMethods.DeleteObject(region);
+        }
     }
 
     private static double ScaleFor(Window window)

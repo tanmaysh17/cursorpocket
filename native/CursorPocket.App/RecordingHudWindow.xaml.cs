@@ -7,6 +7,7 @@ namespace CursorPocket_App;
 public sealed partial class RecordingHudWindow : Window
 {
     private readonly Func<bool, Task> _stop;
+    private readonly IDisposable _escapeLease;
     private bool _stopping;
 
     private RecordingHudWindow(string mode, string device, Func<bool, Task> stop)
@@ -17,6 +18,9 @@ public sealed partial class RecordingHudWindow : Window
         DeviceText.Text = device;
         WindowPlacement.ConfigureUtilityWindow(this);
         WindowPlacement.PlaceTopCenter(this, 740, 124);
+        WindowPlacement.ClipToRoundedRegion(this, 740, 124, 20);
+        _escapeLease = App.Services.EscapeHotkey.Capture(() =>
+            DispatcherQueue.TryEnqueue(async () => await StopAsync(false)));
         var ready = App.Services.Recording.State == RecordingState.Recording;
         ModeText.Text = ready ? mode : "Starting…";
         StopButton.IsEnabled = ready;
@@ -24,7 +28,11 @@ public sealed partial class RecordingHudWindow : Window
         App.Services.Recording.ElapsedChanged += Recording_ElapsedChanged;
         App.Services.Recording.AudioLevelChanged += Recording_AudioLevelChanged;
         App.Services.Recording.StateChanged += Recording_StateChanged;
-        Closed += (_, _) => Unsubscribe();
+        Closed += (_, _) =>
+        {
+            _escapeLease.Dispose();
+            Unsubscribe();
+        };
     }
 
     public static void ShowForAudio(string device, Func<bool, Task> stop)

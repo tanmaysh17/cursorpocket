@@ -147,6 +147,7 @@ public sealed partial class MainWindow : Window
             }
             var microphones = App.Services.Recording.GetMicrophones();
             var microphone = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(microphones, App.Services.Settings.VideoMicrophoneName);
+            App.Services.Context.RestoreFocus(_lastSourceWindow);
             await App.Services.Recording.StartAudioAsync(microphone?.Id);
             RecordingHudWindow.ShowForAudio(
                 microphone?.Name ?? "Default microphone",

@@ -150,8 +150,17 @@ public sealed partial class CommandPaletteWindow : Window
         // restoring the source after the palette closes would immediately
         // bury it again. Transient capture commands still return to source.
         _restoreSourceOnClose = command != "library";
-        CommandRequested?.Invoke(this, command);
+        if (command == "library")
+        {
+            CommandRequested?.Invoke(this, command);
+            HidePalette();
+            return;
+        }
+        // Release the scoped bare keys (especially Escape) before the next
+        // capture surface registers its own cancel key.
+        _restoreSourceOnClose = false;
         HidePalette();
+        CommandRequested?.Invoke(this, command);
     }
 
     private void ResetTimeout()

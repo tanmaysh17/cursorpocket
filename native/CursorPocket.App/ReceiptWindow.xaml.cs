@@ -16,6 +16,7 @@ public sealed partial class ReceiptWindow : Window
         InitializeComponent();
         WindowPlacement.ConfigureUtilityWindow(this);
         WindowPlacement.PlaceBottomRight(this, 430, 128);
+        WindowPlacement.ClipToRoundedRegion(this, 430, 128, 16);
         ReceiptTitle.Text = title;
         ReceiptDetail.Text = detail ?? record?.Preview ?? "Nothing was saved";
         OpenButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;

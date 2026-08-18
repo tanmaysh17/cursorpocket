@@ -26,6 +26,7 @@ public sealed partial class AnnotationWindow : Window
     private AnnotationOperation? _active;
     private Point _start;
     private bool _finished;
+    private readonly IDisposable _escapeLease;
 
     public AnnotationWindow(CaptureRecord record, string path)
     {
@@ -41,9 +42,11 @@ public sealed partial class AnnotationWindow : Window
         DrawingSurface.Height = source.Height;
         ScreenshotImage.Source = new BitmapImage(new Uri(path));
         DrawingSurface.KeyDown += DrawingSurface_KeyDown;
+        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
         Activated += (_, _) => DrawingSurface.Focus(FocusState.Programmatic);
         Closed += (_, _) =>
         {
+            _escapeLease.Dispose();
             if (!_finished)
             {
                 Cancelled?.Invoke(this, EventArgs.Empty);
