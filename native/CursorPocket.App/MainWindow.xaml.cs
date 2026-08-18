@@ -26,7 +26,7 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon("Assets/AppIcon.ico");
-        AppWindow.Resize(new SizeInt32(1100, 760));
+        WindowPlacement.ResizeInDips(this, 1100, 760);
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
             presenter.PreferredMinimumWidth = 720;
@@ -87,7 +87,11 @@ public sealed partial class MainWindow : Window
         }
         _preflight = new VideoPreflightWindow(_lastSourceWindow);
         _preflight.RecordingRequested += async (_, options) => await StartVideoAsync(options);
-        _preflight.Closed += (_, _) => _preflight = null;
+        _preflight.Closed += (_, _) =>
+        {
+            _preflight = null;
+            App.Services.Context.RestoreFocus(_lastSourceWindow);
+        };
         _preflight.Activate();
     }
 
@@ -113,6 +117,7 @@ public sealed partial class MainWindow : Window
                 {
                     var record = await App.Services.Recording.StopAudioAsync(discard);
                     if (record is not null) ShowReceipt(record, "Audio note saved");
+                    else ShowError(discard ? "Audio note discarded" : "Audio note was not saved", "No file was created.");
                 });
         }
         catch (Exception error)
@@ -251,6 +256,7 @@ public sealed partial class MainWindow : Window
                 {
                     var record = await App.Services.Recording.StopVideoAsync(discard);
                     if (record is not null) ShowReceipt(record, "Video saved");
+                    else ShowError(discard ? "Recording discarded" : "Video was not saved", "No file was created.");
                 });
         }
         catch (Exception error)

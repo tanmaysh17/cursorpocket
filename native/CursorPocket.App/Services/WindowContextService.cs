@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Automation;
 using CursorPocket.Core.Services;
 
 namespace CursorPocket_App.Services;
@@ -28,10 +29,16 @@ public sealed class WindowContextService : IContextCaptureService
 
     public async Task<string?> ReadSelectedTextAsync(long sourceWindow, CancellationToken cancellationToken = default)
     {
+        var automationSelection = await Task.Run(() => ReadAutomationSelection((nint)sourceWindow), cancellationToken);
+        if (!string.IsNullOrWhiteSpace(automationSelection))
+        {
+            return automationSelection.Trim();
+        }
         if (!Activate((nint)sourceWindow))
         {
             return null;
         }
+        await Task.Delay(60, cancellationToken);
         var before = NativeMethods.GetClipboardSequenceNumber();
         SendControlKey((byte)'C');
         return await WaitForClipboardAsync(before, cancellationToken);
@@ -44,6 +51,7 @@ public sealed class WindowContextService : IContextCaptureService
         {
             return null;
         }
+        await Task.Delay(60, cancellationToken);
         var before = NativeMethods.GetClipboardSequenceNumber();
         SendControlKey((byte)'L');
         await Task.Delay(45, cancellationToken);
@@ -68,7 +76,16 @@ public sealed class WindowContextService : IContextCaptureService
             NativeMethods.ShowWindowAsync(hwnd, NativeMethods.SwRestore);
         }
         NativeMethods.BringWindowToTop(hwnd);
-        return NativeMethods.SetForegroundWindow(hwnd);
+        NativeMethods.SetForegroundWindow(hwnd);
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            if (NativeMethods.GetForegroundWindow() == hwnd)
+            {
+                return true;
+            }
+            Thread.Sleep(15);
+        }
+        return false;
     }
 
     private static bool IsSupportedBrowser(nint hwnd)
@@ -136,6 +153,42 @@ public sealed class WindowContextService : IContextCaptureService
             {
                 NativeMethods.CloseClipboard();
             }
+        }
+        return null;
+    }
+
+    private static string? ReadAutomationSelection(nint hwnd)
+    {
+        if (hwnd == 0 || !NativeMethods.IsWindow(hwnd))
+        {
+            return null;
+        }
+        try
+        {
+            var root = AutomationElement.FromHandle(hwnd);
+            var providers = root.FindAll(
+                TreeScope.Element | TreeScope.Descendants,
+                new PropertyCondition(AutomationElement.IsTextPatternAvailableProperty, true));
+            foreach (AutomationElement provider in providers)
+            {
+                if (provider.GetCurrentPattern(TextPattern.Pattern) is not TextPattern pattern)
+                {
+                    continue;
+                }
+                foreach (var selection in pattern.GetSelection())
+                {
+                    var value = selection.GetText(-1);
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        return value;
+                    }
+                }
+            }
+        }
+        catch (Exception error) when (error is ElementNotAvailableException or InvalidOperationException or COMException)
+        {
+            // Clipboard copy remains the compatibility fallback for apps that do
+            // not expose a stable UI Automation text provider.
         }
         return null;
     }

@@ -15,11 +15,15 @@ public sealed partial class ReceiptWindow : Window
         _record = record;
         InitializeComponent();
         WindowPlacement.ConfigureUtilityWindow(this);
-        WindowPlacement.PlaceBottomRight(this, 430, 112);
+        WindowPlacement.PlaceBottomRight(this, 430, 128);
         ReceiptTitle.Text = title;
         ReceiptDetail.Text = detail ?? record?.Preview ?? "Nothing was saved";
         OpenButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
         RevealButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
+        if (record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio)
+        {
+            OpenButton.Content = "Play";
+        }
         ReceiptIcon.Glyph = record?.CaptureKind switch
         {
             CaptureKind.Screenshot => "\uE91B",
@@ -58,7 +62,11 @@ public sealed partial class ReceiptWindow : Window
 
     private void Open_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (_record is not null)
+        if (_record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio)
+        {
+            OpenLibraryRequested?.Invoke(this, EventArgs.Empty);
+        }
+        else if (_record is not null)
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(App.Services.Library.GetAbsolutePath(_record)) { UseShellExecute = true });
         }

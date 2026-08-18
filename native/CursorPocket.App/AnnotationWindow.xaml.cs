@@ -34,7 +34,6 @@ public sealed partial class AnnotationWindow : Window
         InitializeComponent();
         var bounds = WindowPlacement.MonitorUnderPointer(true);
         AppWindow.MoveAndResize(new RectInt32(bounds.Left + 20, bounds.Top + 20, Math.Max(760, bounds.Right - bounds.Left - 40), Math.Max(560, bounds.Bottom - bounds.Top - 40)));
-        NativeMethods.SetWindowDisplayAffinity(WinRT.Interop.WindowNative.GetWindowHandle(this), NativeMethods.WdaExcludeFromCapture);
         using var source = new System.Drawing.Bitmap(path);
         Stage.Width = source.Width;
         Stage.Height = source.Height;

@@ -121,6 +121,9 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);
 
+    [DllImport("user32.dll")]
+    internal static extern uint GetDpiForWindow(nint hwnd);
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowPos(nint hwnd, nint insertAfter, int x, int y, int width, int height, uint flags);

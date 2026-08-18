@@ -23,6 +23,7 @@ public sealed record RecordingOptions
     public int Quality { get; init; } = 72;
     public bool DrawCursor { get; init; } = true;
     public bool IncludeMicrophone { get; init; } = true;
+    public string MicrophoneId { get; init; } = string.Empty;
     public string MicrophoneName { get; init; } = string.Empty;
     public bool IncludeCamera { get; init; }
     public string CameraName { get; init; } = string.Empty;

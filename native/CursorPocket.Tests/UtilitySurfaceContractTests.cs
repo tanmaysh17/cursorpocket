@@ -35,7 +35,13 @@ public sealed class UtilitySurfaceContractTests
     {
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
 
-        Assert.Contains("Closed += (_, _) => App.Services.Context.RestoreFocus(SourceWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("App.Services.Context.RestoreFocus(SourceWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
+        Assert.Contains("FocusCommandSurface", code, StringComparison.Ordinal);
+        Assert.Contains("CommandAccelerator_Invoked", ReadFixture("CommandPaletteWindow.xaml"), StringComparison.Ordinal);
+        var globalKeys = ReadFixture("PaletteHotkeyService.cs.txt");
+        Assert.Contains("RegisterHotKey", globalKeys, StringComparison.Ordinal);
+        Assert.Contains("ModNoRepeat", globalKeys, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -45,6 +51,7 @@ public sealed class UtilitySurfaceContractTests
 
         Assert.Contains("!StartButton.IsEnabled", code, StringComparison.Ordinal);
         Assert.Contains("DisplayIndexUnderPointer", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
     }
 
     [Fact]

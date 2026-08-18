@@ -11,6 +11,7 @@ namespace CursorPocket_App;
 public sealed partial class CommandPaletteWindow : Window
 {
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
+    private readonly PaletteHotkeyService _commandKeys = new();
     private bool _screenshotMode;
 
     public CommandPaletteWindow(long sourceWindow, string? initialMode = null)
@@ -19,13 +20,19 @@ public sealed partial class CommandPaletteWindow : Window
         InitializeComponent();
         var bounds = WindowPlacement.MonitorUnderPointer();
         BackdropImage.Source = DesktopSnapshot.Capture(bounds);
-        WindowPlacement.ConfigureUtilityWindow(this);
+        WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
         _timeout.Tick += (_, _) => ClosePalette();
-        Closed += (_, _) => App.Services.Context.RestoreFocus(SourceWindow);
+        _commandKeys.Invoked += CommandKeys_Invoked;
+        Closed += (_, _) =>
+        {
+            _commandKeys.Invoked -= CommandKeys_Invoked;
+            _commandKeys.Dispose();
+            App.Services.Context.RestoreFocus(SourceWindow);
+        };
         Activated += (_, _) =>
         {
-            Root.Focus(FocusState.Programmatic);
+            FocusCommandSurface();
             ResetTimeout();
         };
         if (initialMode == "screenshot")
@@ -62,22 +69,25 @@ public sealed partial class CommandPaletteWindow : Window
 
     private void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
     {
-        ResetTimeout();
-        if (eventArgs.Key == VirtualKey.Escape)
-        {
-            if (_screenshotMode)
-            {
-                ShowPrimaryCommands();
-            }
-            else
-            {
-                ClosePalette();
-            }
-            eventArgs.Handled = true;
-            return;
-        }
         var shiftDown = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
-        var command = _screenshotMode ? eventArgs.Key switch
+        eventArgs.Handled = HandleCommandKey(eventArgs.Key, shiftDown);
+    }
+
+    private void CommandAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs) =>
+        eventArgs.Handled = HandleCommandKey(sender.Key, sender.Modifiers.HasFlag(VirtualKeyModifiers.Shift));
+
+    private void CommandKeys_Invoked(object? sender, PaletteHotkeyEventArgs eventArgs) =>
+        DispatcherQueue.TryEnqueue(() => HandleCommandKey(eventArgs.Key, eventArgs.Shift));
+
+    private bool HandleCommandKey(VirtualKey key, bool shiftDown)
+    {
+        ResetTimeout();
+        if (key == VirtualKey.Escape)
+        {
+            if (_screenshotMode) ShowPrimaryCommands(); else ClosePalette();
+            return true;
+        }
+        var command = _screenshotMode ? key switch
         {
             VirtualKey.R => "region",
             VirtualKey.W => "window",
@@ -85,7 +95,7 @@ public sealed partial class CommandPaletteWindow : Window
             VirtualKey.A => "all-displays",
             VirtualKey.P => "previous-region",
             _ => null,
-        } : eventArgs.Key switch
+        } : key switch
         {
             VirtualKey.S => "screenshot",
             VirtualKey.V => shiftDown ? "repeat-video" : "video",
@@ -97,9 +107,8 @@ public sealed partial class CommandPaletteWindow : Window
         };
         if (command is null)
         {
-            return;
+            return false;
         }
-        eventArgs.Handled = true;
         if (command == "screenshot")
         {
             ShowScreenshotCommands();
@@ -108,6 +117,7 @@ public sealed partial class CommandPaletteWindow : Window
         {
             Request(command);
         }
+        return true;
     }
 
     private void ShowScreenshotCommands()
@@ -117,6 +127,7 @@ public sealed partial class CommandPaletteWindow : Window
         ScreenshotCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "Which part of the screen?";
         PaletteHint.Text = "Press S, then one of these keys. They are sequential, never held together.";
+        RegionCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
 
@@ -127,6 +138,7 @@ public sealed partial class CommandPaletteWindow : Window
         PrimaryCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "What do you want to catch?";
         PaletteHint.Text = "Press one key. Nothing here affects normal typing.";
+        ScreenshotCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
 
@@ -150,7 +162,12 @@ public sealed partial class CommandPaletteWindow : Window
     }
 
     private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs) => ResetTimeout();
-    private void Root_Loaded(object sender, RoutedEventArgs eventArgs) => PulseStoryboard.Begin();
+    private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
+    {
+        PulseStoryboard.Begin();
+        FocusCommandSurface();
+    }
+    private void FocusCommandSurface() => (_screenshotMode ? RegionCommand : ScreenshotCommand).Focus(FocusState.Programmatic);
     private void Close_Click(object sender, RoutedEventArgs eventArgs) => ClosePalette();
     private void LibraryPulse_Click(object sender, RoutedEventArgs eventArgs) => Request("library");
 }

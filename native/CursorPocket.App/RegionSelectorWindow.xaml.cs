@@ -20,7 +20,7 @@ public sealed partial class RegionSelectorWindow : Window
     public RegionSelectorWindow()
     {
         InitializeComponent();
-        WindowPlacement.ConfigureUtilityWindow(this);
+        WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
         _virtualLeft = NativeMethods.GetSystemMetrics(NativeMethods.SmXVirtualScreen);
         _virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
         var width = NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen);

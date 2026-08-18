@@ -5,14 +5,15 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Recording">
     <Grid Padding="10" Background="Transparent">
-        <Border Padding="14,10" Background="#F10C1412" CornerRadius="16" BorderBrush="#55FF5A67" BorderThickness="1">
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="120" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                <Grid Width="28" Height="28"><Ellipse Fill="#33FF5A67" /><Ellipse Width="9" Height="9" Fill="{StaticResource PocketRed}" /></Grid>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock x:Name="ModeText" Text="Recording" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="DeviceText" Text="Microphone" MaxWidth="190" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4"><TextBlock x:Name="TimerText" Text="0:00" FontFamily="Cascadia Mono" FontSize="17" Foreground="{StaticResource PocketInk}" /><ProgressBar x:Name="LevelBar" Height="3" Minimum="0" Maximum="1" Foreground="{StaticResource PocketGreen}" /></StackPanel>
-                <Button Grid.Column="3" Click="Stop_Click" Content="Stop &amp; save" Style="{StaticResource PocketPrimaryButton}" />
-                <Button Grid.Column="4" Click="Discard_Click" Background="Transparent" ToolTipService.ToolTip="Discard recording"><FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" /></Button>
+        <Border Padding="18,14" Background="#FF09110F" CornerRadius="18" BorderBrush="#99FF5A67" BorderThickness="1">
+            <Border.Shadow><ThemeShadow /></Border.Shadow>
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="220" /><ColumnDefinition Width="110" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid Width="34" Height="34"><Ellipse Fill="#44FF5A67" /><Ellipse Width="11" Height="11" Fill="{StaticResource PocketRed}" /></Grid>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2"><TextBlock x:Name="ModeText" Text="Recording" FontSize="15" FontWeight="SemiBold" Foreground="White" /><TextBlock x:Name="DeviceText" Text="Microphone" MaxWidth="220" FontSize="12" Foreground="#FFD8E4DF" TextTrimming="CharacterEllipsis" /></StackPanel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="7"><TextBlock x:Name="TimerText" Text="0:00" FontFamily="Cascadia Mono" FontSize="19" FontWeight="SemiBold" Foreground="White" /><ProgressBar x:Name="LevelBar" Height="5" Minimum="0" Maximum="1" Foreground="{StaticResource PocketGreen}" Background="#FF25332D" /></StackPanel>
+                <Button Grid.Column="3" Click="Stop_Click" Content="Stop &amp; save" Style="{StaticResource PocketPrimaryButton}" AutomationProperties.Name="Stop and save recording" />
+                <Button Grid.Column="4" Width="42" Height="42" Click="Discard_Click" Background="#33FF5A67" CornerRadius="10" ToolTipService.ToolTip="Discard recording" AutomationProperties.Name="Discard recording"><FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" /></Button>
             </Grid>
         </Border>
     </Grid>

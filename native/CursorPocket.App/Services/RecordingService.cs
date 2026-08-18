@@ -1,11 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
-using System.Text.RegularExpressions;
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket.Core.Storage;
 using NAudio.Wave;
+using Windows.Devices.Enumeration;
 
 namespace CursorPocket_App.Services;
 
@@ -19,6 +19,12 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private CaptureReservation? _videoReservation;
     private RecordingOptions? _videoOptions;
     private readonly StringBuilder _videoError = new();
+    private WaveInEvent? _videoWaveIn;
+    private WaveFileWriter? _videoWaveWriter;
+    private string? _videoRawPath;
+    private string? _videoAudioPath;
+    private string? _videoMuxPath;
+    private TaskCompletionSource _videoAudioStopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private WaveInEvent? _waveIn;
     private WaveFileWriter? _waveWriter;
     private CaptureReservation? _audioReservation;
@@ -77,7 +83,33 @@ public sealed class RecordingService : IRecordingService, IDisposable
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
         var output = await errorTask;
-        return ParseDevices(output);
+        var ffmpegDevices = FfmpegDeviceParser.Parse(output);
+        var audio = GetMicrophones().ToList();
+        var video = ffmpegDevices.Video.ToList();
+
+        try
+        {
+            var windowsAudio = await DeviceInformation.FindAllAsync(DeviceClass.AudioCapture).AsTask(cancellationToken);
+            for (var index = 0; index < Math.Min(audio.Count, windowsAudio.Count); index++)
+            {
+                audio[index] = audio[index] with { Name = windowsAudio[index].Name };
+            }
+
+            var windowsVideo = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture).AsTask(cancellationToken);
+            foreach (var device in windowsVideo)
+            {
+                if (video.All(item => !string.Equals(item.Name, device.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    video.Add(new MediaDeviceDescriptor(device.Id, device.Name, "video", video.Count == 0));
+                }
+            }
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Privacy policy can restrict WinRT enumeration. NAudio and FFmpeg remain valid fallbacks.
+        }
+
+        return (audio, video);
     }
 
     public Task StartAudioAsync(string? microphoneId = null, CancellationToken cancellationToken = default)
@@ -171,8 +203,24 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
         _videoReservation = _store.Reserve(CaptureKind.Video, ".mp4");
         _videoOptions = options;
+        _videoRawPath = _videoReservation.AbsolutePath;
+        if (options.IncludeMicrophone)
+        {
+            var temporaryDirectory = Path.Combine(_store.RootDirectory, ".cursorpocket", "temp");
+            Directory.CreateDirectory(temporaryDirectory);
+            _videoAudioPath = Path.Combine(temporaryDirectory, _videoReservation.Id + ".microphone.wav");
+            _videoMuxPath = Path.Combine(temporaryDirectory, _videoReservation.Id + ".mux.mp4");
+        }
+        else
+        {
+            _videoAudioPath = null;
+            _videoMuxPath = null;
+        }
         _videoError.Clear();
-        var command = FfmpegCommandBuilder.Build(_ffmpegPath, _videoReservation.AbsolutePath, options);
+        var command = FfmpegCommandBuilder.Build(
+            _ffmpegPath,
+            _videoRawPath,
+            options with { IncludeMicrophone = false, MicrophoneName = string.Empty });
         var startInfo = new ProcessStartInfo
         {
             FileName = command[0],
@@ -205,6 +253,24 @@ public sealed class RecordingService : IRecordingService, IDisposable
             throw new InvalidOperationException("The video recorder did not start.");
         }
         _videoProcess.BeginErrorReadLine();
+        try
+        {
+            if (options.IncludeMicrophone)
+            {
+                StartVideoMicrophone(options);
+            }
+        }
+        catch
+        {
+            if (!_videoProcess.HasExited)
+            {
+                _videoProcess.Kill(true);
+                await _videoProcess.WaitForExitAsync(cancellationToken);
+            }
+            CleanupVideo(deleteFile: true);
+            SetState(RecordingState.Failed);
+            throw;
+        }
         await Task.Delay(350, cancellationToken);
         if (_videoProcess.HasExited)
         {
@@ -228,6 +294,9 @@ public sealed class RecordingService : IRecordingService, IDisposable
         var process = _videoProcess;
         var reservation = _videoReservation;
         var options = _videoOptions;
+        var rawPath = _videoRawPath ?? reservation.AbsolutePath;
+        var audioPath = _videoAudioPath;
+        var muxPath = _videoMuxPath;
         try
         {
             if (!process.HasExited)
@@ -249,30 +318,66 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
         finally
         {
-            CleanupVideo(deleteFile: discard);
+            await StopVideoMicrophoneAsync(cancellationToken);
+            process.Dispose();
+            _videoProcess = null;
         }
-        if (discard || !File.Exists(reservation.AbsolutePath) || new FileInfo(reservation.AbsolutePath).Length < 1024)
+
+        if (discard)
         {
+            DeleteIfExists(rawPath);
+            DeleteIfExists(audioPath);
+            DeleteIfExists(muxPath);
+            DeleteIfExists(reservation.AbsolutePath);
+            ClearVideoState();
+            SetState(RecordingState.Idle);
+            return null;
+        }
+
+        string? microphoneWarning = null;
+        if (options.IncludeMicrophone && audioPath is not null && muxPath is not null)
+        {
+            try
+            {
+                await MuxVideoMicrophoneAsync(rawPath, audioPath, muxPath, cancellationToken);
+                File.Move(muxPath, reservation.AbsolutePath, true);
+            }
+            catch (Exception error) when (error is IOException or InvalidOperationException)
+            {
+                microphoneWarning = error.Message;
+            }
+            DeleteIfExists(audioPath);
+            DeleteIfExists(muxPath);
+        }
+
+        if (!File.Exists(reservation.AbsolutePath) || new FileInfo(reservation.AbsolutePath).Length < 1024)
+        {
+            ClearVideoState();
             SetState(RecordingState.Idle);
             return null;
         }
         var record = await _store.RegisterExistingAsync(
             CaptureKind.Video,
             reservation.AbsolutePath,
-            $"Video · {FormatDuration(duration)}",
+            microphoneWarning is null
+                ? $"Video · {FormatDuration(duration)}"
+                : $"Video · {FormatDuration(duration)} · microphone was not saved",
             new Dictionary<string, object?>
             {
                 ["duration_seconds"] = Math.Round(duration.TotalSeconds, 3),
                 ["fps"] = options.FramesPerSecond,
                 ["source_kind"] = options.SourceKind.ToString().ToLowerInvariant(),
                 ["include_microphone"] = options.IncludeMicrophone,
+                ["microphone_id"] = options.MicrophoneId,
                 ["microphone_name"] = options.MicrophoneName,
+                ["microphone_error"] = microphoneWarning,
                 ["include_camera"] = options.IncludeCamera,
                 ["camera_name"] = options.CameraName,
                 ["camera_position"] = options.CameraPosition,
                 ["camera_width"] = options.CameraWidth,
             },
             cancellationToken);
+        ClearVideoState();
         SetState(RecordingState.Idle);
         return record;
     }
@@ -301,6 +406,115 @@ public sealed class RecordingService : IRecordingService, IDisposable
     {
         _waveWriter?.Flush();
         _audioStopped.TrySetResult();
+    }
+
+    private void StartVideoMicrophone(RecordingOptions options)
+    {
+        if (string.IsNullOrWhiteSpace(_videoAudioPath))
+        {
+            return;
+        }
+
+        var microphones = GetMicrophones();
+        var selected = microphones.FirstOrDefault(device => string.Equals(device.Id, options.MicrophoneId, StringComparison.OrdinalIgnoreCase))
+            ?? microphones.FirstOrDefault(device => string.Equals(device.Name, options.MicrophoneName, StringComparison.OrdinalIgnoreCase))
+            ?? microphones.FirstOrDefault();
+        if (selected is null || !int.TryParse(selected.Id, NumberStyles.None, CultureInfo.InvariantCulture, out var deviceNumber))
+        {
+            throw new InvalidOperationException("Windows did not report an available microphone for this recording.");
+        }
+
+        _videoAudioStopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _videoWaveIn = new WaveInEvent
+        {
+            DeviceNumber = deviceNumber,
+            WaveFormat = new WaveFormat(48000, 16, 1),
+            BufferMilliseconds = 50,
+            NumberOfBuffers = 4,
+        };
+        _videoWaveWriter = new WaveFileWriter(_videoAudioPath, _videoWaveIn.WaveFormat);
+        _videoWaveIn.DataAvailable += OnVideoAudioData;
+        _videoWaveIn.RecordingStopped += OnVideoAudioStopped;
+        _videoWaveIn.StartRecording();
+    }
+
+    private void OnVideoAudioData(object? sender, WaveInEventArgs eventArgs)
+    {
+        _videoWaveWriter?.Write(eventArgs.Buffer, 0, eventArgs.BytesRecorded);
+        var peak = 0d;
+        for (var index = 0; index + 1 < eventArgs.BytesRecorded; index += 2)
+        {
+            peak = Math.Max(peak, Math.Abs(BitConverter.ToInt16(eventArgs.Buffer, index) / 32768d));
+        }
+        AudioLevel = Math.Min(1, peak * 2.4);
+        AudioLevelChanged?.Invoke(this, AudioLevel);
+    }
+
+    private void OnVideoAudioStopped(object? sender, StoppedEventArgs eventArgs)
+    {
+        _videoWaveWriter?.Flush();
+        _videoAudioStopped.TrySetResult();
+    }
+
+    private async Task StopVideoMicrophoneAsync(CancellationToken cancellationToken)
+    {
+        if (_videoWaveIn is null)
+        {
+            return;
+        }
+        try
+        {
+            _videoWaveIn.StopRecording();
+            await _videoAudioStopped.Task.WaitAsync(TimeSpan.FromSeconds(3), cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            // Preserve the WAV header if a device was unplugged during finalization.
+        }
+        finally
+        {
+            _videoWaveIn.DataAvailable -= OnVideoAudioData;
+            _videoWaveIn.RecordingStopped -= OnVideoAudioStopped;
+            _videoWaveIn.Dispose();
+            _videoWaveIn = null;
+            _videoWaveWriter?.Dispose();
+            _videoWaveWriter = null;
+            AudioLevel = 0;
+        }
+    }
+
+    private async Task MuxVideoMicrophoneAsync(string videoPath, string audioPath, string outputPath, CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _ffmpegPath,
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in new[]
+        {
+            "-y", "-hide_banner", "-loglevel", "error",
+            "-i", videoPath, "-i", audioPath,
+            "-map", "0:v:0", "-map", "1:a:0",
+            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
+            "-shortest", "-movflags", "+faststart", outputPath,
+        })
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var mux = Process.Start(startInfo) ?? throw new InvalidOperationException("The video finalizer did not start.");
+        var errorTask = mux.StandardError.ReadToEndAsync(cancellationToken);
+        await mux.WaitForExitAsync(cancellationToken);
+        var error = (await errorTask).Trim();
+        if (mux.ExitCode != 0 || !File.Exists(outputPath))
+        {
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
+                ? "The microphone track could not be added to the video."
+                : $"The microphone track could not be added to the video: {error}");
+        }
     }
 
     private void EnsureIdle()
@@ -353,14 +567,43 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     private void CleanupVideo(bool deleteFile)
     {
+        if (_videoWaveIn is not null)
+        {
+            try { _videoWaveIn.StopRecording(); } catch (Exception) { }
+            _videoWaveIn.DataAvailable -= OnVideoAudioData;
+            _videoWaveIn.RecordingStopped -= OnVideoAudioStopped;
+            _videoWaveIn.Dispose();
+            _videoWaveIn = null;
+        }
+        _videoWaveWriter?.Dispose();
+        _videoWaveWriter = null;
         _videoProcess?.Dispose();
         _videoProcess = null;
-        if (deleteFile && _videoReservation is not null)
+        if (deleteFile)
         {
-            File.Delete(_videoReservation.AbsolutePath);
+            DeleteIfExists(_videoReservation?.AbsolutePath);
+            DeleteIfExists(_videoRawPath);
+            DeleteIfExists(_videoAudioPath);
+            DeleteIfExists(_videoMuxPath);
         }
+        ClearVideoState();
+    }
+
+    private void ClearVideoState()
+    {
         _videoReservation = null;
         _videoOptions = null;
+        _videoRawPath = null;
+        _videoAudioPath = null;
+        _videoMuxPath = null;
+    }
+
+    private static void DeleteIfExists(string? path)
+    {
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            File.Delete(path);
+        }
     }
 
     private static string FormatDuration(TimeSpan duration) => $"{(int)duration.TotalMinutes}:{duration.Seconds:00}";
@@ -381,39 +624,4 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
     }
 
-    private static (IReadOnlyList<MediaDeviceDescriptor> Audio, IReadOnlyList<MediaDeviceDescriptor> Video) ParseDevices(string output)
-    {
-        var audio = new List<MediaDeviceDescriptor>();
-        var video = new List<MediaDeviceDescriptor>();
-        string? section = null;
-        foreach (var rawLine in output.Split('\n'))
-        {
-            var line = rawLine.Trim();
-            if (line.Contains("DirectShow video devices", StringComparison.OrdinalIgnoreCase))
-            {
-                section = "video";
-                continue;
-            }
-            if (line.Contains("DirectShow audio devices", StringComparison.OrdinalIgnoreCase))
-            {
-                section = "audio";
-                continue;
-            }
-            var match = Regex.Match(line, "\\\"(?<name>[^\\\"]+)\\\"");
-            if (!match.Success || line.Contains("Alternative name", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            var name = match.Groups["name"].Value;
-            if (section == "video" && video.All(device => device.Name != name))
-            {
-                video.Add(new MediaDeviceDescriptor(name, name, "video", video.Count == 0));
-            }
-            else if (section == "audio" && audio.All(device => device.Name != name))
-            {
-                audio.Add(new MediaDeviceDescriptor(name, name, "audio", audio.Count == 0));
-            }
-        }
-        return (audio, video);
-    }
 }

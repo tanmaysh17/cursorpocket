@@ -26,13 +26,12 @@ public sealed partial class VideoPreflightWindow : Window
     {
         _sourceWindow = sourceWindow;
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(940, 720));
+        WindowPlacement.ResizeInDips(this, 940, 720);
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = true;
             presenter.IsResizable = true;
         }
-        NativeMethods.SetWindowDisplayAffinity(WinRT.Interop.WindowNative.GetWindowHandle(this), NativeMethods.WdaExcludeFromCapture);
         MicrophoneToggle.IsOn = App.Services.Settings.VideoMicrophoneEnabled;
         CameraToggle.IsOn = App.Services.Settings.VideoCameraEnabled;
         PointerToggle.IsOn = App.Services.Settings.VideoDrawCursor;
@@ -204,6 +203,7 @@ public sealed partial class VideoPreflightWindow : Window
             SourceKind = sourceValue switch { "region" => VideoSourceKind.Region, "window" => VideoSourceKind.Window, _ => VideoSourceKind.Display },
             WindowHandle = sourceValue == "window" ? _sourceWindow : null,
             IncludeMicrophone = MicrophoneToggle.IsOn && microphone is not null,
+            MicrophoneId = microphone?.Id ?? string.Empty,
             MicrophoneName = microphone?.Name ?? string.Empty,
             IncludeCamera = CameraToggle.IsOn && camera is not null,
             CameraName = camera?.Name ?? string.Empty,

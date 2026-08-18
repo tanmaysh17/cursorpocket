@@ -16,7 +16,7 @@ public sealed partial class RecordingHudWindow : Window
         ModeText.Text = mode;
         DeviceText.Text = device;
         WindowPlacement.ConfigureUtilityWindow(this);
-        WindowPlacement.PlaceTopCenter(this, 590, 74);
+        WindowPlacement.PlaceTopCenter(this, 680, 108);
         App.Services.Recording.ElapsedChanged += Recording_ElapsedChanged;
         App.Services.Recording.AudioLevelChanged += Recording_AudioLevelChanged;
         App.Services.Recording.StateChanged += Recording_StateChanged;
@@ -64,10 +64,19 @@ public sealed partial class RecordingHudWindow : Window
         }
         _stopping = true;
         ModeText.Text = discard ? "Discarding…" : "Finalizing…";
-        await _stop(discard);
-        if (App.Services.Recording.State is RecordingState.Idle or RecordingState.Failed)
+        try
         {
-            Close();
+            await _stop(discard);
+            if (App.Services.Recording.State is RecordingState.Idle or RecordingState.Failed)
+            {
+                Close();
+            }
+        }
+        catch (Exception error)
+        {
+            ModeText.Text = "Could not finish recording";
+            DeviceText.Text = error.Message;
+            _stopping = false;
         }
     }
 

@@ -37,7 +37,7 @@ internal static class WindowPlacement
         return result;
     }
 
-    public static void ConfigureUtilityWindow(Window window, bool topmost = true)
+    public static void ConfigureUtilityWindow(Window window, bool topmost = true, bool excludeFromCapture = true)
     {
         var appWindow = window.AppWindow;
         appWindow.IsShownInSwitchers = false;
@@ -50,7 +50,10 @@ internal static class WindowPlacement
             presenter.IsAlwaysOnTop = topmost;
         }
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
+        if (excludeFromCapture)
+        {
+            NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
+        }
     }
 
     public static void ConfigureColorKeyTransparency(Window window, uint colorKey, bool noActivate = false)
@@ -75,15 +78,37 @@ internal static class WindowPlacement
         window.AppWindow.MoveAndResize(new RectInt32(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
     }
 
+    public static void ResizeInDips(Window window, int width, int height)
+    {
+        var scale = ScaleFor(window);
+        window.AppWindow.Resize(new SizeInt32(ToPixels(width, scale), ToPixels(height, scale)));
+    }
+
     public static void PlaceBottomRight(Window window, int width, int height, int margin = 24)
     {
         var bounds = MonitorUnderPointer(true);
-        window.AppWindow.MoveAndResize(new RectInt32(bounds.Right - width - margin, bounds.Bottom - height - margin, width, height));
+        var scale = ScaleFor(window);
+        var pixelWidth = ToPixels(width, scale);
+        var pixelHeight = ToPixels(height, scale);
+        var pixelMargin = ToPixels(margin, scale);
+        window.AppWindow.MoveAndResize(new RectInt32(bounds.Right - pixelWidth - pixelMargin, bounds.Bottom - pixelHeight - pixelMargin, pixelWidth, pixelHeight));
     }
 
     public static void PlaceTopCenter(Window window, int width, int height, int margin = 18)
     {
         var bounds = MonitorUnderPointer(true);
-        window.AppWindow.MoveAndResize(new RectInt32(bounds.Left + (bounds.Right - bounds.Left - width) / 2, bounds.Top + margin, width, height));
+        var scale = ScaleFor(window);
+        var pixelWidth = ToPixels(width, scale);
+        var pixelHeight = ToPixels(height, scale);
+        var pixelMargin = ToPixels(margin, scale);
+        window.AppWindow.MoveAndResize(new RectInt32(bounds.Left + (bounds.Right - bounds.Left - pixelWidth) / 2, bounds.Top + pixelMargin, pixelWidth, pixelHeight));
     }
+
+    private static double ScaleFor(Window window)
+    {
+        var dpi = NativeMethods.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window));
+        return Math.Max(1d, dpi / 96d);
+    }
+
+    private static int ToPixels(int dips, double scale) => Math.Max(1, (int)Math.Round(dips * scale));
 }
