@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="CursorPocket_App.AnnotationWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Annotate screenshot">
+    <Window.SystemBackdrop><MicaBackdrop Kind="BaseAlt" /></Window.SystemBackdrop>
+    <Grid Padding="18" RowSpacing="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <Grid>
+            <StackPanel Orientation="Horizontal" Spacing="7">
+                <ToggleButton x:Name="PenTool" Tag="pen" Click="Tool_Click" IsChecked="True" Content="Pen" />
+                <ToggleButton x:Name="HighlightTool" Tag="highlight" Click="Tool_Click" Content="Highlight" />
+                <ToggleButton x:Name="ArrowTool" Tag="arrow" Click="Tool_Click" Content="Arrow" />
+                <ToggleButton x:Name="RectangleTool" Tag="rectangle" Click="Tool_Click" Content="Rectangle" />
+                <ToggleButton x:Name="TextTool" Tag="text" Click="Tool_Click" Content="Text" />
+                <Rectangle Width="1" Height="26" Fill="{StaticResource PocketLine}" Margin="6,0" />
+                <Button Tag="#43E08D" Click="Color_Click" ToolTipService.ToolTip="Green"><Ellipse Width="17" Height="17" Fill="#FF43E08D" /></Button>
+                <Button Tag="#FF5A67" Click="Color_Click" ToolTipService.ToolTip="Red"><Ellipse Width="17" Height="17" Fill="#FFFF5A67" /></Button>
+                <Button Tag="#FFD166" Click="Color_Click" ToolTipService.ToolTip="Yellow"><Ellipse Width="17" Height="17" Fill="#FFFFD166" /></Button>
+                <Button Tag="#F4FAF7" Click="Color_Click" ToolTipService.ToolTip="White"><Ellipse Width="17" Height="17" Fill="#FFF4FAF7" /></Button>
+                <Button Click="Undo_Click" Margin="8,0,0,0" Style="{StaticResource PocketQuietButton}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE7A7;" /><TextBlock Text="Undo" /></StackPanel></Button>
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8"><Button Click="Cancel_Click" Content="Keep original" Style="{StaticResource PocketQuietButton}" /><Button Click="Save_Click" Content="Save annotation  ↵" Style="{StaticResource PocketPrimaryButton}" /></StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Background="#FF070C0E" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1" Padding="10">
+            <Viewbox Stretch="Uniform">
+                <Grid x:Name="Stage">
+                    <Image x:Name="ScreenshotImage" Stretch="Fill" />
+                    <Canvas x:Name="DrawingSurface" Background="Transparent" PointerPressed="DrawingSurface_PointerPressed" PointerMoved="DrawingSurface_PointerMoved" PointerReleased="DrawingSurface_PointerReleased" />
+                </Grid>
+            </Viewbox>
+        </Border>
+
+        <Grid Grid.Row="2"><TextBlock Text="Draw directly on the full-resolution image · Ctrl+Z undoes · Esc keeps the original" Style="{StaticResource PocketCaptionText}" /><TextBlock HorizontalAlignment="Right" Text="Nothing leaves this computer" Style="{StaticResource PocketCaptionText}" /></Grid>
+    </Grid>
+</Window>

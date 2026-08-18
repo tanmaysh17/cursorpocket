@@ -7,3 +7,26 @@ dist/
 third_party/ffmpeg/bin/*.exe
 third_party/ffmpeg/cache/
 third_party/ffmpeg/LICENSE.txt
+
+# .NET / Visual Studio
+**/[Bb]in/
+**/[Oo]bj/
+.vs/
+artifacts/
+TestResults/
+*.user
+*.suo
+*.binlog
+*.trx
+*.coverage
+*.nupkg
+*.snupkg
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixupload
+*.appx
+*.appxbundle
+*.appxupload
+publish/
+*.pubxml

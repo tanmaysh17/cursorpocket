@@ -1,0 +1,160 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using CursorPocket.Core.Models;
+using CursorPocket_App.Services;
+
+namespace CursorPocket_App.ViewModels;
+
+public partial class MainPageViewModel(AppServices services) : ObservableObject
+{
+    private readonly List<CaptureItemViewModel> _allItems = [];
+
+    public ObservableCollection<CaptureItemViewModel> Items { get; } = [];
+    public IReadOnlyList<string> Filters { get; } = ["All", "Screenshots", "Video", "Audio", "Text", "Links"];
+
+    [ObservableProperty] private CaptureItemViewModel? _selectedItem;
+    [ObservableProperty] private string _selectedFilter = "All";
+    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private string _statusMessage = "Ready";
+    [ObservableProperty] private string _captureDirectory = services.Settings.CaptureDirectory;
+    [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
+    [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
+    [ObservableProperty] private string _cursorCompanionMode = services.Settings.CursorCompanionMode;
+    [ObservableProperty] private string _activationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
+    [ObservableProperty] private bool _videoMicrophoneEnabled = services.Settings.VideoMicrophoneEnabled;
+    [ObservableProperty] private bool _videoCameraEnabled = services.Settings.VideoCameraEnabled;
+    [ObservableProperty] private int _videoFramesPerSecond = services.Settings.VideoFramesPerSecond;
+    [ObservableProperty] private int _videoCountdownSeconds = services.Settings.VideoCountdownSeconds;
+
+    public string CaptureCountLabel => _allItems.Count switch
+    {
+        0 => "Your next capture will land here",
+        1 => "1 capture, stored locally",
+        _ => $"{_allItems.Count} captures, stored locally",
+    };
+    public string ActivationHint => ActivationShortcut == "Shortcut unavailable"
+        ? "Choose a working activation shortcut in Settings, then make your first capture."
+        : $"Press {ActivationShortcut}, then choose a capture. Audio, video, screenshots, text, and links all appear here.";
+
+    public async Task InitializeAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var records = await services.Library.GetRecentAsync();
+            _allItems.Clear();
+            _allItems.AddRange(records.Select(record => new CaptureItemViewModel(record, services.Library.GetAbsolutePath(record))));
+            ApplyFilter();
+            OnPropertyChanged(nameof(CaptureCountLabel));
+            StatusMessage = services.Hotkey.RegisteredShortcut is null
+                ? "Choose an available activation shortcut in Settings"
+                : $"Press {services.Hotkey.RegisteredShortcut} anywhere to capture";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public void SelectFilter(string value)
+    {
+        SelectedFilter = value;
+        ApplyFilter();
+    }
+
+    public Task CaptureAddedAsync(CaptureRecord record)
+    {
+        var item = new CaptureItemViewModel(record, services.Library.GetAbsolutePath(record));
+        _allItems.Insert(0, item);
+        ApplyFilter();
+        SelectedItem = item;
+        OnPropertyChanged(nameof(CaptureCountLabel));
+        StatusMessage = $"Saved {item.KindLabel.ToLowerInvariant()}";
+        return Task.CompletedTask;
+    }
+
+    [RelayCommand]
+    private async Task DeleteSelectedAsync()
+    {
+        if (SelectedItem is null)
+        {
+            return;
+        }
+        var item = SelectedItem;
+        await services.Library.DeleteAsync(item.Record);
+        _allItems.Remove(item);
+        ApplyFilter();
+        StatusMessage = "Moved capture to the Recycle Bin";
+        OnPropertyChanged(nameof(CaptureCountLabel));
+    }
+
+    [RelayCommand]
+    private void OpenSelected()
+    {
+        if (SelectedItem is not null && File.Exists(SelectedItem.AbsolutePath))
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(SelectedItem.AbsolutePath) { UseShellExecute = true });
+        }
+    }
+
+    [RelayCommand]
+    private void RevealSelected()
+    {
+        if (SelectedItem is not null)
+        {
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{SelectedItem.AbsolutePath}\"");
+        }
+    }
+
+    [RelayCommand]
+    private void OpenCaptureFolder()
+    {
+        Directory.CreateDirectory(CaptureDirectory);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(CaptureDirectory) { UseShellExecute = true });
+    }
+
+    [RelayCommand]
+    private async Task SaveSettingsAsync()
+    {
+        var requestedShortcut = ActivationShortcut;
+        var updated = services.Settings with
+        {
+            CaptureDirectory = CaptureDirectory,
+            StartWithWindows = StartWithWindows,
+            MouseGestureEnabled = MouseGestureEnabled,
+            CursorCompanionMode = CursorCompanionMode,
+            ActivationShortcut = ActivationShortcut,
+            VideoMicrophoneEnabled = VideoMicrophoneEnabled,
+            VideoCameraEnabled = VideoCameraEnabled,
+            VideoFramesPerSecond = VideoFramesPerSecond,
+            VideoCountdownSeconds = VideoCountdownSeconds,
+        };
+        await services.UpdateSettingsAsync(updated);
+        ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
+        OnPropertyChanged(nameof(ActivationHint));
+        await InitializeAsync();
+        StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
+            ? "Settings saved"
+            : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+    }
+
+    private void ApplyFilter()
+    {
+        var filtered = _allItems.Where(item => SelectedFilter switch
+        {
+            "Screenshots" => item.Record.CaptureKind == CaptureKind.Screenshot,
+            "Video" => item.Record.CaptureKind == CaptureKind.Video,
+            "Audio" => item.Record.CaptureKind == CaptureKind.Audio,
+            "Text" => item.Record.CaptureKind == CaptureKind.Text,
+            "Links" => item.Record.CaptureKind == CaptureKind.Link,
+            _ => true,
+        }).ToList();
+        Items.Clear();
+        foreach (var item in filtered)
+        {
+            Items.Add(item);
+        }
+        SelectedItem = Items.FirstOrDefault();
+    }
+}

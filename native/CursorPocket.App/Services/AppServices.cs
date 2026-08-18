@@ -1,0 +1,115 @@
+using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
+using CursorPocket.Core.Storage;
+
+namespace CursorPocket_App.Services;
+
+public sealed class AppServices : IDisposable
+{
+    private AppServices(SettingsStore settingsStore, AppSettings settings, CaptureStore captureStore, string ffmpegPath)
+    {
+        SettingsStore = settingsStore;
+        Settings = settings;
+        CaptureStore = captureStore;
+        FfmpegPath = ffmpegPath;
+        Library = new LibraryService(captureStore);
+        Screenshots = new ScreenshotCaptureService(captureStore);
+        Recording = new RecordingService(captureStore, ffmpegPath);
+        Context = new WindowContextService();
+        Hotkey = new GlobalHotkeyService();
+        Startup = new StartupService();
+        Previews = new PreviewService(captureStore, ffmpegPath);
+        CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
+    }
+
+    public SettingsStore SettingsStore { get; }
+    public AppSettings Settings { get; private set; }
+    public CaptureStore CaptureStore { get; private set; }
+    public LibraryService Library { get; private set; }
+    public ScreenshotCaptureService Screenshots { get; private set; }
+    public RecordingService Recording { get; private set; }
+    public WindowContextService Context { get; }
+    public GlobalHotkeyService Hotkey { get; }
+    public StartupService Startup { get; }
+    public PreviewService Previews { get; private set; }
+    public string FfmpegPath { get; }
+    public event EventHandler<CaptureCompletedEventArgs>? CaptureCompleted;
+    public event EventHandler<AppSettings>? SettingsChanged;
+
+    public static async Task<AppServices> CreateAsync(CancellationToken cancellationToken = default)
+    {
+        var settingsStore = new SettingsStore();
+        var settings = await settingsStore.LoadAsync(cancellationToken);
+        var ffmpegPath = ResolveFfmpegPath();
+        var captureStore = new CaptureStore(settings.CaptureDirectory);
+        await captureStore.RecoverOrphanedMediaAsync(cancellationToken);
+        var services = new AppServices(settingsStore, settings, captureStore, ffmpegPath);
+        if (services.Startup.IsEnabled() && !settings.StartWithWindows)
+        {
+            services.Settings = settings with { StartWithWindows = true };
+            await settingsStore.SaveAsync(services.Settings, cancellationToken);
+        }
+        else if (settings.StartWithWindows && !services.Startup.IsEnabled())
+        {
+            services.Startup.SetEnabled(true);
+        }
+        services.RegisterAvailableHotkey(settings.ActivationShortcut);
+        return services;
+    }
+
+    public async Task UpdateSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        var normalized = SettingsStore.Normalize(settings);
+        var folderChanged = !string.Equals(Settings.CaptureDirectory, normalized.CaptureDirectory, StringComparison.OrdinalIgnoreCase);
+        Settings = normalized;
+        await SettingsStore.SaveAsync(normalized, cancellationToken);
+        Startup.SetEnabled(normalized.StartWithWindows);
+        RegisterAvailableHotkey(normalized.ActivationShortcut);
+
+        if (folderChanged)
+        {
+            Recording.Dispose();
+            CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
+            var replacementStore = new CaptureStore(normalized.CaptureDirectory);
+            await replacementStore.RecoverOrphanedMediaAsync(cancellationToken);
+            CaptureStore = replacementStore;
+            CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
+            Library = new LibraryService(CaptureStore);
+            Screenshots = new ScreenshotCaptureService(CaptureStore);
+            Recording = new RecordingService(CaptureStore, FfmpegPath);
+            Previews = new PreviewService(CaptureStore, FfmpegPath);
+        }
+        SettingsChanged?.Invoke(this, normalized);
+    }
+
+    public async Task UpdateLibraryWindowGeometryAsync(string geometry, CancellationToken cancellationToken = default)
+    {
+        Settings = Settings with { LibraryWindowGeometry = geometry };
+        await SettingsStore.SaveAsync(Settings, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
+        Hotkey.Dispose();
+        Recording.Dispose();
+    }
+
+    private void CaptureStore_CaptureCompleted(object? sender, CaptureCompletedEventArgs eventArgs) =>
+        CaptureCompleted?.Invoke(this, eventArgs);
+
+    private void RegisterAvailableHotkey(string preferred)
+    {
+        HotkeyCandidateResolver.RegisterFirstAvailable(preferred, Hotkey.TryRegister);
+    }
+
+    private static string ResolveFfmpegPath()
+    {
+        var besideApp = Path.Combine(AppContext.BaseDirectory, "ffmpeg.exe");
+        if (File.Exists(besideApp))
+        {
+            return besideApp;
+        }
+        return Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "third_party", "ffmpeg", "bin", "ffmpeg.exe"));
+    }
+}

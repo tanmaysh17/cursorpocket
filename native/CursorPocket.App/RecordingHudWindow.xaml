@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="CursorPocket_App.RecordingHudWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Recording">
+    <Grid Padding="10" Background="Transparent">
+        <Border Padding="14,10" Background="#F10C1412" CornerRadius="16" BorderBrush="#55FF5A67" BorderThickness="1">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="120" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <Grid Width="28" Height="28"><Ellipse Fill="#33FF5A67" /><Ellipse Width="9" Height="9" Fill="{StaticResource PocketRed}" /></Grid>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock x:Name="ModeText" Text="Recording" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="DeviceText" Text="Microphone" MaxWidth="190" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4"><TextBlock x:Name="TimerText" Text="0:00" FontFamily="Cascadia Mono" FontSize="17" Foreground="{StaticResource PocketInk}" /><ProgressBar x:Name="LevelBar" Height="3" Minimum="0" Maximum="1" Foreground="{StaticResource PocketGreen}" /></StackPanel>
+                <Button Grid.Column="3" Click="Stop_Click" Content="Stop &amp; save" Style="{StaticResource PocketPrimaryButton}" />
+                <Button Grid.Column="4" Click="Discard_Click" Background="Transparent" ToolTipService.ToolTip="Discard recording"><FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" /></Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
