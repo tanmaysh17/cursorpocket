@@ -167,7 +167,8 @@ def _activate_window(hwnd: int) -> bool:
     target = wintypes.HWND(hwnd)
     if not user32.IsWindow(target):
         return False
-    user32.ShowWindowAsync(target, SW_RESTORE)
+    if user32.IsIconic(target):
+        user32.ShowWindowAsync(target, SW_RESTORE)
     current_thread = int(ctypes.windll.kernel32.GetCurrentThreadId())
     target_thread = int(user32.GetWindowThreadProcessId(target, None))
     foreground = wintypes.HWND(user32.GetForegroundWindow())

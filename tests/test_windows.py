@@ -6,8 +6,54 @@ import tkinter as tk
 import unittest
 import uuid
 from ctypes import wintypes
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
+import cursorpocket.windows as windows
 from cursorpocket.windows import SingleInstance, exclude_window_from_capture, position_window
+
+
+@unittest.skipUnless(sys.platform == "win32", "Windows-only activation test")
+class WindowActivationTests(unittest.TestCase):
+    @staticmethod
+    def _fake_windows_api(hwnd: int, *, minimized: bool) -> tuple[MagicMock, MagicMock]:
+        user32 = MagicMock()
+        user32.IsWindow.return_value = True
+        user32.IsIconic.return_value = minimized
+        user32.GetForegroundWindow.return_value = hwnd
+        user32.GetWindowThreadProcessId.return_value = 11
+        kernel32 = MagicMock()
+        kernel32.GetCurrentThreadId.return_value = 11
+        return user32, kernel32
+
+    def test_activating_visible_window_does_not_restore_its_window_state(self) -> None:
+        hwnd = 404
+        user32, kernel32 = self._fake_windows_api(hwnd, minimized=False)
+
+        with patch.object(
+            windows.ctypes,
+            "windll",
+            SimpleNamespace(user32=user32, kernel32=kernel32),
+        ):
+            self.assertTrue(windows._activate_window(hwnd))
+
+        user32.ShowWindowAsync.assert_not_called()
+
+    def test_activating_minimized_window_still_restores_it(self) -> None:
+        hwnd = 405
+        user32, kernel32 = self._fake_windows_api(hwnd, minimized=True)
+
+        with patch.object(
+            windows.ctypes,
+            "windll",
+            SimpleNamespace(user32=user32, kernel32=kernel32),
+        ):
+            self.assertTrue(windows._activate_window(hwnd))
+
+        user32.ShowWindowAsync.assert_called_once_with(
+            unittest.mock.ANY,
+            windows.SW_RESTORE,
+        )
 
 
 @unittest.skipUnless(sys.platform == "win32", "Windows-only positioning test")
