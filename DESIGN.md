@@ -35,8 +35,8 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - Segoe UI Variable Text/Small for controls and supporting copy.
 - Cascadia Mono only for key chips, timers, dimensions, and compact status labels.
 - Base spacing unit: 8 px. Normal sequences use 8, 16, 24, or 32 px.
-- Corner radii: 10 px controls, 12–14 px cards, 16–18 px transient receipts/HUD.
-- Minimum critical text: 12 px with high contrast; recording state and timer are 15–19 px.
+- Corner radii: 10 px controls, 12–14 px cards, 16–20 px transient receipts/HUD.
+- Minimum critical text: 12 px with high contrast; recording state and timer are 17–22 px.
 
 ## Surface contracts
 
@@ -68,6 +68,7 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 - Excluded from the captured media and placed at top center using DPI-aware sizing.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
+- No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
 - Timer, device state, **Stop & save**, and **Discard** are simultaneously visible at 100–250% display scale.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
 

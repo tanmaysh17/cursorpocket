@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
     private long _lastSourceWindow;
     private CaptureBounds? _lastRegion;
+    private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
 
     public MainWindow()
@@ -43,16 +44,45 @@ public sealed partial class MainWindow : Window
 
     public void ShowLibrary()
     {
-        AppWindow.Show();
-        Activate();
+        AppWindow.Show(true);
         (RootFrame.Content as MainPage)?.NavigateTo("library");
+        ActivateMainWindow();
     }
 
     public void ShowSettings()
     {
-        AppWindow.Show();
-        Activate();
+        AppWindow.Show(true);
         (RootFrame.Content as MainPage)?.NavigateTo("settings");
+        ActivateMainWindow();
+    }
+
+    private void ActivateMainWindow()
+    {
+        Activate();
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundThread = foreground == 0 ? 0 : NativeMethods.GetWindowThreadProcessId(foreground, out _);
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var attached = foregroundThread != 0 && foregroundThread != currentThread &&
+            NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
+        try
+        {
+            NativeMethods.ShowWindowAsync(handle, NativeMethods.SwShow);
+            NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0,
+                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
+            NativeMethods.BringWindowToTop(handle);
+            NativeMethods.SetForegroundWindow(handle);
+            NativeMethods.SetFocus(handle);
+            NativeMethods.SetWindowPos(handle, NativeMethods.HwndNotTopmost, 0, 0, 0, 0,
+                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
+        }
+        finally
+        {
+            if (attached)
+            {
+                NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
+            }
+        }
     }
 
     public void ShowCommandPalette(string? initialMode = null)
@@ -69,7 +99,15 @@ public sealed partial class MainWindow : Window
         }
         _palette = new CommandPaletteWindow(_lastSourceWindow, initialMode);
         _palette.CommandRequested += Palette_CommandRequested;
-        _palette.Closed += (_, _) => _palette = null;
+        _palette.Closed += (_, _) =>
+        {
+            _palette = null;
+            if (_openLibraryAfterPaletteCloses)
+            {
+                _openLibraryAfterPaletteCloses = false;
+                ShowLibrary();
+            }
+        };
         _palette.Activate();
     }
 
@@ -178,6 +216,13 @@ public sealed partial class MainWindow : Window
     {
         var source = sender is CommandPaletteWindow palette ? palette.SourceWindow : _lastSourceWindow;
         _lastSourceWindow = source;
+        if (command == "library")
+        {
+            // Showing a persistent window from the palette's close callback
+            // avoids Windows reactivating the source after we show Library.
+            _openLibraryAfterPaletteCloses = true;
+            return;
+        }
         await Task.Delay(170);
         switch (command)
         {
@@ -186,7 +231,6 @@ public sealed partial class MainWindow : Window
             case "audio": await ToggleAudioRecordingAsync(); break;
             case "text": await CaptureTextAsync(); break;
             case "link": await CaptureLinkAsync(); break;
-            case "library": ShowLibrary(); break;
             case "display": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureDisplayAsync()); break;
             case "all-displays": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureAllDisplaysAsync()); break;
             case "window": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureWindowAsync(source)); break;

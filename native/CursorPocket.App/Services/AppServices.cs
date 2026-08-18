@@ -44,15 +44,11 @@ public sealed class AppServices : IDisposable
         var captureStore = new CaptureStore(settings.CaptureDirectory);
         await captureStore.RecoverOrphanedMediaAsync(cancellationToken);
         var services = new AppServices(settingsStore, settings, captureStore, ffmpegPath);
-        if (services.Startup.IsEnabled() && !settings.StartWithWindows)
-        {
-            services.Settings = settings with { StartWithWindows = true };
-            await settingsStore.SaveAsync(services.Settings, cancellationToken);
-        }
-        else if (settings.StartWithWindows && !services.Startup.IsEnabled())
-        {
-            services.Startup.SetEnabled(true);
-        }
+        // Keep the saved preference authoritative and rewrite the command on
+        // every launch. This heals a development/portable path after the app
+        // is installed somewhere else without requiring the user to toggle
+        // startup off and on again.
+        services.Startup.SetEnabled(settings.StartWithWindows);
         services.RegisterAvailableHotkey(settings.ActivationShortcut);
         return services;
     }

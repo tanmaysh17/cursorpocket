@@ -16,7 +16,7 @@ public sealed partial class RecordingHudWindow : Window
         ModeText.Text = mode;
         DeviceText.Text = device;
         WindowPlacement.ConfigureUtilityWindow(this);
-        WindowPlacement.PlaceTopCenter(this, 680, 108);
+        WindowPlacement.PlaceTopCenter(this, 740, 124);
         App.Services.Recording.ElapsedChanged += Recording_ElapsedChanged;
         App.Services.Recording.AudioLevelChanged += Recording_AudioLevelChanged;
         App.Services.Recording.StateChanged += Recording_StateChanged;

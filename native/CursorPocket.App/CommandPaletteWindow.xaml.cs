@@ -13,6 +13,7 @@ public sealed partial class CommandPaletteWindow : Window
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly PaletteHotkeyService _commandKeys = new();
     private bool _screenshotMode;
+    private bool _restoreSourceOnClose = true;
 
     public CommandPaletteWindow(long sourceWindow, string? initialMode = null)
     {
@@ -28,7 +29,10 @@ public sealed partial class CommandPaletteWindow : Window
         {
             _commandKeys.Invoked -= CommandKeys_Invoked;
             _commandKeys.Dispose();
-            App.Services.Context.RestoreFocus(SourceWindow);
+            if (_restoreSourceOnClose)
+            {
+                App.Services.Context.RestoreFocus(SourceWindow);
+            }
         };
         Activated += (_, _) =>
         {
@@ -145,6 +149,10 @@ public sealed partial class CommandPaletteWindow : Window
     private void Request(string command)
     {
         _timeout.Stop();
+        // Library is a persistent surface the user explicitly asked to open;
+        // restoring the source after the palette closes would immediately
+        // bury it again. Transient capture commands still return to source.
+        _restoreSourceOnClose = command != "library";
         CommandRequested?.Invoke(this, command);
         Close();
     }

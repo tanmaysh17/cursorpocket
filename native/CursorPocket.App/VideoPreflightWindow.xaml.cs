@@ -241,6 +241,14 @@ public sealed partial class VideoPreflightWindow : Window
         }
     }
 
+    private async void MoreOptions_Expanding(Expander sender, ExpanderExpandingEventArgs eventArgs)
+    {
+        // Let the expanded content participate in layout, then reveal it so
+        // opening More never looks like an empty, clipped panel.
+        await Task.Delay(80);
+        OptionsScroll.ChangeView(null, OptionsScroll.ScrollableHeight, null, false);
+    }
+
     private async void CameraBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
         if (CameraToggle.IsOn) await StartCameraPreviewAsync();

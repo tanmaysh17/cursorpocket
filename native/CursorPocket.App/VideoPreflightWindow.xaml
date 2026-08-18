@@ -19,7 +19,8 @@
         <Grid Grid.Row="1" Margin="0,24,0,20" ColumnSpacing="18">
             <Grid.ColumnDefinitions><ColumnDefinition Width="5*" /><ColumnDefinition Width="4*" /></Grid.ColumnDefinitions>
 
-            <StackPanel Spacing="16">
+            <ScrollViewer x:Name="OptionsScroll" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,0" Spacing="16">
                 <Border Padding="18" Background="{StaticResource PocketSurface}" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
                     <StackPanel Spacing="12">
                         <TextBlock Text="1 · Screen" Style="{StaticResource PocketTitleText}" />
@@ -40,7 +41,7 @@
                     </StackPanel>
                 </Border>
 
-                <Expander Header="More recording options">
+                <Expander Header="More recording options" Expanding="MoreOptions_Expanding">
                     <StackPanel Padding="0,12,0,4" Spacing="12">
                         <ToggleSwitch x:Name="PointerToggle" Header="Include the Windows pointer" IsOn="True" />
                         <ComboBox x:Name="FrameRateBox" Header="Frame rate" SelectedIndex="0"><ComboBoxItem Content="30 fps · balanced" Tag="30" /><ComboBoxItem Content="60 fps · smoother" Tag="60" /></ComboBox>
@@ -48,6 +49,7 @@
                     </StackPanel>
                 </Expander>
             </StackPanel>
+            </ScrollViewer>
 
             <Border Grid.Column="1" Padding="18" Background="{StaticResource PocketRaised}" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
                 <Grid>

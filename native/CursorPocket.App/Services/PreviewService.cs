@@ -10,6 +10,8 @@ namespace CursorPocket_App.Services;
 
 public sealed class PreviewService(CaptureStore store, string ffmpegPath)
 {
+    private readonly SemaphoreSlim _generationGate = new(1, 1);
+
     public async Task<string?> GetPreviewAsync(CaptureRecord record, CancellationToken cancellationToken = default)
     {
         var path = store.AbsolutePath(record);
@@ -27,16 +29,60 @@ public sealed class PreviewService(CaptureStore store, string ffmpegPath)
         {
             return target;
         }
-        if (record.CaptureKind == CaptureKind.Video)
+
+        await _generationGate.WaitAsync(cancellationToken);
+        try
         {
-            return await CreateVideoPosterAsync(path, target, cancellationToken) ? target : null;
+            if (File.Exists(target))
+            {
+                return target;
+            }
+
+            var temporary = Path.Combine(store.PreviewDirectory, $"{record.Id}.{Guid.NewGuid():N}.tmp.png");
+            try
+            {
+                var created = record.CaptureKind switch
+                {
+                    CaptureKind.Video => await CreateVideoPosterAsync(path, temporary, cancellationToken),
+                    CaptureKind.Audio => await CreateWaveformAsync(path, temporary, cancellationToken),
+                    _ => false,
+                };
+                if (!created || !File.Exists(temporary))
+                {
+                    return null;
+                }
+
+                try
+                {
+                    File.Move(temporary, target, false);
+                }
+                catch (IOException) when (File.Exists(target))
+                {
+                    // Another completed request won the atomic publish race.
+                }
+                return File.Exists(target) ? target : null;
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A preview is derived UI data. The capture remains valid and
+                // the app must stay usable if a codec or GDI resource fails.
+                return null;
+            }
+            finally
+            {
+                try { if (File.Exists(temporary)) File.Delete(temporary); } catch (IOException) { }
+            }
         }
-        if (record.CaptureKind == CaptureKind.Audio)
+        finally
         {
-            await Task.Run(() => CreateWaveform(path, target), cancellationToken);
-            return File.Exists(target) ? target : null;
+            _generationGate.Release();
         }
-        return null;
+    }
+
+    private static async Task<bool> CreateWaveformAsync(string input, string output, CancellationToken cancellationToken)
+    {
+        await Task.Run(() => CreateWaveform(input, output), cancellationToken);
+        return File.Exists(output);
     }
 
     private async Task<bool> CreateVideoPosterAsync(string input, string output, CancellationToken cancellationToken)

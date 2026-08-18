@@ -43,9 +43,18 @@ public partial class App : Microsoft.UI.Xaml.Application
             Services.Hotkey.Invoked += (_, _) => DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowCommandPalette());
             StartActivationListener();
             Window.Activate();
-            if (args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase))
+            var backgroundLaunch = args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase)
+                || Environment.GetCommandLineArgs().Any(argument =>
+                    argument.Equals("--background", StringComparison.OrdinalIgnoreCase));
+            if (backgroundLaunch)
             {
                 Window.AppWindow.Hide();
+                // WinUI posts its first-show work after Activate returns. Hide once
+                // more at low priority so startup remains tray-only without racing
+                // that deferred show, while still creating the HWND and services.
+                DispatcherQueue.TryEnqueue(
+                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                    () => Window.AppWindow.Hide());
             }
         }
         catch (Exception error)

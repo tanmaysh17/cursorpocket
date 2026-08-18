@@ -101,10 +101,11 @@ internal sealed class NativeCompanionWindow : IDisposable
             return;
         }
 
-        // Put the 4px status dot eight pixels from the pointer while leaving a
-        // larger invisible target extending down and right for easy clicking.
-        _x = x + 3;
-        _y = y + 3;
+        // Keep the 4px mark just beyond the pointer's bottom-right tail rather
+        // than underneath the cursor body. The 28px layered window remains a
+        // generous invisible click target around that visible mark.
+        _x = x + 10;
+        _y = y + 12;
         ShowWithoutActivation();
         if (_mode == "while-moving" && !_recording)
         {

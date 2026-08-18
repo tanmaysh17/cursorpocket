@@ -9,6 +9,7 @@ internal static class NativeMethods
     internal const int SmCxVirtualScreen = 78;
     internal const int SmCyVirtualScreen = 79;
     internal const int SwRestore = 9;
+    internal const int SwShow = 5;
     internal const uint WdaExcludeFromCapture = 0x11;
     internal const uint MonitorDefaultToNearest = 2;
     internal const uint WmHotkey = 0x0312;
@@ -24,6 +25,7 @@ internal static class NativeMethods
     internal const long WsExToolWindow = 0x00000080L;
     internal const uint WsPopup = 0x80000000;
     internal const uint SwpNoSize = 0x0001;
+    internal const uint SwpNoMove = 0x0002;
     internal const uint SwpNoActivate = 0x0010;
     internal const uint SwpShowWindow = 0x0040;
     internal const uint UlwAlpha = 0x00000002;
@@ -31,6 +33,7 @@ internal static class NativeMethods
     internal const byte AcSrcAlpha = 0x01;
     internal const int ErrorClassAlreadyExists = 1410;
     internal static readonly nint HwndTopmost = new(-1);
+    internal static readonly nint HwndNotTopmost = new(-2);
     internal const uint LwaColorKey = 0x00000001;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -147,6 +150,13 @@ internal static class NativeMethods
     internal static extern bool SetForegroundWindow(nint hwnd);
 
     [DllImport("user32.dll")]
+    internal static extern nint SetFocus(nint hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool AttachThreadInput(uint attachThread, uint attachToThread, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool BringWindowToTop(nint hwnd);
 
@@ -243,6 +253,9 @@ internal static class NativeMethods
 
     [DllImport("kernel32.dll")]
     internal static extern nint GetModuleHandle(string? moduleName);
+
+    [DllImport("kernel32.dll")]
+    internal static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
     internal static extern void keybd_event(byte virtualKey, byte scanCode, uint flags, nuint extraInfo);

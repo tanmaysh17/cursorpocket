@@ -55,6 +55,31 @@ if (Test-Path -LiteralPath $portableArchive) { Remove-Item -LiteralPath $portabl
     -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $publishRoot
 if ($LASTEXITCODE -ne 0) { throw "Native publish failed." }
 
+# Unpackaged WinUI publish can omit compiled XAML resources even though they
+# are present in TargetDir. An installer without these files starts and then
+# exits with XamlParseException, so stage and verify them explicitly.
+$targetDir = (& $dotnet msbuild $appProject -nologo -getProperty:TargetDir `
+    -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64).Trim()
+if (-not (Test-Path -LiteralPath $targetDir)) {
+    throw "Native build output was not found: $targetDir"
+}
+Get-ChildItem -LiteralPath $targetDir -Filter "*.xbf" -File | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $publishRoot $_.Name) -Force
+}
+Get-ChildItem -LiteralPath $targetDir -Filter "*.pri" -File | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $publishRoot $_.Name) -Force
+}
+$compiledAssets = Join-Path $targetDir "Assets"
+if (Test-Path -LiteralPath $compiledAssets) {
+    Copy-Item -LiteralPath $compiledAssets -Destination $publishRoot -Recurse -Force
+}
+$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "CursorPocket.pri", "Assets\AppIcon.ico")
+foreach ($resource in $requiredWinUiResources) {
+    if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $resource))) {
+        throw "Published WinUI resource is missing: $resource"
+    }
+}
+
 $ffmpegRoot = Join-Path $repoRoot "third_party\ffmpeg"
 Copy-Item -LiteralPath (Join-Path $ffmpegRoot "bin\ffmpeg.exe") -Destination (Join-Path $publishRoot "ffmpeg.exe") -Force
 Copy-Item -LiteralPath (Join-Path $ffmpegRoot "LICENSE.txt") -Destination (Join-Path $publishRoot "FFMPEG-LICENSE.txt") -Force

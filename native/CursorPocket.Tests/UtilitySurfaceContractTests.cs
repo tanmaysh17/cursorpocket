@@ -28,14 +28,18 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("UpdateLayeredWindow", code, StringComparison.Ordinal);
         Assert.Contains("WsExNoActivate", code, StringComparison.Ordinal);
         Assert.Contains("4f, 4f", code, StringComparison.Ordinal);
+        Assert.Contains("_x = x + 10", code, StringComparison.Ordinal);
+        Assert.Contains("_y = y + 12", code, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Command_palette_restores_the_source_window_on_every_close_path()
+    public void Command_palette_restores_capture_sources_but_keeps_library_in_front()
     {
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
 
         Assert.Contains("App.Services.Context.RestoreFocus(SourceWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("_restoreSourceOnClose = command != \"library\"", code, StringComparison.Ordinal);
+        Assert.Contains("_openLibraryAfterPaletteCloses", ReadFixture("MainWindow.xaml.cs.txt"), StringComparison.Ordinal);
         Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
         Assert.Contains("FocusCommandSurface", code, StringComparison.Ordinal);
         Assert.Contains("CommandAccelerator_Invoked", ReadFixture("CommandPaletteWindow.xaml"), StringComparison.Ordinal);
@@ -55,12 +59,78 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Video_preflight_keeps_advanced_controls_scrollable_and_auto_reveals_them()
+    {
+        var xaml = ReadFixture("VideoPreflightWindow.xaml");
+        var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+
+        Assert.Contains("VerticalScrollBarVisibility=\"Visible\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Expanding=\"MoreOptions_Expanding\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("OptionsScroll.ChangeView", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recording_hud_uses_large_high_contrast_status_and_actions()
+    {
+        var xaml = ReadFixture("RecordingHudWindow.xaml");
+
+        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"22\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Stop &amp; save\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("BorderThickness=\"0\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Preview_generation_is_serialized_atomic_and_non_fatal()
+    {
+        var code = ReadFixture("PreviewService.cs.txt");
+
+        Assert.Contains("SemaphoreSlim", code, StringComparison.Ordinal);
+        Assert.Contains("File.Move(temporary, target, false)", code, StringComparison.Ordinal);
+        Assert.Contains("The capture remains valid", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Startup_path_and_audio_waveform_are_healed_on_use()
+    {
+        Assert.Contains("Startup.SetEnabled(settings.StartWithWindows)", ReadFixture("AppServices.cs.txt"), StringComparison.Ordinal);
+        var mainPage = ReadFixture("MainPage.xaml.cs.txt");
+        Assert.Contains("CaptureKind.Audio", mainPage, StringComparison.Ordinal);
+        Assert.Contains("GetPreviewAsync(item.Record)", mainPage, StringComparison.Ordinal);
+        Assert.Contains("DetailPlayer.Height = 92", mainPage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Recording_state_subscription_survives_capture_folder_changes()
     {
         var code = ReadFixture("MainWindow.xaml.cs.txt");
 
         Assert.Contains("SubscribeToRecordingState", code, StringComparison.Ordinal);
         Assert.Contains("_subscribedRecording.StateChanged -= Recording_StateChanged", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Native_package_stages_and_verifies_compiled_winui_resources()
+    {
+        var script = ReadFixture("build-native.ps1.txt");
+
+        Assert.Contains("Get-ChildItem -LiteralPath $targetDir -Filter \"*.xbf\"", script, StringComparison.Ordinal);
+        Assert.Contains("Get-ChildItem -LiteralPath $targetDir -Filter \"*.pri\"", script, StringComparison.Ordinal);
+        Assert.Contains("$requiredWinUiResources", script, StringComparison.Ordinal);
+        Assert.Contains("Assets\\AppIcon.ico", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Background_startup_wins_the_initial_winui_show_race()
+    {
+        var code = ReadFixture("App.xaml.cs.txt");
+
+        Assert.Contains("--background", code, StringComparison.Ordinal);
+        Assert.Contains("Environment.GetCommandLineArgs()", code, StringComparison.Ordinal);
+        Assert.Contains("DispatcherQueuePriority.Low", code, StringComparison.Ordinal);
+        Assert.True(code.Split("Window.AppWindow.Hide()", StringSplitOptions.None).Length >= 3);
     }
 
     private static string ReadFixture(string name) =>

@@ -101,6 +101,8 @@ public sealed partial class MainPage : Page
     {
         DetailPlayer.Source = null;
         DetailPlayer.Visibility = Visibility.Collapsed;
+        DetailPlayer.Height = double.NaN;
+        DetailPlayer.VerticalAlignment = VerticalAlignment.Stretch;
         DetailImage.Source = null;
         DetailImage.Visibility = Visibility.Collapsed;
         DetailTextPanel.Visibility = Visibility.Visible;
@@ -125,10 +127,26 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        if (item.Record.CaptureKind is CaptureKind.Video or CaptureKind.Audio)
+        if (item.Record.CaptureKind == CaptureKind.Video)
         {
             DetailTextPanel.Visibility = Visibility.Collapsed;
             DetailPlayer.Source = MediaSource.CreateFromUri(new Uri(item.AbsolutePath));
+            DetailPlayer.Visibility = Visibility.Visible;
+            return;
+        }
+
+        if (item.Record.CaptureKind == CaptureKind.Audio)
+        {
+            DetailTextPanel.Visibility = Visibility.Collapsed;
+            var waveform = await App.Services.Previews.GetPreviewAsync(item.Record);
+            if (waveform is not null)
+            {
+                DetailImage.Source = new BitmapImage(new Uri(waveform));
+                DetailImage.Visibility = Visibility.Visible;
+            }
+            DetailPlayer.Source = MediaSource.CreateFromUri(new Uri(item.AbsolutePath));
+            DetailPlayer.Height = 92;
+            DetailPlayer.VerticalAlignment = VerticalAlignment.Bottom;
             DetailPlayer.Visibility = Visibility.Visible;
             return;
         }
