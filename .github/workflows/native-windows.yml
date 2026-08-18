@@ -1,0 +1,101 @@
+name: Native Windows
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-package:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      WINDOWS_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE }}
+      WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Test Python behavioral reference
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest discover -s tests -q
+          python main.py --self-test
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.424
+
+      - name: Restore native dependencies
+        shell: pwsh
+        run: dotnet restore native/CursorPocket.Native.sln -p:RuntimeIdentifier=win-x64
+
+      - name: Test native services and compatibility
+        shell: pwsh
+        run: dotnet test native/CursorPocket.Tests/CursorPocket.Tests.csproj -c Release --no-restore
+
+      - name: Fetch verified LGPL FFmpeg
+        shell: pwsh
+        run: ./tools/fetch_ffmpeg.ps1
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build portable ZIP and installer
+        shell: pwsh
+        run: ./native/build-native.ps1 -SkipRestore -SkipTests -SkipFfmpeg -RequireInstaller
+
+      - name: Verify distributable notices
+        shell: pwsh
+        run: |
+          $required = @(
+            "artifacts/CursorPocket-portable-win-x64.zip",
+            "artifacts/CursorPocket-Setup-x64.exe",
+            "artifacts/CursorPocket-win-x64/ffmpeg.exe",
+            "artifacts/CursorPocket-win-x64/FFMPEG-LICENSE.txt",
+            "artifacts/CursorPocket-win-x64/THIRD_PARTY_NOTICES.md",
+            "artifacts/CursorPocket-win-x64/licenses/microsoft.windowsappsdk-2.4.0-license.txt",
+            "artifacts/CursorPocket-win-x64/licenses/naudio-2.2.1-license.txt"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Missing artifact: $path" }
+          }
+
+      - name: Optionally sign Windows artifacts
+        if: env.WINDOWS_SIGNING_CERTIFICATE != ''
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP "cursorpocket-signing.pfx"
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe was not found" }
+          & $signtool.FullName sign /fd SHA256 /f $certificatePath /p $env:WINDOWS_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 artifacts/CursorPocket-win-x64/CursorPocket.exe
+          if ($LASTEXITCODE -ne 0) { throw "Application signing failed" }
+          Remove-Item -LiteralPath artifacts/CursorPocket-portable-win-x64.zip -Force
+          Compress-Archive -Path artifacts/CursorPocket-win-x64/* -DestinationPath artifacts/CursorPocket-portable-win-x64.zip -CompressionLevel Optimal
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" native/installer/CursorPocket.iss
+          if ($LASTEXITCODE -ne 0) { throw "Signed installer rebuild failed" }
+          & $signtool.FullName sign /fd SHA256 /f $certificatePath /p $env:WINDOWS_SIGNING_PASSWORD /tr http://timestamp.digicert.com /td SHA256 artifacts/CursorPocket-Setup-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw "Installer signing failed" }
+          Remove-Item -LiteralPath $certificatePath -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorPocket-windows-x64
+          path: |
+            artifacts/CursorPocket-portable-win-x64.zip
+            artifacts/CursorPocket-Setup-x64.exe
+          if-no-files-found: error
+
