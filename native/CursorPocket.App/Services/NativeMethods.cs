@@ -13,14 +13,47 @@ internal static class NativeMethods
     internal const uint MonitorDefaultToNearest = 2;
     internal const uint WmHotkey = 0x0312;
     internal const uint WmClose = 0x0010;
+    internal const uint WmDestroy = 0x0002;
+    internal const uint WmLButtonUp = 0x0202;
+    internal const uint WmNcHitTest = 0x0084;
     internal const int WhMouseLl = 14;
     internal const int WmMouseMove = 0x0200;
+    internal const int GwlExStyle = -20;
+    internal const long WsExLayered = 0x00080000L;
+    internal const long WsExNoActivate = 0x08000000L;
+    internal const long WsExToolWindow = 0x00000080L;
+    internal const uint WsPopup = 0x80000000;
+    internal const uint SwpNoSize = 0x0001;
+    internal const uint SwpNoActivate = 0x0010;
+    internal const uint SwpShowWindow = 0x0040;
+    internal const uint UlwAlpha = 0x00000002;
+    internal const byte AcSrcOver = 0x00;
+    internal const byte AcSrcAlpha = 0x01;
+    internal const int ErrorClassAlreadyExists = 1410;
+    internal static readonly nint HwndTopmost = new(-1);
+    internal const uint LwaColorKey = 0x00000001;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Point
     {
         public int X;
         public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct NativeSize
+    {
+        public int Width;
+        public int Height;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct BlendFunction
+    {
+        public byte BlendOp;
+        public byte BlendFlags;
+        public byte SourceConstantAlpha;
+        public byte AlphaFormat;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -88,6 +121,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetWindowPos(nint hwnd, nint insertAfter, int x, int y, int width, int height, uint flags);
+
     [DllImport("user32.dll")]
     internal static extern nint MonitorFromPoint(Point point, uint flags);
 
@@ -133,6 +170,16 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
 
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    internal static extern nint GetWindowLongPtr(nint hwnd, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    internal static extern nint SetWindowLongPtr(nint hwnd, int index, nint value);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetLayeredWindowAttributes(nint hwnd, uint colorKey, byte alpha, uint flags);
+
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool RegisterHotKey(nint hwnd, int id, uint modifiers, uint key);
@@ -146,6 +193,30 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern nint CreateWindowEx(uint extendedStyle, string className, string windowName, uint style, int x, int y, int width, int height, nint parent, nint menu, nint instance, nint parameter);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UpdateLayeredWindow(nint hwnd, nint destinationDc, ref Point destination, ref NativeSize size, nint sourceDc, ref Point source, uint colorKey, ref BlendFunction blend, uint flags);
+
+    [DllImport("user32.dll")]
+    internal static extern nint GetDC(nint hwnd);
+
+    [DllImport("user32.dll")]
+    internal static extern int ReleaseDC(nint hwnd, nint dc);
+
+    [DllImport("gdi32.dll")]
+    internal static extern nint CreateCompatibleDC(nint dc);
+
+    [DllImport("gdi32.dll")]
+    internal static extern nint SelectObject(nint dc, nint objectHandle);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DeleteDC(nint dc);
+
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool DeleteObject(nint objectHandle);
 
     [DllImport("user32.dll")]
     internal static extern nint DefWindowProc(nint hwnd, uint message, nuint wParam, nint lParam);

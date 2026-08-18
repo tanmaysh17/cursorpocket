@@ -11,7 +11,8 @@ public sealed partial class MainWindow : Window
 {
     private CommandPaletteWindow? _palette;
     private VideoPreflightWindow? _preflight;
-    private CompanionWindow? _companion;
+    private NativeCompanionWindow? _companion;
+    private RecordingService? _subscribedRecording;
     private MouseActivityService? _mouseActivity;
     private System.Windows.Forms.NotifyIcon? _tray;
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
@@ -36,7 +37,7 @@ public sealed partial class MainWindow : Window
         RootFrame.Navigate(typeof(MainPage));
         InitializeCompanion();
         InitializeTray();
-        App.Services.Recording.StateChanged += Recording_StateChanged;
+        SubscribeToRecordingState();
         App.Services.SettingsChanged += Services_SettingsChanged;
     }
 
@@ -310,6 +311,7 @@ public sealed partial class MainWindow : Window
     private void Services_SettingsChanged(object? sender, AppSettings settings) =>
         App.DispatcherQueue.TryEnqueue(() =>
         {
+            SubscribeToRecordingState();
             _companion?.SetMode(settings.CursorCompanionMode);
             if (_companionTrayItem is not null)
             {
@@ -319,7 +321,7 @@ public sealed partial class MainWindow : Window
 
     private void InitializeCompanion()
     {
-        _companion = new CompanionWindow(App.Services.Settings.CursorCompanionMode);
+        _companion = new NativeCompanionWindow(App.Services.Settings.CursorCompanionMode);
         _companion.OpenRequested += (_, _) => ShowCommandPalette();
         _mouseActivity = new MouseActivityService();
         _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() => _companion?.Follow(point.X, point.Y));
@@ -378,11 +380,29 @@ public sealed partial class MainWindow : Window
     {
         _quitting = true;
         await PersistGeometryAsync();
+        if (_subscribedRecording is not null)
+        {
+            _subscribedRecording.StateChanged -= Recording_StateChanged;
+        }
         _mouseActivity?.Dispose();
         _companion?.Close();
         _tray?.Dispose();
         Close();
         ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
+    }
+
+    private void SubscribeToRecordingState()
+    {
+        if (ReferenceEquals(_subscribedRecording, App.Services.Recording))
+        {
+            return;
+        }
+        if (_subscribedRecording is not null)
+        {
+            _subscribedRecording.StateChanged -= Recording_StateChanged;
+        }
+        _subscribedRecording = App.Services.Recording;
+        _subscribedRecording.StateChanged += Recording_StateChanged;
     }
 
     private void RestoreGeometry()

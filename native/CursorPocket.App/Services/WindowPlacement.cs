@@ -18,6 +18,25 @@ internal static class WindowPlacement
         return new NativeMethods.Rect { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
     }
 
+    public static int DisplayIndexUnderPointer()
+    {
+        NativeMethods.GetCursorPos(out var cursor);
+        var target = NativeMethods.MonitorFromPoint(cursor, NativeMethods.MonitorDefaultToNearest);
+        var current = 0;
+        var result = 0;
+        NativeMethods.EnumDisplayMonitors(0, 0, (nint monitor, nint hdc, ref NativeMethods.Rect rect, nint data) =>
+        {
+            if (monitor == target)
+            {
+                result = current;
+                return false;
+            }
+            current++;
+            return true;
+        }, 0);
+        return result;
+    }
+
     public static void ConfigureUtilityWindow(Window window, bool topmost = true)
     {
         var appWindow = window.AppWindow;
@@ -32,6 +51,22 @@ internal static class WindowPlacement
         }
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
         NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);
+    }
+
+    public static void ConfigureColorKeyTransparency(Window window, uint colorKey, bool noActivate = false)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        var existing = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
+        var utilityStyles = NativeMethods.WsExLayered | NativeMethods.WsExToolWindow;
+        if (noActivate)
+        {
+            utilityStyles |= NativeMethods.WsExNoActivate;
+        }
+        NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GwlExStyle, new nint(existing | utilityStyles));
+        if (!NativeMethods.SetLayeredWindowAttributes(hwnd, colorKey, 255, NativeMethods.LwaColorKey))
+        {
+            throw new System.ComponentModel.Win32Exception(System.Runtime.InteropServices.Marshal.GetLastWin32Error());
+        }
     }
 
     public static void FillCurrentMonitor(Window window)

@@ -4,17 +4,20 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Select a region">
-    <Canvas
-        x:Name="Surface"
-        Background="#78030907"
-        KeyDown="Surface_KeyDown"
-        PointerPressed="Surface_PointerPressed"
-        PointerMoved="Surface_PointerMoved"
-        PointerReleased="Surface_PointerReleased">
-        <Border Canvas.Left="28" Canvas.Top="28" Padding="16,11" Background="#E80D1713" CornerRadius="12" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-            <StackPanel Spacing="3"><TextBlock Text="Drag the region to capture" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Release to continue · Esc cancels" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-        </Border>
-        <Rectangle x:Name="Selection" Visibility="Collapsed" Stroke="{StaticResource PocketGreen}" StrokeThickness="2" Fill="#1243E08D" RadiusX="8" RadiusY="8" />
-        <Border x:Name="SizeBadge" Visibility="Collapsed" Padding="8,4" Background="#ED0B1511" CornerRadius="7"><TextBlock x:Name="SizeText" FontFamily="Cascadia Mono" FontSize="11" Foreground="{StaticResource PocketGreen}" /></Border>
-    </Canvas>
+    <Grid Background="#FF030A08">
+        <Image x:Name="BackdropImage" Stretch="Fill" IsHitTestVisible="False" />
+        <Canvas
+            x:Name="Surface"
+            Background="#78030907"
+            KeyDown="Surface_KeyDown"
+            PointerPressed="Surface_PointerPressed"
+            PointerMoved="Surface_PointerMoved"
+            PointerReleased="Surface_PointerReleased">
+            <Border Canvas.Left="28" Canvas.Top="28" Padding="16,11" Background="#E80D1713" CornerRadius="12" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
+                <StackPanel Spacing="3"><TextBlock Text="Drag the region to capture" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Release to continue · Esc cancels" Style="{StaticResource PocketCaptionText}" /></StackPanel>
+            </Border>
+            <Rectangle x:Name="Selection" Visibility="Collapsed" Stroke="{StaticResource PocketGreen}" StrokeThickness="2" Fill="#1243E08D" RadiusX="8" RadiusY="8" />
+            <Border x:Name="SizeBadge" Visibility="Collapsed" Padding="8,4" Background="#ED0B1511" CornerRadius="7"><TextBlock x:Name="SizeText" FontFamily="Cascadia Mono" FontSize="11" Foreground="{StaticResource PocketGreen}" /></Border>
+        </Canvas>
+    </Grid>
 </Window>

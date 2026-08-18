@@ -40,18 +40,6 @@
                 <NavigationViewItem x:Name="CaptureNav" Content="Capture" Icon="Camera" Tag="capture" />
                 <NavigationViewItem x:Name="SettingsNav" Content="Settings" Icon="Setting" Tag="settings" />
             </NavigationView.MenuItems>
-            <NavigationView.PaneFooter>
-                <StackPanel Margin="4,10,8,16" Spacing="8">
-                    <Button HorizontalAlignment="Stretch" Click="OpenCommand_Click" Style="{StaticResource PocketPrimaryButton}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon FontSize="15" Glyph="&#xE945;" />
-                            <TextBlock Text="Open command mode" />
-                        </StackPanel>
-                    </Button>
-                    <TextBlock Text="{x:Bind ViewModel.ActivationShortcut, Mode=OneWay}" Style="{StaticResource PocketCaptionText}" />
-                </StackPanel>
-            </NavigationView.PaneFooter>
-
             <Grid Margin="0">
                 <Grid x:Name="LibraryPanel" Padding="28,22,28,24">
                     <Grid.RowDefinitions>
@@ -81,7 +69,7 @@
 
                     <ScrollViewer Grid.Row="1" Margin="0,22,0,18" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
                         <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="8">
-                            <Button Content="All" Tag="All" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
+                            <Button Content="All" Tag="All" Click="Filter_Click" Background="{StaticResource PocketGreenSoft}" Style="{StaticResource PocketQuietButton}" />
                             <Button Content="Screenshots" Tag="Screenshots" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
                             <Button Content="Video" Tag="Video" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
                             <Button Content="Audio" Tag="Audio" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
@@ -149,7 +137,7 @@
                                     <TextBlock x:Name="DetailKind" Text="Capture preview" Style="{StaticResource PocketCaptionText}" />
                                     <TextBlock x:Name="DetailTitle" Text="Choose something from your library" TextWrapping="Wrap" Style="{StaticResource PocketTitleText}" />
                                 </StackPanel>
-                                <Grid Grid.Row="1" Margin="0,16" MinHeight="220">
+                                <Grid Grid.Row="1" Margin="0,12" MinHeight="120">
                                     <Border Background="#990A0F12" CornerRadius="12" />
                                     <Image x:Name="DetailImage" Margin="8" Stretch="Uniform" Visibility="Collapsed" />
                                     <MediaPlayerElement x:Name="DetailPlayer" AreTransportControlsEnabled="True" AutoPlay="False" Visibility="Collapsed" />
@@ -250,11 +238,11 @@
                                 <TextBlock Text="Video defaults" Style="{StaticResource PocketTitleText}" />
                                 <ToggleSwitch Header="Microphone on in preflight" IsOn="{x:Bind ViewModel.VideoMicrophoneEnabled, Mode=TwoWay}" />
                                 <ToggleSwitch Header="Camera on in preflight" IsOn="{x:Bind ViewModel.VideoCameraEnabled, Mode=TwoWay}" />
-                                <ComboBox x:Name="FpsBox" Header="Frame rate" SelectedValue="{x:Bind ViewModel.VideoFramesPerSecond, Mode=TwoWay}" SelectedValuePath="Tag">
+                                <ComboBox x:Name="FpsBox" Header="Frame rate">
                                     <ComboBoxItem Content="30 fps · balanced" Tag="30" />
                                     <ComboBoxItem Content="60 fps · smoother, larger files" Tag="60" />
                                 </ComboBox>
-                                <ComboBox x:Name="CountdownBox" Header="Countdown" SelectedValue="{x:Bind ViewModel.VideoCountdownSeconds, Mode=TwoWay}" SelectedValuePath="Tag">
+                                <ComboBox x:Name="CountdownBox" Header="Countdown">
                                     <ComboBoxItem Content="No countdown" Tag="0" />
                                     <ComboBoxItem Content="3 seconds" Tag="3" />
                                     <ComboBoxItem Content="5 seconds" Tag="5" />

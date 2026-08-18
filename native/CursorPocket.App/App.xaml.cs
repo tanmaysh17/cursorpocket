@@ -20,30 +20,56 @@ public partial class App : Microsoft.UI.Xaml.Application
         UnhandledException += (_, eventArgs) =>
         {
             System.Diagnostics.Debug.WriteLine(eventArgs.Exception);
-            eventArgs.Handled = true;
+            WriteCrashLog(eventArgs.Exception);
         };
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _singleInstanceMutex = new Mutex(true, "Local\\CursorPocket.Native.SingleInstance", out var firstInstance);
-        _activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\CursorPocket.Native.ShowLibrary");
-        if (!firstInstance)
+        try
         {
-            _activationEvent.Set();
-            Exit();
-            return;
-        }
+            _singleInstanceMutex = new Mutex(true, "Local\\CursorPocket.Native.SingleInstance", out var firstInstance);
+            _activationEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "Local\\CursorPocket.Native.ShowLibrary");
+            if (!firstInstance)
+            {
+                _activationEvent.Set();
+                Exit();
+                return;
+            }
 
-        DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        Services = await AppServices.CreateAsync();
-        Window = new MainWindow();
-        Services.Hotkey.Invoked += (_, _) => DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowCommandPalette());
-        StartActivationListener();
-        Window.Activate();
-        if (args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase))
+            DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            Services = await AppServices.CreateAsync();
+            Window = new MainWindow();
+            Services.Hotkey.Invoked += (_, _) => DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowCommandPalette());
+            StartActivationListener();
+            Window.Activate();
+            if (args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase))
+            {
+                Window.AppWindow.Hide();
+            }
+        }
+        catch (Exception error)
         {
-            Window.AppWindow.Hide();
+            WriteCrashLog(error);
+            Exit();
+        }
+    }
+
+    private static void WriteCrashLog(Exception error)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CursorPocket");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(
+                Path.Combine(directory, "crash.log"),
+                $"[{DateTimeOffset.Now:O}] {error}{Environment.NewLine}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Crash reporting must never replace the original failure.
         }
     }
 

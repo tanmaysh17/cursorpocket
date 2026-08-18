@@ -41,8 +41,26 @@ public sealed partial class MainPage : Page
         CompanionModeBox.SelectedIndex = ViewModel.CursorCompanionMode switch { "off" => 0, "always" => 2, _ => 1 };
         FpsBox.SelectedIndex = ViewModel.VideoFramesPerSecond == 60 ? 1 : 0;
         CountdownBox.SelectedIndex = ViewModel.VideoCountdownSeconds switch { 0 => 0, 5 => 2, _ => 1 };
+        FpsBox.SelectionChanged += VideoDefaults_SelectionChanged;
+        CountdownBox.SelectionChanged += VideoDefaults_SelectionChanged;
         UpdateLibraryVisibility();
         await UpdateDetailAsync();
+    }
+
+    private void VideoDefaults_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (sender is not ComboBox box)
+        {
+            return;
+        }
+        if (box == FpsBox)
+        {
+            ViewModel.VideoFramesPerSecond = FpsBox.SelectedIndex == 1 ? 60 : 30;
+        }
+        else if (box == CountdownBox)
+        {
+            ViewModel.VideoCountdownSeconds = CountdownBox.SelectedIndex switch { 0 => 0, 2 => 5, _ => 3 };
+        }
     }
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs eventArgs)
@@ -68,6 +86,11 @@ public sealed partial class MainPage : Page
         if (sender is Button { Tag: string filter })
         {
             ViewModel.SelectFilter(filter);
+            foreach (var button in FilterBar.Children.OfType<Button>())
+            {
+                button.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                    string.Equals(button.Tag as string, filter, StringComparison.Ordinal) ? "PocketGreenSoft" : "PocketRaised"];
+            }
             UpdateLibraryVisibility();
         }
     }

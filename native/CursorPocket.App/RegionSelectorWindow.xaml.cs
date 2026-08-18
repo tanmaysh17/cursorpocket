@@ -25,6 +25,13 @@ public sealed partial class RegionSelectorWindow : Window
         _virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
         var width = NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen);
         var height = NativeMethods.GetSystemMetrics(NativeMethods.SmCyVirtualScreen);
+        BackdropImage.Source = DesktopSnapshot.Capture(new NativeMethods.Rect
+        {
+            Left = _virtualLeft,
+            Top = _virtualTop,
+            Right = _virtualLeft + width,
+            Bottom = _virtualTop + height,
+        });
         AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
         Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
     }

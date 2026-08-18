@@ -17,9 +17,12 @@ public sealed partial class CommandPaletteWindow : Window
     {
         SourceWindow = sourceWindow;
         InitializeComponent();
+        var bounds = WindowPlacement.MonitorUnderPointer();
+        BackdropImage.Source = DesktopSnapshot.Capture(bounds);
         WindowPlacement.ConfigureUtilityWindow(this);
-        WindowPlacement.FillCurrentMonitor(this);
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(bounds.Left, bounds.Top, bounds.Right - bounds.Left, bounds.Bottom - bounds.Top));
         _timeout.Tick += (_, _) => ClosePalette();
+        Closed += (_, _) => App.Services.Context.RestoreFocus(SourceWindow);
         Activated += (_, _) =>
         {
             Root.Focus(FocusState.Programmatic);
@@ -29,6 +32,9 @@ public sealed partial class CommandPaletteWindow : Window
         {
             ShowScreenshotCommands();
         }
+        AudioDeviceHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
+            ? "Starts with the default microphone"
+            : $"Starts with {App.Services.Settings.VideoMicrophoneName}";
     }
 
     public long SourceWindow { get; }

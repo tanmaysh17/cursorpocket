@@ -189,7 +189,7 @@ public sealed partial class VideoPreflightWindow : Window
 
     private async Task StartAsync()
     {
-        if (_closing)
+        if (_closing || !StartButton.IsEnabled)
         {
             return;
         }
@@ -212,6 +212,7 @@ public sealed partial class VideoPreflightWindow : Window
             FramesPerSecond = int.TryParse((FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var fps) ? fps : 30,
             CountdownSeconds = int.TryParse((CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var countdown) ? countdown : 3,
             DrawCursor = PointerToggle.IsOn,
+            DisplayIndex = sourceValue == "display" ? WindowPlacement.DisplayIndexUnderPointer() : 0,
         };
         RecordingRequested?.Invoke(this, options);
         Close();
