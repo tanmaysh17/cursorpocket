@@ -35,6 +35,8 @@ internal static class NativeMethods
     internal static readonly nint HwndTopmost = new(-1);
     internal static readonly nint HwndNotTopmost = new(-2);
     internal const uint LwaColorKey = 0x00000001;
+    internal const int DwmwaWindowCornerPreference = 33;
+    internal const int DwmWindowCornerPreferenceRound = 2;
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct Point
@@ -192,6 +194,9 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetLayeredWindowAttributes(nint hwnd, uint colorKey, byte alpha, uint flags);
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmSetWindowAttribute(nint hwnd, int attribute, ref int value, int valueSize);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

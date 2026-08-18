@@ -223,7 +223,6 @@ public sealed partial class MainWindow : Window
             _openLibraryAfterPaletteCloses = true;
             return;
         }
-        await Task.Delay(170);
         switch (command)
         {
             case "video": ShowVideoPreflight(); break;
@@ -264,7 +263,6 @@ public sealed partial class MainWindow : Window
         selector.RegionSelected += async (_, bounds) =>
         {
             _lastRegion = bounds;
-            await Task.Delay(130);
             await callback(bounds);
         };
         selector.Activate();
@@ -279,7 +277,7 @@ public sealed partial class MainWindow : Window
         }
         try
         {
-            await App.Services.UpdateSettingsAsync(App.Services.Settings with
+            var rememberedSettings = App.Services.Settings with
             {
                 VideoSourceKind = options.SourceKind.ToString().ToLowerInvariant(),
                 VideoMicrophoneEnabled = options.IncludeMicrophone,
@@ -291,9 +289,8 @@ public sealed partial class MainWindow : Window
                 VideoFramesPerSecond = options.FramesPerSecond,
                 VideoCountdownSeconds = options.CountdownSeconds,
                 VideoDrawCursor = options.DrawCursor,
-            });
+            };
             App.Services.Context.RestoreFocus(_lastSourceWindow);
-            await App.Services.Recording.StartVideoAsync(options);
             RecordingHudWindow.ShowForVideo(
                 options,
                 async discard =>
@@ -302,6 +299,8 @@ public sealed partial class MainWindow : Window
                     if (record is not null) ShowReceipt(record, "Video saved");
                     else ShowError(discard ? "Recording discarded" : "Video was not saved", "No file was created.");
                 });
+            await App.Services.Recording.StartVideoAsync(options);
+            _ = App.Services.UpdateRecordingDefaultsAsync(rememberedSettings);
         }
         catch (Exception error)
         {

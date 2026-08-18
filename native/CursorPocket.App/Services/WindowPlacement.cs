@@ -50,6 +50,12 @@ internal static class WindowPlacement
             presenter.IsAlwaysOnTop = topmost;
         }
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        var cornerPreference = NativeMethods.DwmWindowCornerPreferenceRound;
+        NativeMethods.DwmSetWindowAttribute(
+            hwnd,
+            NativeMethods.DwmwaWindowCornerPreference,
+            ref cornerPreference,
+            sizeof(int));
         if (excludeFromCapture)
         {
             NativeMethods.SetWindowDisplayAffinity(hwnd, NativeMethods.WdaExcludeFromCapture);

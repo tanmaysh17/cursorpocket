@@ -80,6 +80,38 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("Content=\"Stop &amp; save\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderThickness=\"0\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ThemeShadow", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Transient_receipts_and_hud_do_not_expose_white_window_gutters()
+    {
+        var receipt = ReadFixture("ReceiptWindow.xaml");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        Assert.Contains("Background=\"#FF141E1A\"", receipt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"Transparent\"", receipt, StringComparison.Ordinal);
+        Assert.DoesNotContain("BorderBrush=", receipt, StringComparison.Ordinal);
+        Assert.Contains("DwmSetWindowAttribute", placement, StringComparison.Ordinal);
+        Assert.Contains("DwmWindowCornerPreferenceRound", placement, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Capture_commands_have_no_artificial_waits_on_the_critical_path()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var recording = ReadFixture("RecordingService.cs.txt");
+        var snapshot = ReadFixture("DesktopSnapshot.cs.txt");
+        var hud = ReadFixture("RecordingHudWindow.xaml.cs.txt");
+
+        Assert.DoesNotContain("Task.Delay(170", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task.Delay(130", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task.Delay(350", recording, StringComparison.Ordinal);
+        Assert.Contains("ImageFormat.Bmp", snapshot, StringComparison.Ordinal);
+        Assert.Contains("Starting…", hud, StringComparison.Ordinal);
+        Assert.True(main.IndexOf("RecordingHudWindow.ShowForVideo", StringComparison.Ordinal) <
+            main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
     }
 
     [Fact]

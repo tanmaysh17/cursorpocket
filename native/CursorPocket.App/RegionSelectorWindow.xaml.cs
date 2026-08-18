@@ -75,8 +75,8 @@ public sealed partial class RegionSelectorWindow : Window
             return;
         }
         var bounds = new CaptureBounds(left + _virtualLeft, top + _virtualTop, right + _virtualLeft, bottom + _virtualTop);
-        RegionSelected?.Invoke(this, bounds);
         Close();
+        RegionSelected?.Invoke(this, bounds);
     }
 
     private void UpdateSelection(Point point)

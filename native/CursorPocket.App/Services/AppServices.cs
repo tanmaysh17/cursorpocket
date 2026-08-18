@@ -78,6 +78,14 @@ public sealed class AppServices : IDisposable
         SettingsChanged?.Invoke(this, normalized);
     }
 
+    public async Task UpdateRecordingDefaultsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        var normalized = SettingsStore.Normalize(settings);
+        Settings = normalized;
+        await SettingsStore.SaveAsync(normalized, cancellationToken);
+        SettingsChanged?.Invoke(this, normalized);
+    }
+
     public async Task UpdateLibraryWindowGeometryAsync(string geometry, CancellationToken cancellationToken = default)
     {
         Settings = Settings with { LibraryWindowGeometry = geometry };

@@ -56,7 +56,7 @@ public sealed class SettingsStore(string? settingsPath = null)
             : 30;
         var countdown = value.VideoCountdownSeconds is 0 or 3 or 5
             ? value.VideoCountdownSeconds
-            : 3;
+            : 0;
         var position = value.VideoCameraPosition is "top-left" or "top-right" or "bottom-left" or "bottom-right"
             ? value.VideoCameraPosition
             : "bottom-right";

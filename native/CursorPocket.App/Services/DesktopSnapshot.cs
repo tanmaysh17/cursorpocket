@@ -18,13 +18,16 @@ internal static class DesktopSnapshot
         var cacheDirectory = Path.Combine(Path.GetTempPath(), "CursorPocket", "desktop-snapshots");
         Directory.CreateDirectory(cacheDirectory);
         DeleteExpiredSnapshots(cacheDirectory);
-        var snapshotPath = Path.Combine(cacheDirectory, $"{Guid.NewGuid():N}.png");
+        // BMP avoids synchronous PNG compression on the hotkey path. At 4K this
+        // removes the largest source of command-mode launch latency while the
+        // decoder still receives an exact, lossless desktop frame.
+        var snapshotPath = Path.Combine(cacheDirectory, $"{Guid.NewGuid():N}.bmp");
 
         using (var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb))
         using (var graphics = Graphics.FromImage(bitmap))
         {
             graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-            bitmap.Save(snapshotPath, ImageFormat.Png);
+            bitmap.Save(snapshotPath, ImageFormat.Bmp);
         }
 
         var source = new BitmapImage();
@@ -38,9 +41,10 @@ internal static class DesktopSnapshot
     {
         try
         {
-            foreach (var path in Directory.EnumerateFiles(directory, "*.png"))
+            foreach (var path in Directory.EnumerateFiles(directory, "*.*"))
             {
-                if (File.GetLastWriteTimeUtc(path) < DateTime.UtcNow.AddHours(-1))
+                if ((path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase)) &&
+                    File.GetLastWriteTimeUtc(path) < DateTime.UtcNow.AddHours(-1))
                 {
                     File.Delete(path);
                 }

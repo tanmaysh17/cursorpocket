@@ -17,6 +17,10 @@ public sealed partial class RecordingHudWindow : Window
         DeviceText.Text = device;
         WindowPlacement.ConfigureUtilityWindow(this);
         WindowPlacement.PlaceTopCenter(this, 740, 124);
+        var ready = App.Services.Recording.State == RecordingState.Recording;
+        ModeText.Text = ready ? mode : "Starting…";
+        StopButton.IsEnabled = ready;
+        DiscardButton.IsEnabled = ready;
         App.Services.Recording.ElapsedChanged += Recording_ElapsedChanged;
         App.Services.Recording.AudioLevelChanged += Recording_AudioLevelChanged;
         App.Services.Recording.StateChanged += Recording_StateChanged;
@@ -43,9 +47,23 @@ public sealed partial class RecordingHudWindow : Window
 
     private void Recording_StateChanged(object? sender, RecordingState state) => DispatcherQueue.TryEnqueue(() =>
     {
-        if (state == RecordingState.Finalizing)
+        if (state == RecordingState.Starting)
+        {
+            ModeText.Text = "Starting…";
+            StopButton.IsEnabled = false;
+            DiscardButton.IsEnabled = false;
+        }
+        else if (state == RecordingState.Recording)
+        {
+            ModeText.Text = ModeText.Text == "Starting…" ? "Recording" : ModeText.Text;
+            StopButton.IsEnabled = true;
+            DiscardButton.IsEnabled = true;
+        }
+        else if (state == RecordingState.Finalizing)
         {
             ModeText.Text = "Finalizing…";
+            StopButton.IsEnabled = false;
+            DiscardButton.IsEnabled = false;
         }
         else if (state is RecordingState.Idle or RecordingState.Failed)
         {

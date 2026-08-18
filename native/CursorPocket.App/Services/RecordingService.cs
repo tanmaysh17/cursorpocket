@@ -271,7 +271,9 @@ public sealed class RecordingService : IRecordingService, IDisposable
             SetState(RecordingState.Failed);
             throw;
         }
-        await Task.Delay(350, cancellationToken);
+        // Process.Start returns after FFmpeg has been created; yielding once lets
+        // immediate startup failures surface without delaying the recording UI.
+        await Task.Yield();
         if (_videoProcess.HasExited)
         {
             var detail = _videoError.ToString().Trim();

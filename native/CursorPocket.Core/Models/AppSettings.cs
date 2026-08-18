@@ -52,7 +52,7 @@ public sealed record AppSettings
     public int VideoFramesPerSecond { get; init; } = 30;
 
     [JsonPropertyName("video_countdown_seconds")]
-    public int VideoCountdownSeconds { get; init; } = 3;
+    public int VideoCountdownSeconds { get; init; }
 
     [JsonPropertyName("video_draw_cursor")]
     public bool VideoDrawCursor { get; init; } = true;
