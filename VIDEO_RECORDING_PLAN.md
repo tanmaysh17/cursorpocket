@@ -273,7 +273,8 @@ These are deferred so the first release can make the core promise dependable: lo
 - The optional camera is a clean 16:9 picture-in-picture in v1. Device cycling, source choice, size, and corner controls are implemented in the full interface; live camera preview remains follow-up polish so camera hardware is not opened before an explicit recording action.
 - The synthetic verifier passes screen-only, screen + narration, screen + camera, combined, and forcibly interrupted fragmented-MP4 recovery fixtures.
 - A synthetic 3840 × 2160 at 60 fps Media Foundation gate produced a valid three-second H.264 MP4 in 4.03 seconds on the target machine.
-- Automated storage, lifecycle, shortcut, tray, settings compatibility, window-affinity, and synthetic H.264/AAC self-tests pass. The final computer-controlled visual click-through could not run while the Windows desktop was locked; it must be repeated after unlock before publishing a release artifact.
+- Automated storage, lifecycle, shortcut, tray, settings compatibility, window-affinity, and synthetic H.264/AAC self-tests pass.
+- The installed-app gate passed on the unlocked target desktop: `Ctrl + Shift + V` started and stopped a display + microphone + webcam recording, finalized it out of `.in-progress`, and added the manifest entry. The resulting 37.67-second file is 1920 x 1200 H.264/AAC at 29.98 fps with audio; the camera picture-in-picture was placed bottom-right and showed the webcam's disabled-camera feed because the device was physically/privacy disabled. CursorPocket's command and recording controls were absent from the captured frame.
 
 ## Technical references
 
