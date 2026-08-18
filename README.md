@@ -36,7 +36,7 @@ Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highl
 
 Open command mode and press `V`. A dedicated preflight shows the source, named microphone with a live level, camera toggle with live preview, pointer choice, frame rate, countdown, free disk space, and one **Start recording** action. CursorPocket releases the preview camera before FFmpeg begins, then runs the countdown. During recording, the excluded HUD shows elapsed time, audio activity, active devices, **Stop and save**, and **Discard**.
 
-CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
+CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. Press `Escape` while recording to stop and save. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
 
 ## Where things are saved
 

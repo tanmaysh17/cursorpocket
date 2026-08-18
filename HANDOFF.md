@@ -48,6 +48,8 @@ Relevant commits:
 
 - `ba35fba` — remove capture chrome and startup latency
 - `62dae63` — keep command palette warm between activations
+- `61a10ee` — remove the Windows DWM border around capture surfaces
+- `ba71232` — clip utility windows to their rounded surface and scope `Escape` handling
 
 ## Build and verification
 
@@ -60,7 +62,7 @@ $dotnet = "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe"
 & .\native\build-native.ps1
 ```
 
-Expected native suite after `62dae63`: 38 passing tests, zero failures. `build-native.ps1` must fail if compiled XBF/PRI/assets or FFmpeg licensing files are absent.
+Expected native suite after `ba71232`: 39 passing tests, zero failures. `build-native.ps1` must fail if compiled XBF/PRI/assets or FFmpeg licensing files are absent.
 
 For an installed smoke test:
 
@@ -71,6 +73,13 @@ For an installed smoke test:
 5. Use `Ctrl+Shift+Space`, then test `A` and `V`. Confirm immediate feedback, no white HWND gutter, readable HUD, save receipt, and Library playback.
 6. Confirm ordinary typing is unaffected after the palette hides; bare command hotkeys must be unregistered while hidden.
 
+Live verification on the installed build after `ba71232` confirmed:
+
+- `Escape` during an audio recording stops and saves, producing the saved receipt;
+- `Escape` closes region selection without creating a capture;
+- `Escape` closes annotation and keeps the original screenshot, producing the expected receipt;
+- the installed `CursorPocket.dll` matches the release build and the app remains responsive in background mode.
+
 The recording HUD and receipt use capture exclusion, so Windows Graphics Capture-based automation may show the underlying source rather than those surfaces. Use accessibility inspection for state/actions and direct visual inspection on the unlocked desktop for chrome.
 
 ## Known follow-up
@@ -80,4 +89,3 @@ The recording HUD and receipt use capture exclusion, so Windows Graphics Capture
 - Do not optimize by leaving S/V/A/T/L/O registered while the palette is hidden; that would steal normal typing.
 - Preserve source-window state: never restore, resize, unmaximize, or minimize a healthy source window merely to return focus.
 - Keep camera preview release before FFmpeg camera acquisition.
-
