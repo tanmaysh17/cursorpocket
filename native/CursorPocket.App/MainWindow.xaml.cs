@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
 {
     private CommandPaletteWindow? _palette;
     private VideoPreflightWindow? _preflight;
+    private CameraSelfViewWindow? _selfView;
     private NativeCompanionWindow? _companion;
     private RecordingService? _subscribedRecording;
     private MouseActivityService? _mouseActivity;
@@ -299,13 +300,31 @@ public sealed partial class MainWindow : Window
                     if (record is not null) ShowReceipt(record, "Video saved");
                     else ShowError(discard ? "Recording discarded" : "Video was not saved", "No file was created.");
                 });
+            // The self-view holds the camera for the whole recording and is captured
+            // off the screen, so it must be up and placed inside the recorded area
+            // before FFmpeg starts writing frames. The preflight has already released
+            // its own preview by this point.
+            await ShowCameraSelfViewAsync(options);
             await App.Services.Recording.StartVideoAsync(options);
             _ = App.Services.UpdateRecordingDefaultsAsync(rememberedSettings);
         }
         catch (Exception error)
         {
+            DismissCameraSelfView();
             ShowError("Video did not start", error.Message);
         }
+    }
+
+    private async Task ShowCameraSelfViewAsync(RecordingOptions options)
+    {
+        DismissCameraSelfView();
+        _selfView = await CameraSelfViewWindow.ShowForAsync(options, _lastSourceWindow);
+    }
+
+    private void DismissCameraSelfView()
+    {
+        _selfView?.Dismiss();
+        _selfView = null;
     }
 
     private void ShowReceipt(CaptureRecord record, string title)
@@ -328,6 +347,12 @@ public sealed partial class MainWindow : Window
         if (_tray is not null)
         {
             _tray.Text = state == RecordingState.Recording ? "CursorPocket · recording" : "CursorPocket · ready";
+        }
+        // Release the camera as soon as the recording is no longer running, so the
+        // device is free for the next preflight preview.
+        if (state is RecordingState.Idle or RecordingState.Failed)
+        {
+            DismissCameraSelfView();
         }
     });
 

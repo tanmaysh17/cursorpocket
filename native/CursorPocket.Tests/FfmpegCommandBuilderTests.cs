@@ -6,19 +6,47 @@ namespace CursorPocket.Tests;
 public sealed class FfmpegCommandBuilderTests
 {
     [Fact]
-    public void OpensPhysicalDevicesBeforeDesktopDuplication()
+    public void OpensTheMicrophoneBeforeDesktopDuplication()
     {
+        var command = FfmpegCommandBuilder.Build("ffmpeg.exe", "output.mp4", new RecordingOptions
+        {
+            IncludeMicrophone = true,
+            MicrophoneName = "Desk mic",
+        }).ToList();
+
+        Assert.True(command.IndexOf("audio=Desk mic") < command.FindIndex(value => value.StartsWith("ddagrab=")));
+    }
+
+    [Fact]
+    public void TheCameraIsNeverAnFfmpegInput()
+    {
+        // CursorPocket owns the camera and shows a live self-view inside the
+        // recorded area instead. Handing the same device to FFmpeg's dshow demuxer
+        // would take it away from that preview, since DirectShow grants exclusive use.
         var command = FfmpegCommandBuilder.Build("ffmpeg.exe", "output.mp4", new RecordingOptions
         {
             IncludeMicrophone = true,
             MicrophoneName = "Desk mic",
             IncludeCamera = true,
             CameraName = "Studio camera",
+            CameraPosition = "top-left",
+            CameraWidth = 480,
         }).ToList();
 
-        Assert.True(command.IndexOf("audio=Desk mic") < command.FindIndex(value => value.StartsWith("ddagrab=")));
-        Assert.True(command.IndexOf("video=Studio camera") < command.FindIndex(value => value.StartsWith("ddagrab=")));
-        Assert.Contains(command, value => value.Contains("[screen][cam]overlay=W-w-32:H-h-32:shortest=0,format=nv12[video]", StringComparison.Ordinal));
+        Assert.DoesNotContain("video=Studio camera", command);
+        Assert.DoesNotContain(command, value => value.Contains("overlay=", StringComparison.Ordinal));
+        Assert.DoesNotContain(command, value => value.Contains("[cam]", StringComparison.Ordinal));
+        Assert.Contains(command, value => value.Contains("[screen]format=nv12[video]", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ANamedCameraIsStillRequiredForTheSelfView()
+    {
+        Assert.Throws<ArgumentException>(() => FfmpegCommandBuilder.Build("ffmpeg.exe", "output.mp4", new RecordingOptions
+        {
+            IncludeCamera = true,
+            CameraName = "   ",
+        }));
     }
 
     [Fact]
