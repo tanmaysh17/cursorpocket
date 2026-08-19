@@ -49,8 +49,10 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 ### Command mode
 
-- A small panel (296 × 340 dips) in the top-right of the work area on the pointer's display, not a full-monitor overlay. It covers as little of the user's work as possible.
-- **It always opens in the same place and never moves while open.** An earlier version stepped away from an approaching pointer; predictability proved worth more than the clearance, so nothing—not the pointer, not a mode change—relocates the panel.
+- A small panel (296 × 340 dips) on the pointer's display, not a full-monitor overlay. It covers as little of the user's work as possible.
+- **The user places it; nothing else moves it.** Drag anywhere on the panel except a button to move it, double-click to reset to the top right. An earlier version stepped away from an approaching pointer on its own; predictability proved worth more than the clearance, so the pointer, a mode change, and a reopen never relocate it.
+- The position is remembered as a fraction of the display's free space (`CommandPanelPlacement`), not as screen coordinates, so it means the same thing on another display, resolution, or DPI and can never be restored off screen.
+- Dragging uses Windows' own move loop rather than per-frame pointer tracking, so it feels exactly like dragging a title bar on a surface that has none.
 - **Liquid glass.** Command mode is the one transient surface that uses a system backdrop: `DesktopAcrylicBackdrop` blurs the live desktop behind it, with only a thin tint over the top for text contrast. The system paints the whole window, so this is not the transparent-root gutter that the opacity rule guards against. The frozen desktop snapshot it replaced now belongs to region selection alone.
 - Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
 - A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
@@ -87,7 +89,7 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 The design-consultation gate requires all of the following before release:
 
 - no opaque gray capture surface or black companion rectangle;
-- the command panel stays small, opens in the same corner every time, never moves while open, and keeps the blurred desktop readable behind it;
+- the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
 - the command list scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
 - a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;

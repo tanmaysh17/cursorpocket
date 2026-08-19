@@ -1,7 +1,11 @@
+using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Input;
 using Windows.System;
 using Windows.UI.Core;
@@ -10,8 +14,7 @@ namespace CursorPocket_App;
 
 public sealed partial class CommandPaletteWindow : Window
 {
-    // Command mode always opens in the same place. Moving it around — even to keep
-    // clear of the pointer — cost more in predictability than it bought in room.
+    // Command mode reopens wherever the user last put it and never moves on its own.
     private const int PanelWidth = 296;
     private const int PanelHeight = 340;
     private const int PanelMargin = 22;
@@ -39,11 +42,10 @@ public sealed partial class CommandPaletteWindow : Window
     {
         SourceWindow = sourceWindow;
         _restoreSourceOnClose = true;
-        // Same corner of the pointer's display every time, so the panel is where
-        // the user already expects it. Acrylic keeps the source readable behind it,
-        // which is what the full-screen desktop snapshot used to be for.
-        WindowPlacement.PlaceTopRight(this, PanelWidth, PanelHeight, PanelMargin);
-        WindowPlacement.ClipToRoundedRegion(this, PanelWidth, PanelHeight, PanelRadius);
+        // Wherever the user last dragged it, on the pointer's display. Acrylic keeps
+        // the source readable behind it, which is what the full-screen desktop
+        // snapshot used to be for.
+        ApplySavedPlacement();
         PaletteHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
             ? "Press one key · Esc closes"
             : $"A uses {App.Services.Settings.VideoMicrophoneName} · Esc closes";
@@ -52,6 +54,85 @@ public sealed partial class CommandPaletteWindow : Window
         AppWindow.Show(false);
         Activate();
     }
+
+    private void ApplySavedPlacement()
+    {
+        var settings = App.Services.Settings;
+        var work = WindowPlacement.MonitorUnderPointer(true);
+        var placement = CommandPanelPlacement.Resolve(
+            ToBounds(work),
+            PixelWidth(),
+            PixelHeight(),
+            settings.CommandPanelAnchorX,
+            settings.CommandPanelAnchorY,
+            PixelMargin());
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
+        WindowPlacement.ClipToRoundedPixelRegion(this, placement.Width, placement.Height, WindowPlacement.ToPixels(this, PanelRadius));
+    }
+
+    /// <summary>
+    /// Drag anywhere on the panel to move command mode; presses that land on a
+    /// button are left to the button. Windows runs the move loop, so the call blocks
+    /// until the drop; the resting position is then stored as a fraction of the
+    /// display's free space so it survives a resolution or monitor change.
+    /// </summary>
+    private async void Root_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (eventArgs.GetCurrentPoint(Root).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed ||
+            IsOverButton(eventArgs.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        _timeout.Stop();
+        WindowPlacement.BeginNativeDrag(this);
+        var bounds = WindowPlacement.BoundsOf(this);
+        var work = WindowPlacement.WorkAreaAt(bounds.Left + ((bounds.Right - bounds.Left) / 2), bounds.Top + ((bounds.Bottom - bounds.Top) / 2));
+        var (anchorX, anchorY) = CommandPanelPlacement.AnchorFor(
+            ToBounds(work),
+            bounds.Right - bounds.Left,
+            bounds.Bottom - bounds.Top,
+            bounds.Left,
+            bounds.Top,
+            PixelMargin());
+        ResetTimeout();
+        await App.Services.UpdateCommandPanelAnchorAsync(anchorX, anchorY);
+    }
+
+    private async void Root_DoubleTapped(object sender, DoubleTappedRoutedEventArgs eventArgs)
+    {
+        if (IsOverButton(eventArgs.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        ResetTimeout();
+        await App.Services.UpdateCommandPanelAnchorAsync(CommandPanelPlacement.DefaultAnchorX, CommandPanelPlacement.DefaultAnchorY);
+        ApplySavedPlacement();
+    }
+
+    /// <summary>
+    /// Buttons keep their clicks. Walking the visual tree rather than trusting the
+    /// routed event to stop is what keeps a press on a keycap — which is a Button
+    /// inside a Button's content — from starting a drag.
+    /// </summary>
+    private static bool IsOverButton(DependencyObject? source)
+    {
+        for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static CaptureBounds ToBounds(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
+
+    private int PixelWidth() => WindowPlacement.ToPixels(this, PanelWidth);
+    private int PixelHeight() => WindowPlacement.ToPixels(this, PanelHeight);
+    private int PixelMargin() => WindowPlacement.ToPixels(this, PanelMargin);
 
     public long SourceWindow { get; private set; }
     public event EventHandler<string>? CommandRequested;

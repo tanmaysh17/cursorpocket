@@ -155,6 +155,32 @@ internal static class WindowPlacement
         }
     }
 
+    /// <summary>
+    /// Starts a native window drag for a borderless surface. Windows runs its own
+    /// modal move loop, so this call does not return until the user drops the window
+    /// — read the new position from <see cref="BoundsOf"/> afterwards.
+    /// </summary>
+    public static void BeginNativeDrag(Window window)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        NativeMethods.ReleaseCapture();
+        NativeMethods.SendMessage(hwnd, NativeMethods.WmNcLButtonDown, NativeMethods.HtCaption, 0);
+    }
+
+    public static NativeMethods.Rect BoundsOf(Window window)
+    {
+        NativeMethods.GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(window), out var bounds);
+        return bounds;
+    }
+
+    /// <summary>Work area of the display a point sits on, in physical pixels.</summary>
+    public static NativeMethods.Rect WorkAreaAt(int x, int y)
+    {
+        var monitor = NativeMethods.MonitorFromPoint(new NativeMethods.Point { X = x, Y = y }, NativeMethods.MonitorDefaultToNearest);
+        var info = new NativeMethods.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfo>() };
+        return NativeMethods.GetMonitorInfo(monitor, ref info) ? info.Work : MonitorUnderPointer(true);
+    }
+
     public static void FillCurrentMonitor(Window window)
     {
         var bounds = MonitorUnderPointer();

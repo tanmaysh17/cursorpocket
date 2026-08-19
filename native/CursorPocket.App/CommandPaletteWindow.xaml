@@ -11,7 +11,9 @@
     <Window.SystemBackdrop>
         <DesktopAcrylicBackdrop />
     </Window.SystemBackdrop>
-    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" Loaded="Root_Loaded" Background="Transparent">
+    <!-- The whole panel is a drag handle. Presses that land on a button are left
+         alone, so every command stays clickable. -->
+    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" PointerPressed="Root_PointerPressed" DoubleTapped="Root_DoubleTapped" Loaded="Root_Loaded" Background="Transparent">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="S" Invoked="CommandAccelerator_Invoked" />
             <KeyboardAccelerator Key="V" Invoked="CommandAccelerator_Invoked" />
@@ -84,7 +86,19 @@
                         <Image Source="ms-appx:///Assets/CursorPocketLogo.png" Width="21" Height="21" Stretch="Uniform" />
                     </Grid>
                 </Button>
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Text="COMMAND MODE" Foreground="{StaticResource PocketGreen}" FontFamily="Cascadia Mono" FontSize="10" FontWeight="SemiBold" CharacterSpacing="110" />
+                <Grid
+                    Grid.Column="1"
+                    Background="Transparent"
+                    ColumnSpacing="6"
+                    ToolTipService.ToolTip="Drag anywhere on the panel to move it · double-click to reset to the top right"
+                    AutomationProperties.Name="Drag anywhere on the panel to move command mode">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center" Text="COMMAND MODE" Foreground="{StaticResource PocketGreen}" FontFamily="Cascadia Mono" FontSize="10" FontWeight="SemiBold" CharacterSpacing="110" />
+                    <FontIcon Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Glyph="&#xE700;" FontSize="11" Foreground="{StaticResource PocketMuted}" Opacity="0.7" />
+                </Grid>
                 <Button Grid.Column="2" VerticalAlignment="Center" Padding="4" Click="Close_Click" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Close command mode" AutomationProperties.Name="Close command mode">
                     <FontIcon Glyph="&#xE711;" FontSize="11" />
                 </Button>

@@ -16,13 +16,38 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BackdropImage", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
-        // One fixed anchor: nothing may move the panel while it is open.
-        Assert.Contains("PlaceTopRight", code, StringComparison.Ordinal);
+        // The panel only ever moves because the user dragged it — never on its own.
         Assert.DoesNotContain("NotifyPointerMoved", code, StringComparison.Ordinal);
         Assert.DoesNotContain("NotifyPointerMoved", main, StringComparison.Ordinal);
         Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
         // The command list still has to scroll rather than clip at 250% scale.
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Command_mode_can_be_dragged_anywhere_and_reopens_where_it_was_left()
+    {
+        var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CommandPaletteWindow.xaml");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+        var services = ReadFixture("AppServices.cs.txt");
+
+        // The whole panel drags, not just a title strip.
+        Assert.Contains("PointerPressed=\"Root_PointerPressed\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DoubleTapped=\"Root_DoubleTapped\"", xaml, StringComparison.Ordinal);
+        // ...but a press on any button stays a click, including the keycaps, which are
+        // Buttons nested inside a Button's content.
+        Assert.Contains("IsOverButton", code, StringComparison.Ordinal);
+        Assert.Contains("node is ButtonBase", code, StringComparison.Ordinal);
+        // Windows owns the move loop, so the drop position is read back afterwards.
+        Assert.Contains("BeginNativeDrag", code, StringComparison.Ordinal);
+        Assert.Contains("WmNcLButtonDown", placement, StringComparison.Ordinal);
+        Assert.Contains("ReleaseCapture", placement, StringComparison.Ordinal);
+        // Stored as fractions of the free space, so a remembered position cannot come
+        // back off screen on a different display.
+        Assert.Contains("CommandPanelPlacement.Resolve", code, StringComparison.Ordinal);
+        Assert.Contains("CommandPanelPlacement.AnchorFor", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateCommandPanelAnchorAsync", services, StringComparison.Ordinal);
     }
 
     [Fact]

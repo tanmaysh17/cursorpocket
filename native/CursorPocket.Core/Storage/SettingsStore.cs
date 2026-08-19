@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 
 namespace CursorPocket.Core.Storage;
 
@@ -74,6 +75,9 @@ public sealed class SettingsStore(string? settingsPath = null)
         var captureDirectory = string.IsNullOrWhiteSpace(value.CaptureDirectory)
             ? new AppSettings().CaptureDirectory
             : value.CaptureDirectory;
+        // A corrupt or out-of-range anchor must never put command mode off screen.
+        var anchorX = ClampAnchor(value.CommandPanelAnchorX, CommandPanelPlacement.DefaultAnchorX);
+        var anchorY = ClampAnchor(value.CommandPanelAnchorY, CommandPanelPlacement.DefaultAnchorY);
 
         return value with
         {
@@ -84,6 +88,11 @@ public sealed class SettingsStore(string? settingsPath = null)
             VideoSourceKind = source,
             VideoCameraWidth = cameraWidth,
             CursorCompanionMode = companionMode,
+            CommandPanelAnchorX = anchorX,
+            CommandPanelAnchorY = anchorY,
         };
     }
+
+    private static double ClampAnchor(double value, double fallback) =>
+        double.IsFinite(value) ? Math.Clamp(value, 0, 1) : fallback;
 }

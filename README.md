@@ -10,6 +10,8 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a full-resolution annotation surface. Audio and video use a clear recording HUD with save/discard controls. Every successful capture gets a receipt and appears immediately in the Library.
 
+Drag anywhere on the panel to move command mode wherever you want it; it reopens in the same place next time, on whichever display your pointer is on. Double-click it to put it back in the top-right corner.
+
 Command mode closes after one action, when you press `Escape`, or automatically after thirty seconds. Click the pulsing logo in its bottom-right corner when you want the full CursorPocket library and settings window. That full window can be moved and resized, and CursorPocket remembers its size and position.
 
 ### Command-mode keys
