@@ -84,6 +84,7 @@ public sealed partial class ReceiptWindow : Window
     }
 
     private void Library_Click(object sender, RoutedEventArgs eventArgs) { OpenLibraryRequested?.Invoke(this, EventArgs.Empty); Close(); }
+    private void Dismiss_Click(object sender, RoutedEventArgs eventArgs) { _timer.Stop(); Close(); }
     private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _timer.Stop();
     private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _timer.Start();
 }

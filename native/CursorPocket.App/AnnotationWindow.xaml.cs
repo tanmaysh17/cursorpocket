@@ -262,6 +262,29 @@ public sealed partial class AnnotationWindow : Window
         }
     }
 
+    private void SaveAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        // The inline text tool commits its label on Enter, so leave the key to the
+        // editor while it has focus. Everywhere else Enter saves the screenshot,
+        // whether or not anything was drawn on it.
+        if (FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        _ = SaveAsync();
+    }
+
+    private void UndoAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (FocusManager.GetFocusedElement(Content.XamlRoot) is TextBox)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        Undo_Click(this, new RoutedEventArgs());
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
     private void Cancel() { _finished = true; Cancelled?.Invoke(this, EventArgs.Empty); Close(); }
 

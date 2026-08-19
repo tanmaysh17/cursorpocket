@@ -13,6 +13,25 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Command_mode_is_a_compact_panel_that_steps_away_from_the_pointer()
+    {
+        var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CommandPaletteWindow.xaml");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+
+        Assert.Contains("PanelWidth = 372", code, StringComparison.Ordinal);
+        Assert.Contains("PanelHeight = 468", code, StringComparison.Ordinal);
+        Assert.Contains("PalettePlacementPolicy.ChooseCorner", code, StringComparison.Ordinal);
+        Assert.Contains("avoid: _corner", code, StringComparison.Ordinal);
+        Assert.Contains("_panel.Contains(x, y)", code, StringComparison.Ordinal);
+        Assert.Contains("ClipToRoundedPixelRegion", code, StringComparison.Ordinal);
+        Assert.Contains("_palette?.NotifyPointerMoved", main, StringComparison.Ordinal);
+        // The command list has to scroll rather than clip once the panel no longer
+        // owns the whole display, especially at 250% display scale.
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Region_selector_keeps_the_desktop_visible_while_selecting()
     {
         var xaml = ReadFixture("RegionSelectorWindow.xaml");

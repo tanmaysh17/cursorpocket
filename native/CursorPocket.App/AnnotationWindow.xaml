@@ -19,6 +19,13 @@
                 <Setter Property="CornerRadius" Value="16" />
             </Style>
         </Grid.Resources>
+        <!--  A Canvas cannot take keyboard focus, so the drawing surface never
+              receives KeyDown. Accelerators on the root keep Enter and Ctrl+Z working
+              no matter which toolbar control currently has focus.  -->
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Enter" Invoked="SaveAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="UndoAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -132,7 +139,7 @@
                     Style="{StaticResource PocketQuietButton}" />
                 <Button Click="Save_Click" Style="{StaticResource PocketPrimaryButton}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Save annotation" />
+                        <TextBlock Text="Save screenshot" />
                         <TextBlock
                             VerticalAlignment="Center"
                             FontFamily="Cascadia Mono"
@@ -166,7 +173,7 @@
         </Border>
 
         <Grid Grid.Row="2">
-            <TextBlock Style="{StaticResource PocketMetaText}" Text="Drawing on the full-resolution image · Ctrl+Z undoes · Esc keeps the original" />
+            <TextBlock Style="{StaticResource PocketMetaText}" Text="Drawing on the full-resolution image · Enter saves, with or without marks · Ctrl+Z undoes · Esc keeps the original" />
         </Grid>
     </Grid>
 </Window>

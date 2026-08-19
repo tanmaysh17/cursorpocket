@@ -83,8 +83,14 @@ def _draw_pocket(draw: ImageDraw.ImageDraw, scale: float, fill) -> None:
     )
 
 
-def render_mark(size: int, ground: bool = True) -> Image.Image:
-    """Render the mark at `size` px, with or without the dark rounded ground."""
+def render_mark(size: int, ground: bool = True, simplify: bool | None = None) -> Image.Image:
+    """Render the mark at `size` px, with or without the dark rounded ground.
+
+    `simplify` forces the cursor-only form on or off. Leave it None to pick by
+    size, or set it True for an asset that will be displayed small however large
+    the file is, such as the command panel header.
+    """
+    small = size <= SMALL_SIZE if simplify is None else simplify
     # Keep the supersampled canvas bounded so a 4K master stays renderable.
     supersample = max(1, min(SS, 8192 // max(size, 1)))
     render = size * supersample
@@ -97,13 +103,13 @@ def render_mark(size: int, ground: bool = True) -> Image.Image:
             radius=GROUND_RADIUS * scale,
             fill=GROUND,
         )
-    if size > SMALL_SIZE:
+    if not small:
         _draw_pocket(draw, scale, GREEN)
 
     # A keyline is stroked around the arrow before the arrow itself is filled,
     # so the pocket is cut back by an even gap wherever the two overlap and the
     # arrow reads as passing in front of the pocket mouth.
-    arrow = cursor_points(scale, small=size <= SMALL_SIZE)
+    arrow = cursor_points(scale, small=small)
     draw.line(
         arrow + [arrow[0]],
         fill=GROUND if ground else (0, 0, 0, 0),
@@ -120,6 +126,9 @@ def main() -> None:
     render_mark(1024).save(ASSETS / "cursorpocket-logo.png")
     render_mark(4096).save(ASSETS / "cursorpocket-logo-4k.png")
     render_mark(1024, ground=False).save(ASSETS / "cursorpocket-mark.png")
+    render_mark(256, simplify=True).save(
+        ROOT / "native" / "CursorPocket.App" / "Assets" / "CursorPocketLogo.png"
+    )
 
     sizes = (256, 128, 64, 48, 40, 32, 24, 20, 16)
     frames = [render_mark(size) for size in sizes]
