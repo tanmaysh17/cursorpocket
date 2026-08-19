@@ -234,9 +234,20 @@ public sealed partial class MainWindow : Window
         try
         {
             var record = await capture();
-            var editor = new AnnotationWindow(record, App.Services.Library.GetAbsolutePath(record));
-            editor.Saved += (_, _) => ShowReceipt(record, "Screenshot saved");
-            editor.Cancelled += (_, _) => ShowReceipt(record, "Screenshot saved without annotation");
+            var path = App.Services.Library.GetAbsolutePath(record);
+            // Copy immediately, so the shot is pasteable the moment it is taken
+            // rather than only after the annotation surface is dismissed.
+            var copied = await CopyImageToClipboardAsync(path);
+            var editor = new AnnotationWindow(record, path);
+            editor.Saved += async (_, _) =>
+            {
+                // Re-copy so the clipboard holds the marked-up image, not the original.
+                var recopied = await CopyImageToClipboardAsync(path);
+                ShowReceipt(record, recopied ? "Screenshot saved · copied" : "Screenshot saved");
+            };
+            editor.Cancelled += (_, _) => ShowReceipt(record, copied
+                ? "Screenshot saved · copied"
+                : "Screenshot saved without annotation");
             // Command mode has just hidden itself, so the source app already owns the
             // foreground. Activate() alone loses that race and leaves the annotation
             // window behind or minimized.
@@ -316,6 +327,31 @@ public sealed partial class MainWindow : Window
     {
         _selfView?.Dismiss();
         _selfView = null;
+    }
+
+    /// <summary>
+    /// Puts a saved screenshot on the clipboard. Flushed so it outlives CursorPocket:
+    /// without that, quitting the app takes the image back off the clipboard. A failure
+    /// here is reported in the receipt wording but never fails the capture — the file
+    /// is already on disk, which is the part that matters.
+    /// </summary>
+    private static async Task<bool> CopyImageToClipboardAsync(string path)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromFile(file));
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+            return true;
+        }
+        catch (Exception)
+        {
+            // Another app can hold the clipboard open, and Flush throws if the
+            // clipboard is locked. The screenshot is saved either way.
+            return false;
+        }
     }
 
     private void ShowReceipt(CaptureRecord record, string title)

@@ -24,15 +24,70 @@ public sealed partial class CameraSelfViewWindow : Window
 {
     private MediaCapture? _mediaCapture;
     private MediaPlayer? _cameraPlayer;
+    private CaptureBounds _captureArea = new(0, 0, 1920, 1080);
+    private (int Left, int Top) _dragOrigin;
+    private (int X, int Y) _dragStart;
+    private bool _dragging;
     private bool _closed;
 
     private CameraSelfViewWindow()
     {
         InitializeComponent();
+        // Not click-through: the user drags this to reposition their camera mid
+        // recording, which needs pointer input. It stays small so the area it takes
+        // out of the demonstration is minimal, and it never takes activation.
         WindowPlacement.ConfigureUtilityWindow(this, topmost: true, excludeFromCapture: false);
-        WindowPlacement.MakeClickThrough(this);
         Closed += (_, _) => ReleaseCamera();
     }
+
+    /// <summary>
+    /// Drag the self-view anywhere inside the area being recorded. The clamp is not
+    /// cosmetic: the webcam reaches the file by being on screen inside that rectangle,
+    /// so a self-view dragged outside it would silently vanish from the recording.
+    /// </summary>
+    private void Root_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs)
+    {
+        var bounds = WindowPlacement.BoundsOf(this);
+        _dragOrigin = (bounds.Left, bounds.Top);
+        _dragStart = WindowPlacement.PointerPosition();
+        _dragging = Root.CapturePointer(eventArgs.Pointer);
+        eventArgs.Handled = _dragging;
+    }
+
+    private void Root_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
+        var bounds = WindowPlacement.BoundsOf(this);
+        var width = bounds.Right - bounds.Left;
+        var height = bounds.Bottom - bounds.Top;
+        var left = Math.Clamp(
+            _dragOrigin.Left + (pointerX - _dragStart.X),
+            _captureArea.Left,
+            Math.Max(_captureArea.Left, _captureArea.Right - width));
+        var top = Math.Clamp(
+            _dragOrigin.Top + (pointerY - _dragStart.Y),
+            _captureArea.Top,
+            Math.Max(_captureArea.Top, _captureArea.Bottom - height));
+        WindowPlacement.MoveTo(this, left, top);
+    }
+
+    private void Root_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+        _dragging = false;
+        eventArgs.Handled = true;
+        Root.ReleasePointerCapture(eventArgs.Pointer);
+    }
+
+    private void Root_PointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _dragging = false;
 
     /// <summary>
     /// Shows the self-view inside the area being recorded, or returns null when the
@@ -48,6 +103,7 @@ public sealed partial class CameraSelfViewWindow : Window
         var bounds = ResolveCaptureArea(options, sourceWindow);
         var placement = CameraSelfViewPlacement.Compute(bounds, options.CameraPosition, options.CameraWidth);
         var window = new CameraSelfViewWindow();
+        window._captureArea = bounds;
         window.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
         WindowPlacement.ClipToRoundedPixelRegion(window, placement.Width, placement.Height, 12);
         window.AppWindow.Show(false);

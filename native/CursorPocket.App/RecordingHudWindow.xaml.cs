@@ -21,7 +21,13 @@ public sealed partial class RecordingHudWindow : Window
     private readonly List<Rectangle> _collapsedBars = [];
     private readonly List<Rectangle> _expandedBars = [];
     private readonly bool _hasAudio;
-    private bool _expanded;
+    // Polls the pointer so the drawer opens as it approaches rather than only once it
+    // lands on the pill, and steps the geometry, which composition cannot animate.
+    private readonly DispatcherTimer _drawer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private readonly System.Diagnostics.Stopwatch _frameClock = System.Diagnostics.Stopwatch.StartNew();
+    private double _progress;
+    private double _target;
+    private bool _focusWithin;
     private bool _stopping;
 
     private RecordingHudWindow(string mode, string device, bool hasAudio, Func<bool, Task> stop)
@@ -34,6 +40,8 @@ public sealed partial class RecordingHudWindow : Window
         WindowPlacement.ConfigureUtilityWindow(this);
         BuildMeters();
         ApplySize();
+        _drawer.Tick += Drawer_Tick;
+        _drawer.Start();
         _escapeLease = App.Services.EscapeHotkey.Capture(() =>
             DispatcherQueue.TryEnqueue(async () => await StopAsync(false)));
         var ready = App.Services.Recording.State == RecordingState.Recording;
@@ -46,6 +54,8 @@ public sealed partial class RecordingHudWindow : Window
         App.Services.Recording.StateChanged += Recording_StateChanged;
         Closed += (_, _) =>
         {
+            _drawer.Stop();
+            _drawer.Tick -= Drawer_Tick;
             _escapeLease.Dispose();
             Unsubscribe();
         };
@@ -123,31 +133,57 @@ public sealed partial class RecordingHudWindow : Window
         }
     }
 
-    private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => SetExpanded(true);
-    private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => SetExpanded(false);
+    private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _target = 1;
+    private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) { }
     // Keyboard users reach the actions without a pointer ever entering the pill.
-    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) => SetExpanded(true);
+    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) { _focusWithin = true; _target = 1; }
+    private void Root_LostFocus(object sender, RoutedEventArgs eventArgs) => _focusWithin = false;
 
-    private void SetExpanded(bool expanded)
+    private void Drawer_Tick(object? sender, object eventArgs)
     {
-        if (_expanded == expanded)
+        var elapsed = _frameClock.Elapsed.TotalMilliseconds;
+        _frameClock.Restart();
+
+        // Open while the pointer is near, or while focus is inside the drawer so a
+        // keyboard user does not have it close under them.
+        var bounds = WindowPlacement.BoundsOf(this);
+        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
+        var rect = new CaptureBounds(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        // Focus is tracked explicitly rather than queried: FocusManager reports the
+        // last focused element even when the window is inactive, which would pin the
+        // drawer open for the rest of the recording.
+        _target = DrawerAnimation.IsPointerNear(rect, pointerX, pointerY) || _focusWithin ? 1 : 0;
+
+        var next = DrawerAnimation.Advance(_progress, _target, elapsed);
+        if (Math.Abs(next - _progress) < 0.0001)
         {
             return;
         }
-        _expanded = expanded;
-        CollapsedView.Visibility = expanded ? Visibility.Collapsed : Visibility.Visible;
-        ExpandedView.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
-        ApplySize();
+        _progress = next;
+        ApplyProgress();
+    }
+
+    private void ApplyProgress()
+    {
+        var eased = DrawerAnimation.Ease(_progress);
+        var width = DrawerAnimation.Lerp(CollapsedWidth, ExpandedWidth, eased);
+        var height = DrawerAnimation.Lerp(CollapsedHeight, ExpandedHeight, eased);
+        WindowPlacement.PlaceTopCenter(this, width, height, TopMargin);
+        WindowPlacement.ClipToRoundedRegion(this, width, height, DrawerAnimation.Lerp(CollapsedHeight / 2, 16, eased));
+
+        // The contents cross-fade and the drawer's face slides down with it, so the
+        // surface reads as being pulled open rather than swapped.
+        CollapsedView.Opacity = 1 - eased;
+        ExpandedView.Opacity = eased;
+        ExpandedSlide.Y = (eased - 1) * 14;
+        CollapsedView.Visibility = eased < 0.98 ? Visibility.Visible : Visibility.Collapsed;
+        ExpandedView.Visibility = eased > 0.02 ? Visibility.Visible : Visibility.Collapsed;
+        // Only accept clicks once the actions are actually readable.
+        ExpandedView.IsHitTestVisible = eased > 0.6;
         RenderMeters();
     }
 
-    private void ApplySize()
-    {
-        var width = _expanded ? ExpandedWidth : CollapsedWidth;
-        var height = _expanded ? ExpandedHeight : CollapsedHeight;
-        WindowPlacement.PlaceTopCenter(this, width, height, TopMargin);
-        WindowPlacement.ClipToRoundedRegion(this, width, height, _expanded ? 16 : CollapsedHeight / 2);
-    }
+    private void ApplySize() => ApplyProgress();
 
     private void Recording_ElapsedChanged(object? sender, TimeSpan elapsed) => DispatcherQueue.TryEnqueue(() =>
     {

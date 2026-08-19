@@ -39,6 +39,12 @@ internal static class DisplayOutputLocator
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage(
+        "Trimming",
+        "IL2050:COM interop correctness cannot be guaranteed after trimming",
+        Justification = "build-native.ps1 publishes untrimmed. If trimming were ever enabled and these " +
+            "interfaces were removed, the call throws and FindOutputIndex returns null, which falls back " +
+            "to grabbing the monitor rectangle — degraded performance, still the correct screen.")]
     private static int? FindOnDefaultAdapter(string deviceName)
     {
         var factoryId = typeof(IDxgiFactory1).GUID;

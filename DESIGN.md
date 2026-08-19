@@ -74,7 +74,7 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - When a recording includes the camera, a live self-view sits inside the area being recorded at the chosen corner and size, so the user can see their own feed while they record.
 - **It is the one CursorPocket surface deliberately visible in captured media.** CursorPocket holds the camera for the whole recording, and the webcam reaches the file by being on screen inside the captured rectangle. FFmpeg must never be given a `dshow` camera input at the same time—DirectShow grants a single consumer exclusive use, and that is exactly what made a live self-view impossible before.
 - Placement is computed by `CameraSelfViewPlacement` and must always land inside the recorded rectangle. Anything outside it is missing from the file.
-- Click-through and never focused: it sits over the work being demonstrated and must not swallow a click or take activation.
+- **Draggable, and clamped to the recorded rectangle.** The user drags it to reposition their camera mid recording, so it accepts pointer input rather than being click-through. The clamp is not cosmetic: the webcam reaches the file by being on screen inside that rectangle, so a self-view dragged outside it would silently vanish from the recording. It never takes activation from the work being demonstrated.
 - Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
 - A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
 - The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
@@ -82,7 +82,8 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 ### Recording HUD
 
 - Excluded from the captured media and tucked against the top edge, centred, using DPI-aware sizing.
-- **Small by default, complete on approach.** Collapsed it is a 178 × 30 dip pill: live mark, timer, and level meter, nothing else. Hovering it—or giving it keyboard focus—opens the full surface with mode, device, **Stop & save**, and **Discard**. Recording is not a mode the user is asked to look at; it is a mode they occasionally reach for.
+- **Small by default, complete on approach.** Collapsed it is a 178 × 30 dip pill: live mark, timer, and level meter, nothing else. It opens to the full surface—mode, device, **Stop & save**, **Discard**—as the pointer *approaches*, not when it lands, and draws back up when the pointer leaves. Recording is not a mode the user is asked to look at; it is a mode they occasionally reach for.
+- It moves like a drawer: an eased travel of roughly 190 ms in both directions, with the contents cross-fading and sliding down as it opens. Snapping between two sizes read as abrupt. Window geometry cannot be animated by the composition engine, so `DrawerAnimation` steps it per frame; keyboard focus holds it open, tracked explicitly because `FocusManager` reports stale focus on an inactive window.
 - `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
 - No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
@@ -93,7 +94,7 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 ### Receipt and Library
 
 - Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover. Because hovering pauses the countdown indefinitely, it also carries an explicit dismiss control.
-- Receipts use the correct media preview and explicit Open/Reveal/Library actions.
+- Receipts use the correct media preview and explicit Open/Reveal/Library actions. A screenshot is also copied to the clipboard the moment it is taken, and again after annotation so the clipboard holds the marked-up image; the receipt says so.
 - Library is a standard resizable Mica window with date grouping and All/Screenshots/Video/Audio/Text/Links filters.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
 
@@ -106,7 +107,8 @@ The design-consultation gate requires all of the following before release:
 - the command list scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
 - a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
-- `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
+- `Enter` saves a screenshot from the annotation surface whether or not anything was drawn, and the shot is on the clipboard without asking;
+- a dragged region is captured in full, with nothing missing from its right or bottom edge at any display scale;
 - two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not — and ordinary mouse work over a working session never opens it;
 - named microphone and camera are visible before video begins;
 - the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;

@@ -71,6 +71,20 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Region_selection_captures_physical_pixels_not_layout_coordinates()
+    {
+        var code = ReadFixture("RegionSelectorWindow.xaml.cs.txt");
+
+        // Screen capture is in physical pixels. Taking the corners from the cursor
+        // rather than from XAML positions is what keeps a scaled display from losing
+        // the right and bottom of every region.
+        Assert.Contains("WindowPlacement.PointerPosition()", code, StringComparison.Ordinal);
+        Assert.Contains("RegionSelection.FromCorners", code, StringComparison.Ordinal);
+        Assert.Contains("RegionSelection.IsUsable", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Math.Min(_start.X, end.X)", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Region_selector_keeps_the_desktop_visible_while_selecting()
     {
         var xaml = ReadFixture("RegionSelectorWindow.xaml");
@@ -155,11 +169,14 @@ public sealed class UtilitySurfaceContractTests
         // reaches the file by being on screen inside the recorded area.
         Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
-        // It sits over the user's work while they demonstrate it, so it must not
-        // take clicks or focus.
-        Assert.Contains("MakeClickThrough", code, StringComparison.Ordinal);
-        Assert.Contains("WsExTransparent", placement, StringComparison.Ordinal);
+        // It is dragged to reposition the camera mid recording, so it accepts pointer
+        // input — but it must never take activation from the work being demonstrated.
+        Assert.Contains("Root.CapturePointer", code, StringComparison.Ordinal);
         Assert.Contains("RestoreFocus(sourceWindow)", code, StringComparison.Ordinal);
+        // The clamp is not cosmetic: outside the recorded rectangle the webcam is
+        // simply absent from the file.
+        Assert.Contains("_captureArea.Right - width", code, StringComparison.Ordinal);
+        Assert.Contains("_captureArea.Bottom - height", code, StringComparison.Ordinal);
         Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
         // Opaque edge to edge, like every other transient surface.
         Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);

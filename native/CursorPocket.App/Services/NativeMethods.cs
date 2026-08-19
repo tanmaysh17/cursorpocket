@@ -24,7 +24,6 @@ internal static class NativeMethods
     internal const long WsExLayered = 0x00080000L;
     internal const long WsExNoActivate = 0x08000000L;
     internal const long WsExToolWindow = 0x00000080L;
-    internal const long WsExTransparent = 0x00000020L;
     internal const uint WsPopup = 0x80000000;
     internal const long WsCaption = 0x00C00000L;
     internal const long WsThickFrame = 0x00040000L;

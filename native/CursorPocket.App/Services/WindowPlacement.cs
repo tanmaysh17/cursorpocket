@@ -47,21 +47,6 @@ internal static class WindowPlacement
         return (bounds, DisplayOutputLocator.FindOutputIndex(info.DeviceName));
     }
 
-    /// <summary>
-    /// Lets the pointer through to whatever is underneath. Used by the camera
-    /// self-view, which sits over the user's work while they demonstrate it and
-    /// must never swallow a click.
-    /// </summary>
-    public static void MakeClickThrough(Window window)
-    {
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        var existing = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
-        NativeMethods.SetWindowLongPtr(
-            hwnd,
-            NativeMethods.GwlExStyle,
-            new nint(existing | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
-    }
-
     public static void ConfigureUtilityWindow(Window window, bool topmost = true, bool excludeFromCapture = true)
     {
         var appWindow = window.AppWindow;
