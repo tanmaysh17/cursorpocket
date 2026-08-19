@@ -94,6 +94,16 @@ public sealed class AppServices : IDisposable
         await SettingsStore.SaveAsync(Settings, cancellationToken);
     }
 
+    /// <summary>
+    /// Remembers where the user dragged command mode. Deliberately does not raise
+    /// SettingsChanged: moving the panel is not a change other surfaces care about.
+    /// </summary>
+    public async Task UpdateCommandPanelAnchorAsync(double anchorX, double anchorY, CancellationToken cancellationToken = default)
+    {
+        Settings = SettingsStore.Normalize(Settings with { CommandPanelAnchorX = anchorX, CommandPanelAnchorY = anchorY });
+        await SettingsStore.SaveAsync(Settings, cancellationToken);
+    }
+
     public void Dispose()
     {
         CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;

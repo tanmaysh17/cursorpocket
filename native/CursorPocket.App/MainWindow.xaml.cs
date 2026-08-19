@@ -57,34 +57,7 @@ public sealed partial class MainWindow : Window
         ActivateMainWindow();
     }
 
-    private void ActivateMainWindow()
-    {
-        Activate();
-        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        var foreground = NativeMethods.GetForegroundWindow();
-        var foregroundThread = foreground == 0 ? 0 : NativeMethods.GetWindowThreadProcessId(foreground, out _);
-        var currentThread = NativeMethods.GetCurrentThreadId();
-        var attached = foregroundThread != 0 && foregroundThread != currentThread &&
-            NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
-        try
-        {
-            NativeMethods.ShowWindowAsync(handle, NativeMethods.SwShow);
-            NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0,
-                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
-            NativeMethods.BringWindowToTop(handle);
-            NativeMethods.SetForegroundWindow(handle);
-            NativeMethods.SetFocus(handle);
-            NativeMethods.SetWindowPos(handle, NativeMethods.HwndNotTopmost, 0, 0, 0, 0,
-                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
-        }
-        finally
-        {
-            if (attached)
-            {
-                NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
-            }
-        }
-    }
+    private void ActivateMainWindow() => WindowPlacement.ForceForeground(this);
 
     public void ShowCommandPalette(string? initialMode = null)
     {
@@ -249,7 +222,11 @@ public sealed partial class MainWindow : Window
             var editor = new AnnotationWindow(record, App.Services.Library.GetAbsolutePath(record));
             editor.Saved += (_, _) => ShowReceipt(record, "Screenshot saved");
             editor.Cancelled += (_, _) => ShowReceipt(record, "Screenshot saved without annotation");
-            editor.Activate();
+            // Command mode has just hidden itself, so the source app already owns the
+            // foreground. Activate() alone loses that race and leaves the annotation
+            // window behind or minimized.
+            editor.AppWindow.Show(true);
+            WindowPlacement.ForceForeground(editor);
         }
         catch (Exception error)
         {
@@ -373,13 +350,7 @@ public sealed partial class MainWindow : Window
         _companion = new NativeCompanionWindow(App.Services.Settings.CursorCompanionMode);
         _companion.OpenRequested += (_, _) => ShowCommandPalette();
         _mouseActivity = new MouseActivityService();
-        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() =>
-        {
-            _companion?.Follow(point.X, point.Y);
-            // Reuse this hook rather than polling: command mode is a compact panel
-            // now, so it has to step aside when the pointer closes in on it.
-            _palette?.NotifyPointerMoved(point.X, point.Y);
-        });
+        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() => _companion?.Follow(point.X, point.Y));
         _mouseActivity.DoubleCircle += (_, _) =>
         {
             if (App.Services.Settings.MouseGestureEnabled)

@@ -1,9 +1,11 @@
-using System.Diagnostics;
+using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Input;
 using Windows.System;
 using Windows.UI.Core;
@@ -12,24 +14,16 @@ namespace CursorPocket_App;
 
 public sealed partial class CommandPaletteWindow : Window
 {
-    private const int PanelWidth = 372;
-    private const int PanelHeight = 468;
-    private const int PanelMargin = 24;
-    private const int PanelRadius = 16;
-    // How close the pointer may get before command mode steps aside. Wide enough
-    // that the panel clears out before the pointer reaches whatever sits under it.
-    private const int KeepAwayPadding = 64;
-    private static readonly TimeSpan RelocateCooldown = TimeSpan.FromMilliseconds(500);
+    // Command mode reopens wherever the user last put it and never moves on its own.
+    private const int PanelWidth = 296;
+    private const int PanelHeight = 340;
+    private const int PanelMargin = 22;
 
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly PaletteHotkeyService _commandKeys = new();
-    private readonly Stopwatch _sinceRelocated = Stopwatch.StartNew();
-    private NativeMethods.Rect _display;
-    private PaletteRect _workArea;
-    private PaletteRect _panel;
-    private PaletteCorner _corner = PaletteCorner.TopRight;
-    private bool _visible;
-    private bool _keepAwayArmed;
+    private (int Left, int Top) _dragOrigin;
+    private (int X, int Y) _dragStart;
+    private bool _dragging;
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
 
@@ -50,93 +44,143 @@ public sealed partial class CommandPaletteWindow : Window
     {
         SourceWindow = sourceWindow;
         _restoreSourceOnClose = true;
-        _display = WindowPlacement.MonitorUnderPointer();
-        _workArea = WindowPlacement.WorkAreaUnderPointer();
-        // The snapshot still covers the whole display: the compact panel shows the
-        // slice of frozen desktop it happens to cover, and re-slices when it moves.
-        BackdropImage.Source = DesktopSnapshot.Capture(_display);
-        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
-        _corner = PalettePlacementPolicy.ChooseCorner(
-            _workArea,
-            PixelWidth(),
-            PixelHeight(),
-            PixelMargin(),
-            pointerX,
-            pointerY,
-            PixelKeepAway());
-        // Command mode opens away from the pointer already, so the keep-away rule
-        // stays disarmed until the pointer has been clear of the panel once. That
-        // stops the panel from hopping the instant it appears.
-        _keepAwayArmed = false;
-        _sinceRelocated.Restart();
-        ApplyPlacement();
-        AudioDeviceHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
-            ? "Starts with the default microphone"
-            : $"Starts with {App.Services.Settings.VideoMicrophoneName}";
+        // Wherever the user last dragged it, on the pointer's display. Acrylic keeps
+        // the source readable behind it, which is what the full-screen desktop
+        // snapshot used to be for.
+        ApplySavedPlacement();
+        PaletteHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
+            ? "Press one key · Esc closes"
+            : $"A uses {App.Services.Settings.VideoMicrophoneName} · Esc closes";
         if (initialMode == "screenshot") ShowScreenshotCommands(); else ShowPrimaryCommands();
         _commandKeys.SetEnabled(true);
-        _visible = true;
         AppWindow.Show(false);
         Activate();
     }
 
-    /// <summary>
-    /// Steps the panel out of the pointer's way. Called from the shared low-level
-    /// mouse hook, so it stays allocation-free and returns early in the common case.
-    /// </summary>
-    public void NotifyPointerMoved(int x, int y)
+    private void ApplySavedPlacement()
     {
-        if (!_visible)
-        {
-            return;
-        }
-        if (!PalettePlacementPolicy.IsPointerEncroaching(_panel, x, y, PixelKeepAway()))
-        {
-            _keepAwayArmed = true;
-            return;
-        }
-        // Hold still once the pointer is actually on the panel, and move at most
-        // once per approach, so the command rows stay clickable with the mouse
-        // instead of fleeing the pointer that is trying to reach them.
-        if (!_keepAwayArmed || _panel.Contains(x, y) || _sinceRelocated.Elapsed < RelocateCooldown)
-        {
-            return;
-        }
-        _corner = PalettePlacementPolicy.ChooseCorner(
-            _workArea,
+        var settings = App.Services.Settings;
+        var work = WindowPlacement.MonitorUnderPointer(true);
+        var placement = CommandPanelPlacement.Resolve(
+            ToBounds(work),
             PixelWidth(),
             PixelHeight(),
-            PixelMargin(),
-            x,
-            y,
-            PixelKeepAway(),
-            avoid: _corner);
-        _keepAwayArmed = false;
-        _sinceRelocated.Restart();
-        ApplyPlacement();
+            settings.CommandPanelAnchorX,
+            settings.CommandPanelAnchorY,
+            PixelMargin());
+        AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
+        // Deliberately no SetWindowRgn clip here. A window region takes the window off
+        // DWM's fast path for moves, which made dragging the panel visibly lag.
+        // ConfigureUtilityWindow already asks DWM for rounded corners, so the shape is
+        // the same without the cost. Surfaces that are never dragged still clip.
     }
 
-    private void ApplyPlacement()
+    /// <summary>
+    /// Drag anywhere on the panel to move command mode; presses that land on a
+    /// button are left to the button.
+    /// <para>
+    /// The drag is tracked here rather than handed to Windows' modal move loop
+    /// (<c>WM_NCLBUTTONDOWN</c>/<c>HTCAPTION</c>): WinUI's input layer consumes the
+    /// mouse messages that loop needs, so it either lagged badly or never moved the
+    /// window at all. Positions come from <c>GetCursorPos</c> in physical pixels, so
+    /// no DPI conversion sits between the pointer and the window.
+    /// </para>
+    /// </summary>
+    private void Root_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
-        _panel = PalettePlacementPolicy.RectFor(_corner, _workArea, PixelWidth(), PixelHeight(), PixelMargin());
-        WindowPlacement.MoveAndResizeTo(this, _panel);
-        WindowPlacement.ClipToRoundedPixelRegion(this, _panel.Width, _panel.Height, WindowPlacement.ToPixels(this, PanelRadius));
-        AlignBackdrop();
+        if (eventArgs.GetCurrentPoint(Root).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed ||
+            IsOverButton(eventArgs.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+        var bounds = WindowPlacement.BoundsOf(this);
+        _dragOrigin = (bounds.Left, bounds.Top);
+        _dragStart = WindowPlacement.PointerPosition();
+        _dragging = Root.CapturePointer(eventArgs.Pointer);
+        if (_dragging)
+        {
+            eventArgs.Handled = true;
+            _timeout.Stop();
+        }
     }
 
-    private void AlignBackdrop()
+    private void Root_PointerMovedWhileDragging(int pointerX, int pointerY) =>
+        WindowPlacement.MoveTo(
+            this,
+            _dragOrigin.Left + (pointerX - _dragStart.X),
+            _dragOrigin.Top + (pointerY - _dragStart.Y));
+
+    private async void Root_PointerReleased(object sender, PointerRoutedEventArgs eventArgs)
     {
-        var scale = WindowPlacement.ScaleFor(this);
-        BackdropImage.Width = (_display.Right - _display.Left) / scale;
-        BackdropImage.Height = (_display.Bottom - _display.Top) / scale;
-        BackdropOffset.X = -(_panel.Left - _display.Left) / scale;
-        BackdropOffset.Y = -(_panel.Top - _display.Top) / scale;
+        if (!_dragging)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        Root.ReleasePointerCapture(eventArgs.Pointer);
+        await EndDragAsync();
     }
+
+    private async void Root_PointerCaptureLost(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (_dragging)
+        {
+            await EndDragAsync();
+        }
+    }
+
+    private async Task EndDragAsync()
+    {
+        _dragging = false;
+        ResetTimeout();
+        var bounds = WindowPlacement.BoundsOf(this);
+        var work = WindowPlacement.WorkAreaAt(
+            bounds.Left + ((bounds.Right - bounds.Left) / 2),
+            bounds.Top + ((bounds.Bottom - bounds.Top) / 2));
+        var (anchorX, anchorY) = CommandPanelPlacement.AnchorFor(
+            ToBounds(work),
+            bounds.Right - bounds.Left,
+            bounds.Bottom - bounds.Top,
+            bounds.Left,
+            bounds.Top,
+            PixelMargin());
+        await App.Services.UpdateCommandPanelAnchorAsync(anchorX, anchorY);
+    }
+
+    private async void Root_DoubleTapped(object sender, DoubleTappedRoutedEventArgs eventArgs)
+    {
+        if (IsOverButton(eventArgs.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        ResetTimeout();
+        await App.Services.UpdateCommandPanelAnchorAsync(CommandPanelPlacement.DefaultAnchorX, CommandPanelPlacement.DefaultAnchorY);
+        ApplySavedPlacement();
+    }
+
+    /// <summary>
+    /// Buttons keep their clicks. Walking the visual tree rather than trusting the
+    /// routed event to stop is what keeps a press on a keycap — which is a Button
+    /// inside a Button's content — from starting a drag.
+    /// </summary>
+    private static bool IsOverButton(DependencyObject? source)
+    {
+        for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ButtonBase)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static CaptureBounds ToBounds(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
 
     private int PixelWidth() => WindowPlacement.ToPixels(this, PanelWidth);
     private int PixelHeight() => WindowPlacement.ToPixels(this, PanelHeight);
     private int PixelMargin() => WindowPlacement.ToPixels(this, PanelMargin);
-    private int PixelKeepAway() => WindowPlacement.ToPixels(this, KeepAwayPadding);
 
     public long SourceWindow { get; private set; }
     public event EventHandler<string>? CommandRequested;
@@ -221,7 +265,7 @@ public sealed partial class CommandPaletteWindow : Window
         PrimaryCommands.Visibility = Visibility.Collapsed;
         ScreenshotCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "Which part of the screen?";
-        PaletteHint.Text = "Press S, then one of these keys. They are sequential, never held together.";
+        PaletteHint.Text = "Keys are sequential, never held together";
         RegionCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
@@ -232,7 +276,7 @@ public sealed partial class CommandPaletteWindow : Window
         ScreenshotCommands.Visibility = Visibility.Collapsed;
         PrimaryCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "What do you want to catch?";
-        PaletteHint.Text = "Press one key. Nothing here affects normal typing.";
+        PaletteHint.Text = "Press one key · Esc closes";
         ScreenshotCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
@@ -267,7 +311,6 @@ public sealed partial class CommandPaletteWindow : Window
     {
         _timeout.Stop();
         _commandKeys.SetEnabled(false);
-        _visible = false;
         AppWindow.Hide();
         if (_restoreSourceOnClose)
         {
@@ -276,7 +319,17 @@ public sealed partial class CommandPaletteWindow : Window
         PaletteHidden?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs) => ResetTimeout();
+    private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            ResetTimeout();
+            return;
+        }
+        eventArgs.Handled = true;
+        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
+        Root_PointerMovedWhileDragging(pointerX, pointerY);
+    }
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
         PulseStoryboard.Begin();
