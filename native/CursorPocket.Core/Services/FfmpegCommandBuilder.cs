@@ -25,7 +25,6 @@ public static class FfmpegCommandBuilder
 
         var command = new List<string> { ffmpegPath, "-n", "-hide_banner", "-loglevel", "warning" };
         int? microphoneIndex = null;
-        int? cameraIndex = null;
         var inputIndex = 0;
 
         if (options.IncludeMicrophone)
@@ -33,12 +32,10 @@ public static class FfmpegCommandBuilder
             microphoneIndex = inputIndex++;
             command.AddRange(["-thread_queue_size", "2048", "-rtbufsize", "64M", "-f", "dshow", "-audio_buffer_size", "50", "-i", $"audio={options.MicrophoneName}"]);
         }
-        if (options.IncludeCamera)
-        {
-            cameraIndex = inputIndex++;
-            command.AddRange(["-thread_queue_size", "2048", "-rtbufsize", "256M", "-f", "dshow", "-video_size", "640x360", "-framerate", Math.Min(options.FramesPerSecond, 30).ToString(), "-i", $"video={options.CameraName}"]);
-        }
-
+        // The camera is deliberately not an FFmpeg input. CursorPocket owns the
+        // device and shows a live self-view inside the recorded area, so the webcam
+        // reaches the file through the screen capture and the user can see it while
+        // recording. See CameraSelfViewPlacement.
         var screenIndex = inputIndex;
         var drawMouse = options.DrawCursor ? "1" : "0";
         string screenFilter;
@@ -65,19 +62,7 @@ public static class FfmpegCommandBuilder
                 throw new ArgumentOutOfRangeException(nameof(options));
         }
 
-        var filters = new List<string> { screenFilter };
-        if (cameraIndex is not null)
-        {
-            var cameraWidth = Math.Clamp(options.CameraWidth, 160, 640);
-            var cameraHeight = Math.Max(90, (int)Math.Round(cameraWidth * 9d / 16d));
-            cameraHeight -= cameraHeight % 2;
-            filters.Add($"[{cameraIndex}:v]setpts=PTS-STARTPTS,scale={cameraWidth}:{cameraHeight},format=yuv420p[cam]");
-            filters.Add($"[screen][cam]overlay={OverlayPosition(options.CameraPosition)}:shortest=0,format=nv12[video]");
-        }
-        else
-        {
-            filters.Add("[screen]format=nv12[video]");
-        }
+        var filters = new List<string> { screenFilter, "[screen]format=nv12[video]" };
         if (microphoneIndex is not null)
         {
             filters.Add($"[{microphoneIndex}:a]asetpts=PTS-STARTPTS,aresample=48000:async=1:first_pts=0[audio]");
@@ -107,11 +92,4 @@ public static class FfmpegCommandBuilder
         };
     }
 
-    private static string OverlayPosition(string value) => value switch
-    {
-        "top-left" => "32:32",
-        "top-right" => "W-w-32:32",
-        "bottom-left" => "32:H-h-32",
-        _ => "W-w-32:H-h-32",
-    };
 }

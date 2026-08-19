@@ -37,6 +37,37 @@ internal static class WindowPlacement
         return result;
     }
 
+    public static NativeMethods.Rect MonitorBoundsAt(int index)
+    {
+        var current = 0;
+        NativeMethods.Rect? result = null;
+        NativeMethods.EnumDisplayMonitors(0, 0, (nint monitor, nint hdc, ref NativeMethods.Rect rect, nint data) =>
+        {
+            if (current++ != index)
+            {
+                return true;
+            }
+            result = rect;
+            return false;
+        }, 0);
+        return result ?? MonitorUnderPointer();
+    }
+
+    /// <summary>
+    /// Lets the pointer through to whatever is underneath. Used by the camera
+    /// self-view, which sits over the user's work while they demonstrate it and
+    /// must never swallow a click.
+    /// </summary>
+    public static void MakeClickThrough(Window window)
+    {
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        var existing = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
+        NativeMethods.SetWindowLongPtr(
+            hwnd,
+            NativeMethods.GwlExStyle,
+            new nint(existing | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
+    }
+
     public static void ConfigureUtilityWindow(Window window, bool topmost = true, bool excludeFromCapture = true)
     {
         var appWindow = window.AppWindow;
@@ -239,8 +270,8 @@ internal static class WindowPlacement
 
     /// <summary>
     /// Clips a surface whose size was already resolved in physical pixels, so a
-    /// window sized against a monitor rectangle stays exactly aligned with its
-    /// rounded region instead of being re-derived from rounded dips.
+    /// window sized against a monitor or capture rectangle stays exactly aligned
+    /// with its rounded region instead of being re-derived from rounded dips.
     /// </summary>
     public static void ClipToRoundedPixelRegion(Window window, int pixelWidth, int pixelHeight, int pixelRadius)
     {

@@ -67,7 +67,17 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - Three numbered decisions: source, microphone, camera.
 - Microphone and camera show named Windows devices, availability, live signal/preview, and remembered selection.
 - Start remains disabled until discovery completes and FFmpeg is available.
-- Camera preview is released before FFmpeg starts.
+- The preflight camera preview is released before the recording self-view opens the same device.
+
+### Camera self-view
+
+- When a recording includes the camera, a live self-view sits inside the area being recorded at the chosen corner and size, so the user can see their own feed while they record.
+- **It is the one CursorPocket surface deliberately visible in captured media.** CursorPocket holds the camera for the whole recording, and the webcam reaches the file by being on screen inside the captured rectangle. FFmpeg must never be given a `dshow` camera input at the same time—DirectShow grants a single consumer exclusive use, and that is exactly what made a live self-view impossible before.
+- Placement is computed by `CameraSelfViewPlacement` and must always land inside the recorded rectangle. Anything outside it is missing from the file.
+- Click-through and never focused: it sits over the work being demonstrated and must not swallow a click or take activation.
+- Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
+- A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
+- The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
 
 ### Recording HUD
 
@@ -96,6 +106,7 @@ The design-consultation gate requires all of the following before release:
 - `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
 - two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not — and ordinary mouse work over a working session never opens it;
 - named microphone and camera are visible before video begins;
+- the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;
 - recording HUD is readable over both light and dark source content at the active Windows scale;
 - save, failure, and discard states are unmistakable;
 - Library remains readable and scrollable at its minimum size;

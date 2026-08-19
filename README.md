@@ -36,9 +36,11 @@ Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highl
 
 ### Screen walkthroughs
 
-Open command mode and press `V`. A dedicated preflight shows the source, named microphone with a live level, camera toggle with live preview, pointer choice, frame rate, countdown, free disk space, and one **Start recording** action. CursorPocket releases the preview camera before FFmpeg begins, then runs the countdown. During recording, the excluded HUD shows elapsed time, audio activity, active devices, **Stop and save**, and **Discard**.
+Open command mode and press `V`. A dedicated preflight shows the source, named microphone with a live level, camera toggle with live preview, pointer choice, frame rate, countdown, free disk space, and one **Start recording** action. CursorPocket releases the preflight preview before the recording self-view opens the same camera, then runs the countdown. During recording, the excluded HUD shows elapsed time, audio activity, active devices, **Stop and save**, and **Discard**.
 
-CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. Press `Escape` while recording to stop and save. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
+When the camera is on, a live self-view appears at the corner and size you chose, inside the area being recorded, so you can watch your own feed while you record. It passes clicks straight through to whatever is underneath, and it is what lands in the file — the webcam is recorded from the screen rather than composited separately. A window recording captures only that window, so the self-view stays visible to you but does not appear in the saved file; the preflight says so before you start. If Windows will not open the camera, the recording still runs without it.
+
+CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video; the camera self-view is deliberately not. Press `Escape` while recording to stop and save. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
 
 ## Where things are saved
 

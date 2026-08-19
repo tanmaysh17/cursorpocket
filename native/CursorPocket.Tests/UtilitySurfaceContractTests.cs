@@ -122,6 +122,35 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void The_camera_self_view_is_recorded_off_the_screen_and_never_steals_input()
+    {
+        var code = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CameraSelfViewWindow.xaml");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        // This is the one surface that must appear in captured media: the webcam
+        // reaches the file by being on screen inside the recorded area.
+        Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+        // It sits over the user's work while they demonstrate it, so it must not
+        // take clicks or focus.
+        Assert.Contains("MakeClickThrough", code, StringComparison.Ordinal);
+        Assert.Contains("WsExTransparent", placement, StringComparison.Ordinal);
+        Assert.Contains("RestoreFocus(sourceWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
+        // Opaque edge to edge, like every other transient surface.
+        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
+        // The camera has to be held before FFmpeg writes frames and released as
+        // soon as the recording stops, or the next preflight preview finds it busy.
+        Assert.True(main.IndexOf("ShowCameraSelfViewAsync(options)", StringComparison.Ordinal) <
+            main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
+        Assert.Contains("DismissCameraSelfView", main, StringComparison.Ordinal);
+        Assert.Contains("RecordingState.Idle or RecordingState.Failed", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Video_preflight_keeps_advanced_controls_scrollable_and_auto_reveals_them()
     {
         var xaml = ReadFixture("VideoPreflightWindow.xaml");

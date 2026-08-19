@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added a live camera self-view during screen walkthroughs, so the webcam feed is visible on screen while recording instead of only in the saved file.
+- Moved camera ownership from FFmpeg to CursorPocket. The webcam is now recorded from the screen at the chosen corner and size, which is what makes a live self-view possible; DirectShow grants a single consumer exclusive use of the device.
+- Window-source recordings keep the on-screen self-view but cannot carry it into the saved file, and the preflight now says so before recording starts.
+- A camera Windows will not open no longer prevents a recording; the screen still records without a webcam inset.
+
 ## 0.3.0 — 2026-08-17
 
 - Added local H.264/AAC screen walkthrough recording with `V` to start or stop.
