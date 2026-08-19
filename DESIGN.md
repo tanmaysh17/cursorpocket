@@ -12,7 +12,7 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 ## Visual direction
 
-The visual direction is **cursor-field Fluent**: quiet graphite Mica for persistent surfaces, a frozen live desktop with a soft green edge field for command mode, and a crisp vector cursor as the only decorative brand mark. Avoid floating glass cards with arbitrary borders, excessive gradients, oversized spheres, or ornamental copy.
+The visual direction is **cursor-field Fluent**: quiet graphite Mica for persistent surfaces, a compact command panel over the frozen desktop with a restrained green edge, and the product logo used sparingly as the brand mark—at command-panel header scale, never as page decoration. Avoid floating glass cards with arbitrary borders, excessive gradients, decorative spheres, or ornamental copy.
 
 ### Color roles
 
@@ -49,12 +49,14 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 ### Command mode
 
-- Full monitor under the pointer, backed by a desktop snapshot rather than an opaque fallback surface.
-- A broad four-edge green glow communicates that command mode is active.
-- Upper-right command guide fades into the desktop without a hard panel boundary.
-- Bottom-right brand is only the pulsing vector cursor—no text, disc, container, or boundary.
+- A compact panel (372 × 468 dips) anchored in one corner of the work area under the pointer, not a full-monitor overlay. It covers as little of the user's work as possible.
+- Backed by the slice of frozen desktop it happens to cover, re-sliced whenever it moves, so the source stays legible through it rather than behind an opaque fallback surface.
+- One restrained green edge treatment—a top wash and a hairline border—communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
+- **Keep-away is a contract.** When the pointer enters the keep-away band the panel steps to the corner farthest from it, then holds until the pointer leaves the band again. It never moves while the pointer is inside it, so every row stays clickable. Placement decisions live in `PalettePlacementPolicy` and are unit-tested.
+- The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
+- The command list scrolls rather than clipping, so nothing critical is lost at high display scale.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
-- Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent.
+- Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent. Because the panel no longer covers the screen it can lose activation while still shown; the global bare-key service is what keeps the keys working, and clicking elsewhere deliberately does **not** dismiss it.
 
 ### Recording preflight
 
@@ -84,7 +86,7 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 ### Receipt and Library
 
-- Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover.
+- Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover. Because hovering pauses the countdown indefinitely, it also carries an explicit dismiss control.
 - Receipts use the correct media preview and explicit Open/Reveal/Library actions.
 - Library is a standard resizable Mica window with date grouping and All/Screenshots/Video/Audio/Text/Links filters.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
@@ -94,8 +96,10 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 The design-consultation gate requires all of the following before release:
 
 - no opaque gray capture surface or black companion rectangle;
-- command overlay preserves readable source context and has no hard-edged glass panel;
+- the command panel stays compact, preserves readable source context, and has no hard-edged glass slab;
+- the command panel steps away from an approaching pointer, holds still once the pointer is on it, and scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
+- `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
 - named microphone and camera are visible before video begins;
 - the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;
 - recording HUD is readable over both light and dark source content at the active Windows scale;

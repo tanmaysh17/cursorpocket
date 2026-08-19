@@ -1,3 +1,4 @@
+using CursorPocket.Core.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -144,6 +145,21 @@ internal static class WindowPlacement
         }
     }
 
+    public static PaletteRect WorkAreaUnderPointer()
+    {
+        var bounds = MonitorUnderPointer(true);
+        return PaletteRect.FromEdges(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    public static (int X, int Y) PointerPosition()
+    {
+        NativeMethods.GetCursorPos(out var cursor);
+        return (cursor.X, cursor.Y);
+    }
+
+    public static void MoveAndResizeTo(Window window, PaletteRect rect) =>
+        window.AppWindow.MoveAndResize(new RectInt32(rect.Left, rect.Top, rect.Width, rect.Height));
+
     public static void FillCurrentMonitor(Window window)
     {
         var bounds = MonitorUnderPointer();
@@ -201,11 +217,13 @@ internal static class WindowPlacement
         }
     }
 
-    private static double ScaleFor(Window window)
+    public static double ScaleFor(Window window)
     {
         var dpi = NativeMethods.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window));
         return Math.Max(1d, dpi / 96d);
     }
+
+    public static int ToPixels(Window window, int dips) => ToPixels(dips, ScaleFor(window));
 
     private static int ToPixels(int dips, double scale) => Math.Max(1, (int)Math.Round(dips * scale));
 }

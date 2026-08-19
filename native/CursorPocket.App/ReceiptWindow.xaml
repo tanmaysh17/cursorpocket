@@ -12,10 +12,15 @@
                     <Grid><Image x:Name="PreviewImage" Stretch="UniformToFill" Visibility="Collapsed" /><FontIcon x:Name="ReceiptIcon" Glyph="&#xE73E;" Foreground="{StaticResource PocketGreen}" FontSize="26" /></Grid>
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="7">
-                    <StackPanel Spacing="2"><TextBlock x:Name="ReceiptTitle" Text="Capture saved" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="ReceiptDetail" MaxWidth="280" Text="Saved locally" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
+                    <StackPanel Spacing="2"><TextBlock x:Name="ReceiptTitle" MaxWidth="252" Text="Capture saved" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="ReceiptDetail" MaxWidth="252" Text="Saved locally" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="7"><Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" /><Button x:Name="RevealButton" Click="Reveal_Click" Content="Reveal" Style="{StaticResource PocketQuietButton}" /><Button Click="Library_Click" Content="Library" Style="{StaticResource PocketQuietButton}" /></StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
+        <!-- Hovering pauses the auto-close timer, so the receipt needs an explicit
+             way out rather than only the 12 second countdown. -->
+        <Button x:Name="DismissButton" Click="Dismiss_Click" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0" Width="26" Height="26" Padding="0" CornerRadius="8" Background="#FF1B2723" BorderThickness="0" ToolTipService.ToolTip="Dismiss" AutomationProperties.Name="Dismiss this receipt">
+            <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="{StaticResource PocketMuted}" />
+        </Button>
     </Grid>
 </Window>
