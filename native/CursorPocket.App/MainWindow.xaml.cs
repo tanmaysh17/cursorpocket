@@ -373,7 +373,13 @@ public sealed partial class MainWindow : Window
         _companion = new NativeCompanionWindow(App.Services.Settings.CursorCompanionMode);
         _companion.OpenRequested += (_, _) => ShowCommandPalette();
         _mouseActivity = new MouseActivityService();
-        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() => _companion?.Follow(point.X, point.Y));
+        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() =>
+        {
+            _companion?.Follow(point.X, point.Y);
+            // Reuse this hook rather than polling: command mode is a compact panel
+            // now, so it has to step aside when the pointer closes in on it.
+            _palette?.NotifyPointerMoved(point.X, point.Y);
+        });
         _mouseActivity.DoubleCircle += (_, _) =>
         {
             if (App.Services.Settings.MouseGestureEnabled)

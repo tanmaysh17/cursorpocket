@@ -1,3 +1,4 @@
+using CursorPocket.Core.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -113,6 +114,21 @@ internal static class WindowPlacement
         }
     }
 
+    public static PaletteRect WorkAreaUnderPointer()
+    {
+        var bounds = MonitorUnderPointer(true);
+        return PaletteRect.FromEdges(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+    }
+
+    public static (int X, int Y) PointerPosition()
+    {
+        NativeMethods.GetCursorPos(out var cursor);
+        return (cursor.X, cursor.Y);
+    }
+
+    public static void MoveAndResizeTo(Window window, PaletteRect rect) =>
+        window.AppWindow.MoveAndResize(new RectInt32(rect.Left, rect.Top, rect.Width, rect.Height));
+
     public static void FillCurrentMonitor(Window window)
     {
         var bounds = MonitorUnderPointer();
@@ -148,9 +164,17 @@ internal static class WindowPlacement
     public static void ClipToRoundedRegion(Window window, int width, int height, int radius)
     {
         var scale = ScaleFor(window);
-        var pixelWidth = ToPixels(width, scale);
-        var pixelHeight = ToPixels(height, scale);
-        var pixelDiameter = ToPixels(radius * 2, scale);
+        ClipToRoundedPixelRegion(window, ToPixels(width, scale), ToPixels(height, scale), ToPixels(radius, scale));
+    }
+
+    /// <summary>
+    /// Clips a surface whose size was already resolved in physical pixels, so a
+    /// window sized against a monitor rectangle stays exactly aligned with its
+    /// rounded region instead of being re-derived from rounded dips.
+    /// </summary>
+    public static void ClipToRoundedPixelRegion(Window window, int pixelWidth, int pixelHeight, int pixelRadius)
+    {
+        var pixelDiameter = Math.Max(1, pixelRadius * 2);
         var region = NativeMethods.CreateRoundRectRgn(0, 0, pixelWidth + 1, pixelHeight + 1, pixelDiameter, pixelDiameter);
         if (region == 0)
         {
@@ -162,11 +186,13 @@ internal static class WindowPlacement
         }
     }
 
-    private static double ScaleFor(Window window)
+    public static double ScaleFor(Window window)
     {
         var dpi = NativeMethods.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window));
         return Math.Max(1d, dpi / 96d);
     }
+
+    public static int ToPixels(Window window, int dips) => ToPixels(dips, ScaleFor(window));
 
     private static int ToPixels(int dips, double scale) => Math.Max(1, (int)Math.Round(dips * scale));
 }
