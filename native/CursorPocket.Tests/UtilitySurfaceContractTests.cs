@@ -112,13 +112,35 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
-    public void Video_preflight_does_not_start_before_readiness_and_targets_the_pointer_display()
+    public void Video_preflight_does_not_start_before_readiness()
     {
         var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
 
         Assert.Contains("!StartButton.IsEnabled", code, StringComparison.Ordinal);
-        Assert.Contains("DisplayIndexUnderPointer", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_display_recording_captures_the_screen_command_mode_was_opened_on()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+        var locator = ReadFixture("DisplayOutputLocator.cs.txt");
+
+        // Resolved when the user asks to record. Resolving it at Start instead reads
+        // the pointer over the preflight window, which Windows may have opened on
+        // another screen.
+        Assert.Contains("SnapshotDisplayTarget", main, StringComparison.Ordinal);
+        Assert.Contains("DisplayTargetUnderPointer", placement, StringComparison.Ordinal);
+        Assert.Contains("_displayBounds", preflight, StringComparison.Ordinal);
+        Assert.Contains("_displayOutputIndex", preflight, StringComparison.Ordinal);
+        // ddagrab's output_idx is a DXGI ordering, so it must come from DXGI and never
+        // from a monitor enumeration index.
+        Assert.Contains("EnumOutputs", locator, StringComparison.Ordinal);
+        Assert.Contains("DeviceName", locator, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisplayIndexUnderPointer", preflight, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisplayIndexUnderPointer", placement, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -174,6 +196,28 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ThemeShadow", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_recording_hud_sits_small_at_the_top_edge_and_opens_on_hover()
+    {
+        var xaml = ReadFixture("RecordingHudWindow.xaml");
+        var code = ReadFixture("RecordingHudWindow.xaml.cs.txt");
+
+        Assert.Contains("PointerEntered=\"Root_PointerEntered\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("PointerExited=\"Root_PointerExited\"", xaml, StringComparison.Ordinal);
+        // Keyboard users must be able to reach the actions without a pointer.
+        Assert.Contains("GotFocus=\"Root_GotFocus\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CollapsedWidth = 178", code, StringComparison.Ordinal);
+        Assert.Contains("CollapsedHeight = 30", code, StringComparison.Ordinal);
+        Assert.Contains("TopMargin = 0", code, StringComparison.Ordinal);
+        Assert.Contains("ClipToRoundedRegion", code, StringComparison.Ordinal);
+        // Escape still stops and saves, so a collapsed HUD never traps a recording.
+        Assert.Contains("EscapeHotkey.Capture", code, StringComparison.Ordinal);
+        // The level meter is a rolling waveform, not one bar sliding left and right.
+        Assert.Contains("AudioLevelHistory", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProgressBar", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("LevelBar", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

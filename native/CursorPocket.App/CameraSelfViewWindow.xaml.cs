@@ -76,7 +76,9 @@ public sealed partial class CameraSelfViewWindow : Window
     {
         switch (options.SourceKind)
         {
-            case VideoSourceKind.Region when options.Bounds is not null:
+            // Bounds is the recorded rectangle for both a region and a display, so it
+            // is also the area the self-view has to stay inside.
+            case VideoSourceKind.Region or VideoSourceKind.Display when options.Bounds is not null:
                 return options.Bounds;
             case VideoSourceKind.Window:
                 var handle = options.WindowHandle is null or 0 ? sourceWindow : options.WindowHandle.Value;
@@ -86,9 +88,7 @@ public sealed partial class CameraSelfViewWindow : Window
                 }
                 break;
         }
-        var monitor = options.SourceKind == VideoSourceKind.Display
-            ? WindowPlacement.MonitorBoundsAt(Math.Max(0, options.DisplayIndex))
-            : WindowPlacement.MonitorUnderPointer();
+        var monitor = WindowPlacement.MonitorUnderPointer();
         return new CaptureBounds(monitor.Left, monitor.Top, monitor.Right, monitor.Bottom);
     }
 

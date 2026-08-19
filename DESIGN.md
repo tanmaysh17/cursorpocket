@@ -81,11 +81,14 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 ### Recording HUD
 
-- Excluded from the captured media and placed at top center using DPI-aware sizing.
+- Excluded from the captured media and tucked against the top edge, centred, using DPI-aware sizing.
+- **Small by default, complete on approach.** Collapsed it is a 178 × 30 dip pill: live mark, timer, and level meter, nothing else. Hovering it—or giving it keyboard focus—opens the full surface with mode, device, **Stop & save**, and **Discard**. Recording is not a mode the user is asked to look at; it is a mode they occasionally reach for.
+- `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
 - No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
-- Timer, device state, **Stop & save**, and **Discard** are simultaneously visible at 100–250% display scale.
+- Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
+- The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
 
 ### Receipt and Library
 

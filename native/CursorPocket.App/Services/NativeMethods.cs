@@ -92,6 +92,23 @@ internal static class NativeMethods
         public uint Flags;
     }
 
+    /// <summary>
+    /// <c>MONITORINFOEX</c>. The device name (<c>\\.\DISPLAYn</c>) is what lets a
+    /// monitor be matched to a DXGI output, whose index is the only way to tell
+    /// FFmpeg's ddagrab which screen to capture.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct MonitorInfoEx
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect Work;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct Message
     {
@@ -152,6 +169,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetMonitorInfoEx(nint monitor, ref MonitorInfoEx info);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

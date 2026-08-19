@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? _tray;
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
     private long _lastSourceWindow;
+    private (CaptureBounds Bounds, int? OutputIndex)? _displayTarget;
     private CaptureBounds? _lastRegion;
     private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
@@ -67,8 +68,17 @@ public sealed partial class MainWindow : Window
         {
             _lastSourceWindow = source;
         }
+        SnapshotDisplayTarget();
         _palette!.Show(_lastSourceWindow, initialMode);
     }
+
+    /// <summary>
+    /// Remembers which screen the user was on when they asked for CursorPocket. It
+    /// cannot be resolved later from the pointer: by the time Start is pressed the
+    /// pointer is over the preflight window, which Windows may have opened on
+    /// another display.
+    /// </summary>
+    private void SnapshotDisplayTarget() => _displayTarget = WindowPlacement.DisplayTargetUnderPointer();
 
     private void InitializeCommandPalette()
     {
@@ -96,7 +106,11 @@ public sealed partial class MainWindow : Window
         {
             _lastSourceWindow = source;
         }
-        _preflight = new VideoPreflightWindow(_lastSourceWindow);
+        // Opened straight from the tray rather than through command mode, so the
+        // pointer is still on the screen the user means.
+        _displayTarget ??= WindowPlacement.DisplayTargetUnderPointer();
+        var target = _displayTarget.Value;
+        _preflight = new VideoPreflightWindow(_lastSourceWindow, target.Bounds, target.OutputIndex);
         _preflight.RecordingRequested += async (_, options) => await StartVideoAsync(options);
         _preflight.Closed += (_, _) =>
         {
@@ -342,10 +356,19 @@ public sealed partial class MainWindow : Window
             "window" => VideoSourceKind.Window,
             _ => VideoSourceKind.Display,
         };
+        // Repeating a setup still records the screen the user is on now, resolved
+        // when command mode opened.
+        var display = _displayTarget ?? WindowPlacement.DisplayTargetUnderPointer();
         return new RecordingOptions
         {
             SourceKind = sourceKind,
-            Bounds = sourceKind == VideoSourceKind.Region ? _lastRegion : null,
+            Bounds = sourceKind switch
+            {
+                VideoSourceKind.Region => _lastRegion,
+                VideoSourceKind.Display => display.Bounds,
+                _ => null,
+            },
+            DisplayOutputIndex = sourceKind == VideoSourceKind.Display ? display.OutputIndex : null,
             WindowHandle = sourceKind == VideoSourceKind.Window ? _lastSourceWindow : null,
             IncludeMicrophone = settings.VideoMicrophoneEnabled,
             MicrophoneName = settings.VideoMicrophoneName,
