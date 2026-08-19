@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorPocket.App", "CursorPocket.App\CursorPocket.App.csproj", "{7A2D1E76-908E-491B-AD53-57842F854FF8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorPocket.Core", "CursorPocket.Core\CursorPocket.Core.csproj", "{C68DE1AD-CE8E-4C01-95CB-B9C0DDE93CC3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CursorPocket.Tests", "CursorPocket.Tests\CursorPocket.Tests.csproj", "{E0AB9C24-5979-4133-BA89-EB2DE9F17B9E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7A2D1E76-908E-491B-AD53-57842F854FF8}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{7A2D1E76-908E-491B-AD53-57842F854FF8}.Debug|Any CPU.Build.0 = Debug|x86
+		{7A2D1E76-908E-491B-AD53-57842F854FF8}.Release|Any CPU.ActiveCfg = Release|x86
+		{7A2D1E76-908E-491B-AD53-57842F854FF8}.Release|Any CPU.Build.0 = Release|x86
+		{C68DE1AD-CE8E-4C01-95CB-B9C0DDE93CC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C68DE1AD-CE8E-4C01-95CB-B9C0DDE93CC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C68DE1AD-CE8E-4C01-95CB-B9C0DDE93CC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C68DE1AD-CE8E-4C01-95CB-B9C0DDE93CC3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E0AB9C24-5979-4133-BA89-EB2DE9F17B9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E0AB9C24-5979-4133-BA89-EB2DE9F17B9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E0AB9C24-5979-4133-BA89-EB2DE9F17B9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E0AB9C24-5979-4133-BA89-EB2DE9F17B9E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

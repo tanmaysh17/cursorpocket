@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "CursorPocket.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "CursorPocket.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
