@@ -6,9 +6,11 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 ## The everyday workflow
 
-1. Enter command mode by drawing two quick, small circles with the mouse, clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
+1. Enter command mode by drawing two circles with the mouse, clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
 2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a full-resolution annotation surface. Audio and video use a clear recording HUD with save/discard controls. Every successful capture gets a receipt and appears immediately in the Library.
+
+Drag anywhere on the panel to move command mode wherever you want it; it reopens in the same place next time, on whichever display your pointer is on. Double-click it to put it back in the top-right corner.
 
 Command mode closes after one action, when you press `Escape`, or automatically after thirty seconds. Click the pulsing logo in its bottom-right corner when you want the full CursorPocket library and settings window. That full window can be moved and resized, and CursorPocket remembers its size and position.
 
@@ -34,9 +36,11 @@ Every screenshot opens a full-resolution markup preview. Choose **Pen**, **Highl
 
 ### Screen walkthroughs
 
-Open command mode and press `V`. A dedicated preflight shows the source, named microphone with a live level, camera toggle with live preview, pointer choice, frame rate, countdown, free disk space, and one **Start recording** action. CursorPocket releases the preview camera before FFmpeg begins, then runs the countdown. During recording, the excluded HUD shows elapsed time, audio activity, active devices, **Stop and save**, and **Discard**.
+Open command mode and press `V`. A dedicated preflight shows the source, named microphone with a live level, camera toggle with live preview, pointer choice, frame rate, countdown, free disk space, and one **Start recording** action. CursorPocket releases the preflight preview before the recording self-view opens the same camera, then runs the countdown. During recording, the excluded HUD shows elapsed time, audio activity, active devices, **Stop and save**, and **Discard**.
 
-CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video. Press `Escape` while recording to stop and save. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
+When the camera is on, a live self-view appears at the corner and size you chose, inside the area being recorded, so you can watch your own feed while you record. It passes clicks straight through to whatever is underneath, and it is what lands in the file — the webcam is recorded from the screen rather than composited separately. A window recording captures only that window, so the self-view stays visible to you but does not appear in the saved file; the preflight says so before you start. If Windows will not open the camera, the recording still runs without it.
+
+CursorPocket saves a normal H.264/AAC MP4 locally. Its dot, command overlay, and recording bar are excluded from the captured video; the camera self-view is deliberately not. Press `Escape` while recording to stop and save. If Windows or the app closes unexpectedly, CursorPocket keeps the fragmented partial recording and attempts to recover it on the next launch. Camera and microphone choices can be changed before recording; Windows privacy settings still control whether each device is available.
 
 ## Where things are saved
 
@@ -66,7 +70,7 @@ CursorPocket Captures\
 - **Red cursor and recording HUD:** audio or video is recording. The HUD always exposes save and discard.
 - **Tray icon:** right-click it for every capture action, Settings, the capture folder, and Quit.
 - **Hidden mode:** choose **Off** in Settings or **Hide cursor companion** in the tray menu. The tray and confirmed global engagement shortcut remain active.
-- **Mouse gesture:** draw two quick circles, clockwise or counter-clockwise, to enter command mode. It works in hidden mode and can be disabled in Settings.
+- **Mouse gesture:** draw two circles, clockwise or counter-clockwise, to enter command mode. Small wrist circles and fairly wide sweeps both work, drawn quickly or slowly; what matters is that the path loops round roughly twice in one direction, so ordinary mouse movement does not set it off. It works in hidden mode and can be disabled in Settings.
 
 The dot can also be disabled permanently in Settings. It does not replace the Windows cursor and is excluded from screenshots while capturing.
 

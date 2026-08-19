@@ -4,12 +4,16 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="CursorPocket command mode">
-    <Grid
-        x:Name="Root"
-        Background="#FF060D0B"
-        KeyDown="Root_KeyDown"
-        Loaded="Root_Loaded"
-        PointerMoved="Root_PointerMoved">
+    <!-- Command mode is the one transient surface that uses a system backdrop.
+         Acrylic blurs the live desktop behind the panel, so a small panel still
+         reads as part of the source rather than a box sitting on top of it. The
+         system paints the whole window, so there is no transparent WinUI gutter. -->
+    <Window.SystemBackdrop>
+        <DesktopAcrylicBackdrop />
+    </Window.SystemBackdrop>
+    <!-- The whole panel is a drag handle. Presses that land on a button are left
+         alone, so every command stays clickable. -->
+    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" PointerPressed="Root_PointerPressed" PointerReleased="Root_PointerReleased" PointerCaptureLost="Root_PointerCaptureLost" DoubleTapped="Root_DoubleTapped" Loaded="Root_Loaded" Background="Transparent">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="S" Invoked="CommandAccelerator_Invoked" />
             <KeyboardAccelerator Key="V" Invoked="CommandAccelerator_Invoked" />
@@ -25,492 +29,126 @@
             <KeyboardAccelerator Key="Escape" Invoked="CommandAccelerator_Invoked" />
         </Grid.KeyboardAccelerators>
         <Grid.Resources>
-            <Style x:Key="CommandRow" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+            <Style x:Key="CommandRow" TargetType="Button">
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="Padding" Value="8,6" />
-                <Setter Property="CornerRadius" Value="9" />
-            </Style>
-            <Style x:Key="CompactCommandRow" TargetType="Button" BasedOn="{StaticResource CommandRow}">
-                <Setter Property="MinHeight" Value="32" />
-                <Setter Property="Padding" Value="8,3" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="6,3" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="BorderThickness" Value="0" />
             </Style>
             <Style x:Key="CompactKeyCap" TargetType="Button" BasedOn="{StaticResource KeyCapButton}">
                 <Setter Property="MinWidth" Value="34" />
-                <Setter Property="MinHeight" Value="30" />
-                <Setter Property="Height" Value="30" />
-                <Setter Property="Padding" Value="7,0" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="FontSize" Value="13" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Padding" Value="5,2" />
+                <Setter Property="CornerRadius" Value="7" />
+                <Setter Property="FontSize" Value="12" />
             </Style>
-            <Style x:Key="ScreenshotTile" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+            <Style x:Key="ScreenshotTile" TargetType="Button">
                 <Setter Property="Margin" Value="2" />
-                <Setter Property="Padding" Value="8,7" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="6,5" />
+                <Setter Property="CornerRadius" Value="9" />
                 <Setter Property="HorizontalAlignment" Value="Stretch" />
-                <Setter Property="HorizontalContentAlignment" Value="Left" />
                 <Setter Property="Background" Value="{StaticResource PocketRaised}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
             </Style>
             <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever">
-                <DoubleAnimation
-                    Storyboard.TargetName="PulseRing"
-                    Storyboard.TargetProperty="Opacity"
-                    From="0.38"
-                    To="0.08"
-                    Duration="0:0:1.35" />
-                <DoubleAnimation
-                    Storyboard.TargetName="PulseRing"
-                    Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                    From="0.72"
-                    To="1.12"
-                    Duration="0:0:1.35" />
-                <DoubleAnimation
-                    Storyboard.TargetName="PulseRing"
-                    Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                    From="0.72"
-                    To="1.12"
-                    Duration="0:0:1.35" />
+                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="Opacity" From="0.38" To="0.08" Duration="0:0:1.35" />
+                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.72" To="1.12" Duration="0:0:1.35" />
+                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.72" To="1.12" Duration="0:0:1.35" />
             </Storyboard>
         </Grid.Resources>
 
-        <!--  The frozen desktop the panel covers, offset so command mode reads as a
-              quiet pane over the source rather than an opaque box floating on it.  -->
-        <Image
-            x:Name="BackdropImage"
-            HorizontalAlignment="Left"
-            VerticalAlignment="Top"
-            IsHitTestVisible="False"
-            Stretch="Fill">
-            <Image.RenderTransform>
-                <TranslateTransform x:Name="BackdropOffset" />
-            </Image.RenderTransform>
-        </Image>
-        <Rectangle Fill="#F00A1210" IsHitTestVisible="False" />
-        <Rectangle
-            Height="64"
-            VerticalAlignment="Top"
-            IsHitTestVisible="False">
-            <Rectangle.Fill>
-                <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                    <GradientStop Offset="0" Color="#2645E08C" />
-                    <GradientStop Offset="1" Color="#0045E08C" />
-                </LinearGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
-        <Border
-            BorderBrush="{StaticResource PocketGreen}"
-            BorderThickness="1"
-            CornerRadius="16"
-            IsHitTestVisible="False"
-            Opacity="0.34" />
+        <!-- A thin tint over the acrylic: enough for text contrast over bright
+             source content, light enough that the desktop still reads through. -->
+        <Rectangle Fill="#3C060D0B" IsHitTestVisible="False" />
+        <Border BorderBrush="{StaticResource PocketGreen}" BorderThickness="1" CornerRadius="14" Opacity="0.3" IsHitTestVisible="False" />
 
-        <Grid Padding="16,14,16,12" RowSpacing="10">
+        <Grid Padding="12,10,12,9" RowSpacing="7">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <StackPanel Spacing="3">
-                <Grid ColumnSpacing="8">
+            <Grid ColumnSpacing="7">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button Width="24" Height="24" Padding="0" Background="Transparent" BorderThickness="0" Click="LibraryPulse_Click" ToolTipService.ToolTip="Open the full CursorPocket Library" AutomationProperties.Name="Open the full CursorPocket Library">
+                    <Grid Width="22" Height="22">
+                        <Ellipse x:Name="PulseRing" Width="20" Height="20" Fill="{StaticResource PocketGreen}" Opacity="0.34" RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <ScaleTransform ScaleX="0.82" ScaleY="0.82" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Image Source="ms-appx:///Assets/CursorPocketLogo.png" Width="21" Height="21" Stretch="Uniform" />
+                    </Grid>
+                </Button>
+                <Grid
+                    Grid.Column="1"
+                    Background="Transparent"
+                    ColumnSpacing="6"
+                    ToolTipService.ToolTip="Drag anywhere on the panel to move it · double-click to reset to the top right"
+                    AutomationProperties.Name="Drag anywhere on the panel to move command mode">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Button
-                        Width="30"
-                        Height="30"
-                        MinHeight="30"
-                        Padding="0"
-                        Click="LibraryPulse_Click"
-                        Style="{StaticResource PocketGhostButton}"
-                        ToolTipService.ToolTip="Open the full CursorPocket Library"
-                        AutomationProperties.Name="Open the full CursorPocket Library">
-                        <Grid Width="28" Height="28">
-                            <Ellipse
-                                x:Name="PulseRing"
-                                Width="26"
-                                Height="26"
-                                Fill="{StaticResource PocketGreen}"
-                                Opacity="0.34"
-                                RenderTransformOrigin="0.5,0.5">
-                                <Ellipse.RenderTransform>
-                                    <ScaleTransform ScaleX="0.82" ScaleY="0.82" />
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-                            <Image
-                                Width="26"
-                                Height="26"
-                                Source="ms-appx:///Assets/CursorPocketLogo.png"
-                                Stretch="Uniform" />
-                        </Grid>
-                    </Button>
-                    <!--  The panel can land in any corner of any display, so it names itself
-                          rather than relying on the user recognising the surface.  -->
-                    <TextBlock
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Foreground="{StaticResource PocketGreen}"
-                        Style="{StaticResource PocketLabelText}"
-                        Text="COMMAND MODE" />
-                    <Button
-                        Grid.Column="2"
-                        Width="30"
-                        Height="30"
-                        MinHeight="30"
-                        Padding="0"
-                        VerticalAlignment="Center"
-                        Click="Close_Click"
-                        Style="{StaticResource PocketGhostButton}"
-                        ToolTipService.ToolTip="Close command mode"
-                        AutomationProperties.Name="Close command mode">
-                        <FontIcon FontSize="13" Glyph="&#xE711;" />
-                    </Button>
+                    <TextBlock VerticalAlignment="Center" Text="COMMAND MODE" Foreground="{StaticResource PocketGreen}" FontFamily="Cascadia Mono" FontSize="10" FontWeight="SemiBold" CharacterSpacing="110" />
+                    <FontIcon Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Glyph="&#xE700;" FontSize="11" Foreground="{StaticResource PocketMuted}" Opacity="0.7" />
                 </Grid>
-                <TextBlock
-                    x:Name="PaletteTitle"
-                    FontSize="18"
-                    Style="{StaticResource PocketTitleText}"
-                    Text="What do you want to catch?"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    x:Name="PaletteHint"
-                    Style="{StaticResource PocketCaptionText}"
-                    Text="Press one key."
-                    TextWrapping="Wrap" />
-            </StackPanel>
+                <Button Grid.Column="2" VerticalAlignment="Center" Padding="4" Click="Close_Click" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Close command mode" AutomationProperties.Name="Close command mode">
+                    <FontIcon Glyph="&#xE711;" FontSize="11" />
+                </Button>
+            </Grid>
 
-            <ScrollViewer
-                x:Name="CommandScroll"
-                Grid.Row="1"
-                HorizontalScrollMode="Disabled"
-                VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="PaletteTitle" Grid.Row="1" Text="What do you want to catch?" Style="{StaticResource PocketTitleText}" FontSize="15" TextWrapping="Wrap" />
+
+            <ScrollViewer x:Name="CommandScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
                 <Grid>
-                    <!--  The three captures the product exists for carry a description; the
-                          rest are one line each below the rule. Key chips share one
-                          right-aligned column, so a two-key shortcut cannot shift a label.  -->
-                    <StackPanel x:Name="PrimaryCommands">
-                        <StackPanel Spacing="2">
-                            <Button
-                                x:Name="ScreenshotCommand"
-                                Click="Command_Click"
-                                Style="{StaticResource CommandRow}"
-                                Tag="screenshot">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        Content="S"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Screenshot" />
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Region, window, or display" />
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CommandRow}"
-                                Tag="video">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        Content="V"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Video" />
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Confirm source and devices first" />
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CommandRow}"
-                                Tag="audio">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        Content="A"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Audio note" />
-                                        <TextBlock
-                                            x:Name="AudioDeviceHint"
-                                            Style="{StaticResource PocketMetaText}"
-                                            Text="Starts with your remembered microphone"
-                                            TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </Grid>
-                            </Button>
-                        </StackPanel>
-
-                        <Rectangle
-                            Height="1"
-                            Margin="8,7"
-                            Fill="{StaticResource PocketLine}" />
-
-                        <StackPanel x:Name="SecondaryCommands" Spacing="1">
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CompactCommandRow}"
-                                Tag="text">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        Content="T"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PocketInkDim}"
-                                        Style="{StaticResource PocketBodyText}"
-                                        Text="Highlighted text" />
-                                </Grid>
-                            </Button>
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CompactCommandRow}"
-                                Tag="link">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        Content="L"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PocketInkDim}"
-                                        Style="{StaticResource PocketBodyText}"
-                                        Text="Current web link" />
-                                </Grid>
-                            </Button>
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CompactCommandRow}"
-                                Tag="repeat-video">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        MinWidth="60"
-                                        HorizontalAlignment="Right"
-                                        Content="Shift+V"
-                                        FontSize="11"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PocketInkDim}"
-                                        Style="{StaticResource PocketBodyText}"
-                                        Text="Repeat last video setup" />
-                                </Grid>
-                            </Button>
-                            <Button
-                                Click="Command_Click"
-                                Style="{StaticResource CompactCommandRow}"
-                                Tag="library">
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="60" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Right"
-                                        AutomationProperties.Name="Letter O"
-                                        Content="O"
-                                        FontFamily="Segoe UI Variable Display"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource CompactKeyCap}"
-                                        ToolTipService.ToolTip="Letter O" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Foreground="{StaticResource PocketInkDim}"
-                                        Style="{StaticResource PocketBodyText}"
-                                        Text="Open Library" />
-                                </Grid>
-                            </Button>
-                        </StackPanel>
+                    <StackPanel x:Name="PrimaryCommands" Spacing="1">
+                        <Button x:Name="ScreenshotCommand" Style="{StaticResource CommandRow}" Tag="screenshot" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="S" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Screenshot" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE91B;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="video" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="V" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Video" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE714;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="repeat-video" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="⇧V" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" AutomationProperties.Name="Shift plus V" ToolTipService.ToolTip="Shift + V" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Repeat last video" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE72C;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="audio" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="A" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Audio note" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE720;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="text" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="T" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Highlighted text" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE8C1;" Foreground="{StaticResource PocketBlue}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="link" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="L" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Current web link" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE71B;" Foreground="{StaticResource PocketBlue}" /></Grid>
+                        </Button>
+                        <Button Style="{StaticResource CommandRow}" Tag="library" Click="Command_Click">
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="O" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" FontFamily="Segoe UI Variable Display" AutomationProperties.Name="Letter O" ToolTipService.ToolTip="Letter O" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Open Library" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE8B9;" Foreground="{StaticResource PocketMuted}" /></Grid>
+                        </Button>
                     </StackPanel>
 
-                    <StackPanel
-                        x:Name="ScreenshotCommands"
-                        Spacing="8"
-                        Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Button
-                                Content="S"
-                                IsHitTestVisible="False"
-                                IsTabStop="False"
-                                Style="{StaticResource CompactKeyCap}" />
-                            <FontIcon
-                                VerticalAlignment="Center"
-                                FontSize="13"
-                                Foreground="{StaticResource PocketMuted}"
-                                Glyph="&#xE76C;" />
-                            <TextBlock
-                                VerticalAlignment="Center"
-                                Style="{StaticResource PocketMetaText}"
-                                Text="then one screenshot key" />
-                        </StackPanel>
+                    <StackPanel x:Name="ScreenshotCommands" Visibility="Collapsed" Spacing="5">
+                        <StackPanel Orientation="Horizontal" Spacing="5"><Button Content="S" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><FontIcon Glyph="&#xE76C;" FontSize="12" Foreground="{StaticResource PocketMuted}" /><TextBlock VerticalAlignment="Center" Text="then one key" Style="{StaticResource PocketCaptionText}" /></StackPanel>
                         <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition />
-                                <ColumnDefinition />
-                                <ColumnDefinition />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition />
-                                <RowDefinition />
-                            </Grid.RowDefinitions>
-                            <Button
-                                x:Name="RegionCommand"
-                                Click="Command_Click"
-                                Style="{StaticResource ScreenshotTile}"
-                                Tag="region">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="15"
-                                        Foreground="{StaticResource PocketGreen}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="R" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Region" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                Grid.Column="1"
-                                Click="Command_Click"
-                                Style="{StaticResource ScreenshotTile}"
-                                Tag="window">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="15"
-                                        Foreground="{StaticResource PocketGreen}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="W" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Window" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                Grid.Column="2"
-                                Click="Command_Click"
-                                Style="{StaticResource ScreenshotTile}"
-                                Tag="display">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="15"
-                                        Foreground="{StaticResource PocketGreen}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="D" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Display" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                Grid.Row="1"
-                                Click="Command_Click"
-                                Style="{StaticResource ScreenshotTile}"
-                                Tag="all-displays">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="15"
-                                        Foreground="{StaticResource PocketGreen}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="A" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="All displays" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                Grid.Row="1"
-                                Grid.Column="1"
-                                Click="Command_Click"
-                                Style="{StaticResource ScreenshotTile}"
-                                Tag="previous-region">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="15"
-                                        Foreground="{StaticResource PocketGreen}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="P" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Previous" />
-                                </StackPanel>
-                            </Button>
-                            <Button
-                                Grid.Row="1"
-                                Grid.Column="2"
-                                Margin="2"
-                                Padding="8,7"
-                                Click="Command_Click"
-                                Style="{StaticResource CompactCommandRow}"
-                                Tag="back">
-                                <StackPanel Spacing="4">
-                                    <TextBlock
-                                        FontFamily="Cascadia Mono"
-                                        FontSize="13"
-                                        Foreground="{StaticResource PocketMuted}"
-                                        IsTextScaleFactorEnabled="False"
-                                        Text="Esc" />
-                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Back" />
-                                </StackPanel>
-                            </Button>
+                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
+                            <Button x:Name="RegionCommand" Tag="region" Click="Command_Click" Style="{StaticResource ScreenshotTile}"><StackPanel><TextBlock Text="R" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="14" /><TextBlock Text="Region" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+                            <Button Grid.Column="1" Tag="window" Click="Command_Click" Style="{StaticResource ScreenshotTile}"><StackPanel><TextBlock Text="W" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="14" /><TextBlock Text="Window" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+                            <Button Grid.Column="2" Tag="display" Click="Command_Click" Style="{StaticResource ScreenshotTile}"><StackPanel><TextBlock Text="D" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="14" /><TextBlock Text="Display" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+                            <Button Grid.Row="1" Tag="all-displays" Click="Command_Click" Style="{StaticResource ScreenshotTile}"><StackPanel><TextBlock Text="A" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="14" /><TextBlock Text="All" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+                            <Button Grid.Row="1" Grid.Column="1" Tag="previous-region" Click="Command_Click" Style="{StaticResource ScreenshotTile}"><StackPanel><TextBlock Text="P" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="14" /><TextBlock Text="Previous" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+                            <Button Grid.Row="1" Grid.Column="2" Tag="back" Click="Command_Click" Style="{StaticResource ScreenshotTile}" Background="Transparent"><StackPanel><TextBlock Text="Esc" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketMuted}" FontSize="12" /><TextBlock Text="Back" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
                         </Grid>
                     </StackPanel>
                 </Grid>
             </ScrollViewer>
 
-            <Grid Grid.Row="2">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Ellipse
-                        Width="6"
-                        Height="6"
-                        VerticalAlignment="Center"
-                        Fill="{StaticResource PocketGreen}" />
-                    <TextBlock Style="{StaticResource PocketMetaText}" Text="Closes after 30 s idle" />
-                </StackPanel>
-                <TextBlock
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource PocketMetaText}"
-                    Text="Esc closes" />
-            </Grid>
+            <TextBlock x:Name="PaletteHint" Grid.Row="3" Text="Press one key · Esc closes" Style="{StaticResource PocketCaptionText}" TextTrimming="CharacterEllipsis" />
         </Grid>
     </Grid>
 </Window>

@@ -62,14 +62,16 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ### Command mode
 
-- A compact panel (372 × 468 dips) anchored in one corner of the work area under the pointer, not a full-monitor overlay. It covers as little of the user's work as possible.
-- Backed by the slice of frozen desktop it happens to cover, re-sliced whenever it moves, so the source stays legible through it rather than behind an opaque fallback surface.
-- One restrained green edge treatment—a top wash and a hairline border—communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
-- **Keep-away is a contract.** When the pointer enters the keep-away band the panel steps to the corner farthest from it, then holds until the pointer leaves the band again. It never moves while the pointer is inside it, so every row stays clickable. Placement decisions live in `PalettePlacementPolicy` and are unit-tested.
-- The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only. The asset is the cursor-only form of the mark, rendered at header scale rather than downscaled from the full lockup.
-- Because the panel can land in any corner of any display, it names itself with a `COMMAND MODE` label instead of relying on the user recognising the surface.
-- Screenshot, video, and audio carry a description; text, link, repeat-video, and Library are one line each below a hairline. There is no trailing icon column: a column that mixes a submenu chevron with category glyphs states two different things in one place.
-- Key chips share one right-aligned 60 px column, so a two-key shortcut cannot shift a label out of line with the rest.
+- A small panel (296 × 340 dips) on the pointer's display, not a full-monitor overlay. It covers as little of the user's work as possible.
+- **The user places it; nothing else moves it.** Drag anywhere on the panel except a button to move it, double-click to reset to the top right. An earlier version stepped away from an approaching pointer on its own; predictability proved worth more than the clearance, so the pointer, a mode change, and a reopen never relocate it.
+- The position is remembered as a fraction of the display's free space (`CommandPanelPlacement`), not as screen coordinates, so it means the same thing on another display, resolution, or DPI and can never be restored off screen.
+- Dragging uses Windows' own move loop rather than per-frame pointer tracking, so it feels exactly like dragging a title bar on a surface that has none. The panel takes its rounded corners from DWM rather than a window region, because a region clip drops the window off DWM's fast path and makes dragging lag.
+- **Liquid glass.** Command mode is the one transient surface that uses a system backdrop: `DesktopAcrylicBackdrop` blurs the live desktop behind it, with only a thin tint over the top for text contrast. The system paints the whole window, so this is not the transparent-root gutter that the opacity rule guards against. The frozen desktop snapshot it replaced now belongs to region selection alone.
+- Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
+- A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
+- The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
+- The row icon column says one thing on every row: which kind of capture it is. It never mixes a submenu chevron with kind glyphs, and no row is left without one.
+- Every key chip is the same width and a combination rides in a single chip, so a two-key shortcut cannot shift its label out of line with the rest.
 - The command list scrolls rather than clipping, so nothing critical is lost at high display scale.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
 - Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent. Because the panel no longer covers the screen it can lose activation while still shown; the global bare-key service is what keeps the keys working, and clicking elsewhere deliberately does **not** dismiss it.
@@ -81,7 +83,17 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - The right column answers what the numbers cannot: a framing preview with the camera picture-in-picture shown in the slot it will actually occupy, plus mono tags stating container, frame rate, microphone, and countdown.
 - Microphone and camera show named Windows devices, availability, live signal/preview, and remembered selection.
 - Start remains disabled until discovery completes and FFmpeg is available. Readiness is stated by a dot colour as well as words.
-- Camera preview is released before FFmpeg starts.
+- The preflight camera preview is released before the recording self-view opens the same device.
+
+### Camera self-view
+
+- When a recording includes the camera, a live self-view sits inside the area being recorded at the chosen corner and size, so the user can see their own feed while they record.
+- **It is the one CursorPocket surface deliberately visible in captured media.** CursorPocket holds the camera for the whole recording, and the webcam reaches the file by being on screen inside the captured rectangle. FFmpeg must never be given a `dshow` camera input at the same time—DirectShow grants a single consumer exclusive use, and that is exactly what made a live self-view impossible before.
+- Placement is computed by `CameraSelfViewPlacement` and must always land inside the recorded rectangle. Anything outside it is missing from the file.
+- Click-through and never focused: it sits over the work being demonstrated and must not swallow a click or take activation.
+- Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
+- A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
+- The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
 
 ### Recording HUD
 
@@ -117,11 +129,14 @@ The mark is one idea: a cursor crossing into a pocket. Above the pocket mouth th
 The design-consultation gate requires all of the following before release:
 
 - no opaque gray capture surface or black companion rectangle;
-- the command panel stays compact, preserves readable source context, and has no hard-edged glass slab;
-- the command panel steps away from an approaching pointer, holds still once the pointer is on it, and scrolls instead of clipping at 100–250% scale;
+- the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
+- the command list scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
+- a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
 - `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
+- two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not — and ordinary mouse work over a working session never opens it;
 - named microphone and camera are visible before video begins;
+- the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;
 - recording HUD is readable over both light and dark source content at the active Windows scale;
 - save, failure, and discard states are unmistakable;
 - Library remains readable and scrollable at its minimum size;

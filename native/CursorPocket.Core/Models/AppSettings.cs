@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CursorPocket.Core.Services;
 
 namespace CursorPocket.Core.Models;
 
@@ -62,4 +63,12 @@ public sealed record AppSettings
 
     [JsonPropertyName("library_window_geometry")]
     public string LibraryWindowGeometry { get; init; } = string.Empty;
+
+    // Where the user dragged command mode to, as a fraction of the free space on
+    // the display it is shown on. See CommandPanelPlacement.
+    [JsonPropertyName("command_panel_anchor_x")]
+    public double CommandPanelAnchorX { get; init; } = CommandPanelPlacement.DefaultAnchorX;
+
+    [JsonPropertyName("command_panel_anchor_y")]
+    public double CommandPanelAnchorY { get; init; } = CommandPanelPlacement.DefaultAnchorY;
 }

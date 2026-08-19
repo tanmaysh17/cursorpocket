@@ -62,7 +62,8 @@
                                 x:Name="SourceBox"
                                 HorizontalAlignment="Stretch"
                                 AutomationProperties.Name="Recording source"
-                                SelectedIndex="0">
+                                SelectedIndex="0"
+                                SelectionChanged="SourceBox_SelectionChanged">
                                 <ComboBoxItem Content="Display under pointer" Tag="display" />
                                 <ComboBoxItem Content="Select a region after setup" Tag="region" />
                                 <ComboBoxItem Content="Window used before CursorPocket" Tag="window" />
@@ -167,6 +168,22 @@
                                     DisplayMemberPath="Name"
                                     SelectionChanged="CameraBox_SelectionChanged"
                                     AutomationProperties.Name="Camera" />
+                                <StackPanel
+                                    x:Name="CameraSourceNotice"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    Visibility="Collapsed">
+                                    <FontIcon
+                                        VerticalAlignment="Top"
+                                        FontSize="14"
+                                        Foreground="{StaticResource PocketMuted}"
+                                        Glyph="&#xE7BA;" />
+                                    <TextBlock
+                                        x:Name="CameraSourceNoticeText"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Window recordings capture only that window, so the camera will be visible on screen but will not appear in the saved file."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition />

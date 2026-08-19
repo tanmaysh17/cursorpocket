@@ -3,40 +3,84 @@ namespace CursorPocket.Tests;
 public sealed class UtilitySurfaceContractTests
 {
     [Fact]
-    public void Command_palette_uses_a_desktop_snapshot_instead_of_fallback_acrylic()
-    {
-        var xaml = ReadFixture("CommandPaletteWindow.xaml");
-
-        Assert.Contains("x:Name=\"BackdropImage\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("IBufferByteAccess", ReadFixture("DesktopSnapshot.cs.txt"), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Command_mode_is_a_compact_panel_that_steps_away_from_the_pointer()
+    public void Command_mode_is_a_small_glass_panel_that_holds_one_position()
     {
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
         var xaml = ReadFixture("CommandPaletteWindow.xaml");
         var main = ReadFixture("MainWindow.xaml.cs.txt");
 
-        Assert.Contains("PanelWidth = 372", code, StringComparison.Ordinal);
-        Assert.Contains("PanelHeight = 468", code, StringComparison.Ordinal);
-        Assert.Contains("PalettePlacementPolicy.ChooseCorner", code, StringComparison.Ordinal);
-        Assert.Contains("avoid: _corner", code, StringComparison.Ordinal);
-        Assert.Contains("_panel.Contains(x, y)", code, StringComparison.Ordinal);
-        Assert.Contains("ClipToRoundedPixelRegion", code, StringComparison.Ordinal);
-        Assert.Contains("_palette?.NotifyPointerMoved", main, StringComparison.Ordinal);
-        // The command list has to scroll rather than clip once the panel no longer
-        // owns the whole display, especially at 250% display scale.
+        Assert.Contains("PanelWidth = 296", code, StringComparison.Ordinal);
+        Assert.Contains("PanelHeight = 340", code, StringComparison.Ordinal);
+        // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
+        // per-move realignment are gone along with the keep-away behaviour.
+        Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BackdropImage", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
+        // The panel only ever moves because the user dragged it — never on its own.
+        Assert.DoesNotContain("NotifyPointerMoved", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotifyPointerMoved", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
+        // The command list still has to scroll rather than clip at 250% scale.
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Command_mode_can_be_dragged_anywhere_and_reopens_where_it_was_left()
+    {
+        var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CommandPaletteWindow.xaml");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+        var services = ReadFixture("AppServices.cs.txt");
+
+        // The whole panel drags, not just a title strip.
+        Assert.Contains("PointerPressed=\"Root_PointerPressed\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DoubleTapped=\"Root_DoubleTapped\"", xaml, StringComparison.Ordinal);
+        // ...but a press on any button stays a click, including the keycaps, which are
+        // Buttons nested inside a Button's content.
+        Assert.Contains("IsOverButton", code, StringComparison.Ordinal);
+        Assert.Contains("node is ButtonBase", code, StringComparison.Ordinal);
+        // The drag is tracked from pointer events, not handed to Windows' modal move
+        // loop: WinUI consumes the messages that loop needs, so the window never moved.
+        Assert.Contains("Root.CapturePointer", code, StringComparison.Ordinal);
+        Assert.Contains("PointerReleased=\"Root_PointerReleased\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("PointerCaptureLost=\"Root_PointerCaptureLost\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("WmNcLButtonDown", placement, StringComparison.Ordinal);
+        Assert.Contains("SwpNoZOrder", placement, StringComparison.Ordinal);
+        // A region clip would take the window off DWM's fast path and make the drag lag.
+        Assert.DoesNotContain("ClipToRoundedPixelRegion", code, StringComparison.Ordinal);
+        // Stored as fractions of the free space, so a remembered position cannot come
+        // back off screen on a different display.
+        Assert.Contains("CommandPanelPlacement.Resolve", code, StringComparison.Ordinal);
+        Assert.Contains("CommandPanelPlacement.AnchorFor", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateCommandPanelAnchorAsync", services, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Capture_surfaces_are_forced_to_the_foreground_rather_than_merely_activated()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        // Command mode hides itself before a capture surface opens, handing the
+        // foreground to the source app; Activate() alone loses that race and the
+        // annotation window stays minimized.
+        Assert.Contains("WindowPlacement.ForceForeground(editor)", main, StringComparison.Ordinal);
+        Assert.Contains("editor.AppWindow.Show(true)", main, StringComparison.Ordinal);
+        Assert.Contains("AttachThreadInput", placement, StringComparison.Ordinal);
+        Assert.Contains("IsIconic(handle) ? NativeMethods.SwRestore", placement, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Region_selector_keeps_the_desktop_visible_while_selecting()
     {
         var xaml = ReadFixture("RegionSelectorWindow.xaml");
+        var snapshot = ReadFixture("DesktopSnapshot.cs.txt");
 
+        // Region selection is now the only surface using the frozen desktop, so its
+        // fast lossless snapshot path is asserted here rather than on the palette.
         Assert.Contains("x:Name=\"BackdropImage\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ImageFormat.Bmp", snapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("IBufferByteAccess", snapshot, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +119,35 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("!StartButton.IsEnabled", code, StringComparison.Ordinal);
         Assert.Contains("DisplayIndexUnderPointer", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_camera_self_view_is_recorded_off_the_screen_and_never_steals_input()
+    {
+        var code = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CameraSelfViewWindow.xaml");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        // This is the one surface that must appear in captured media: the webcam
+        // reaches the file by being on screen inside the recorded area.
+        Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+        // It sits over the user's work while they demonstrate it, so it must not
+        // take clicks or focus.
+        Assert.Contains("MakeClickThrough", code, StringComparison.Ordinal);
+        Assert.Contains("WsExTransparent", placement, StringComparison.Ordinal);
+        Assert.Contains("RestoreFocus(sourceWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
+        // Opaque edge to edge, like every other transient surface.
+        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
+        // The camera has to be held before FFmpeg writes frames and released as
+        // soon as the recording stops, or the next preflight preview finds it busy.
+        Assert.True(main.IndexOf("ShowCameraSelfViewAsync(options)", StringComparison.Ordinal) <
+            main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
+        Assert.Contains("DismissCameraSelfView", main, StringComparison.Ordinal);
+        Assert.Contains("RecordingState.Idle or RecordingState.Failed", main, StringComparison.Ordinal);
     }
 
     [Fact]

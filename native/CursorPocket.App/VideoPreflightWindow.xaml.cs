@@ -1,4 +1,5 @@
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -44,7 +45,6 @@ public sealed partial class VideoPreflightWindow : Window
         UpdateSummaryTags();
         FrameRateBox.SelectionChanged += Summary_SelectionChanged;
         CountdownBox.SelectionChanged += Summary_SelectionChanged;
-        SourceBox.SelectionChanged += Summary_SelectionChanged;
         Activated += OnActivated;
         Closed += (_, _) => CleanupDevices();
     }
@@ -77,6 +77,7 @@ public sealed partial class VideoPreflightWindow : Window
                 : "FFmpeg is missing; rebuild or repair CursorPocket before recording.";
             StartButton.IsEnabled = File.Exists(App.Services.FfmpegPath);
             StartMicrophoneMeter();
+            UpdateCameraSourceNotice();
             if (CameraToggle.IsOn)
             {
                 await StartCameraPreviewAsync();
@@ -257,6 +258,36 @@ public sealed partial class VideoPreflightWindow : Window
         }
         CameraOptions.Visibility = CameraToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
         UpdateSummaryTags();
+        UpdateCameraSourceNotice();
+    }
+
+    private void SourceBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        UpdateSummaryTags();
+        UpdateCameraSourceNotice();
+    }
+
+    /// <summary>
+    /// The camera is recorded by being on screen inside the captured area, so a
+    /// window recording keeps the live self-view but cannot carry it into the file.
+    /// Say so here rather than letting the user discover it after recording.
+    /// </summary>
+    private void UpdateCameraSourceNotice()
+    {
+        if (CameraSourceNotice is null)
+        {
+            return;
+        }
+        var sourceValue = (SourceBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "display";
+        var sourceKind = sourceValue switch
+        {
+            "region" => VideoSourceKind.Region,
+            "window" => VideoSourceKind.Window,
+            _ => VideoSourceKind.Display,
+        };
+        CameraSourceNotice.Visibility = CameraToggle.IsOn && !CameraSelfViewPlacement.IsRecordedForSource(sourceKind)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void MicrophoneToggle_Toggled(object sender, RoutedEventArgs eventArgs)

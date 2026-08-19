@@ -11,6 +11,7 @@ public sealed partial class MainWindow : Window
 {
     private CommandPaletteWindow? _palette;
     private VideoPreflightWindow? _preflight;
+    private CameraSelfViewWindow? _selfView;
     private NativeCompanionWindow? _companion;
     private RecordingService? _subscribedRecording;
     private MouseActivityService? _mouseActivity;
@@ -57,34 +58,7 @@ public sealed partial class MainWindow : Window
         ActivateMainWindow();
     }
 
-    private void ActivateMainWindow()
-    {
-        Activate();
-        var handle = WinRT.Interop.WindowNative.GetWindowHandle(this);
-        var foreground = NativeMethods.GetForegroundWindow();
-        var foregroundThread = foreground == 0 ? 0 : NativeMethods.GetWindowThreadProcessId(foreground, out _);
-        var currentThread = NativeMethods.GetCurrentThreadId();
-        var attached = foregroundThread != 0 && foregroundThread != currentThread &&
-            NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
-        try
-        {
-            NativeMethods.ShowWindowAsync(handle, NativeMethods.SwShow);
-            NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0,
-                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
-            NativeMethods.BringWindowToTop(handle);
-            NativeMethods.SetForegroundWindow(handle);
-            NativeMethods.SetFocus(handle);
-            NativeMethods.SetWindowPos(handle, NativeMethods.HwndNotTopmost, 0, 0, 0, 0,
-                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
-        }
-        finally
-        {
-            if (attached)
-            {
-                NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
-            }
-        }
-    }
+    private void ActivateMainWindow() => WindowPlacement.ForceForeground(this);
 
     public void ShowCommandPalette(string? initialMode = null)
     {
@@ -249,7 +223,11 @@ public sealed partial class MainWindow : Window
             var editor = new AnnotationWindow(record, App.Services.Library.GetAbsolutePath(record));
             editor.Saved += (_, _) => ShowReceipt(record, "Screenshot saved");
             editor.Cancelled += (_, _) => ShowReceipt(record, "Screenshot saved without annotation");
-            editor.Activate();
+            // Command mode has just hidden itself, so the source app already owns the
+            // foreground. Activate() alone loses that race and leaves the annotation
+            // window behind or minimized.
+            editor.AppWindow.Show(true);
+            WindowPlacement.ForceForeground(editor);
         }
         catch (Exception error)
         {
@@ -299,13 +277,31 @@ public sealed partial class MainWindow : Window
                     if (record is not null) ShowReceipt(record, "Video saved");
                     else ShowError(discard ? "Recording discarded" : "Video was not saved", "No file was created.");
                 });
+            // The self-view holds the camera for the whole recording and is captured
+            // off the screen, so it must be up and placed inside the recorded area
+            // before FFmpeg starts writing frames. The preflight has already released
+            // its own preview by this point.
+            await ShowCameraSelfViewAsync(options);
             await App.Services.Recording.StartVideoAsync(options);
             _ = App.Services.UpdateRecordingDefaultsAsync(rememberedSettings);
         }
         catch (Exception error)
         {
+            DismissCameraSelfView();
             ShowError("Video did not start", error.Message);
         }
+    }
+
+    private async Task ShowCameraSelfViewAsync(RecordingOptions options)
+    {
+        DismissCameraSelfView();
+        _selfView = await CameraSelfViewWindow.ShowForAsync(options, _lastSourceWindow);
+    }
+
+    private void DismissCameraSelfView()
+    {
+        _selfView?.Dismiss();
+        _selfView = null;
     }
 
     private void ShowReceipt(CaptureRecord record, string title)
@@ -328,6 +324,12 @@ public sealed partial class MainWindow : Window
         if (_tray is not null)
         {
             _tray.Text = state == RecordingState.Recording ? "CursorPocket · recording" : "CursorPocket · ready";
+        }
+        // Release the camera as soon as the recording is no longer running, so the
+        // device is free for the next preflight preview.
+        if (state is RecordingState.Idle or RecordingState.Failed)
+        {
+            DismissCameraSelfView();
         }
     });
 
@@ -373,13 +375,7 @@ public sealed partial class MainWindow : Window
         _companion = new NativeCompanionWindow(App.Services.Settings.CursorCompanionMode);
         _companion.OpenRequested += (_, _) => ShowCommandPalette();
         _mouseActivity = new MouseActivityService();
-        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() =>
-        {
-            _companion?.Follow(point.X, point.Y);
-            // Reuse this hook rather than polling: command mode is a compact panel
-            // now, so it has to step aside when the pointer closes in on it.
-            _palette?.NotifyPointerMoved(point.X, point.Y);
-        });
+        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() => _companion?.Follow(point.X, point.Y));
         _mouseActivity.DoubleCircle += (_, _) =>
         {
             if (App.Services.Settings.MouseGestureEnabled)
