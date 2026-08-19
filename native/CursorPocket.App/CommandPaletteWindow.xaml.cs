@@ -21,6 +21,9 @@ public sealed partial class CommandPaletteWindow : Window
 
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly PaletteHotkeyService _commandKeys = new();
+    private (int Left, int Top) _dragOrigin;
+    private (int X, int Y) _dragStart;
+    private bool _dragging;
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
 
@@ -74,22 +77,66 @@ public sealed partial class CommandPaletteWindow : Window
 
     /// <summary>
     /// Drag anywhere on the panel to move command mode; presses that land on a
-    /// button are left to the button. Windows runs the move loop, so the call blocks
-    /// until the drop; the resting position is then stored as a fraction of the
-    /// display's free space so it survives a resolution or monitor change.
+    /// button are left to the button.
+    /// <para>
+    /// The drag is tracked here rather than handed to Windows' modal move loop
+    /// (<c>WM_NCLBUTTONDOWN</c>/<c>HTCAPTION</c>): WinUI's input layer consumes the
+    /// mouse messages that loop needs, so it either lagged badly or never moved the
+    /// window at all. Positions come from <c>GetCursorPos</c> in physical pixels, so
+    /// no DPI conversion sits between the pointer and the window.
+    /// </para>
     /// </summary>
-    private async void Root_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
+    private void Root_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
         if (eventArgs.GetCurrentPoint(Root).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed ||
             IsOverButton(eventArgs.OriginalSource as DependencyObject))
         {
             return;
         }
-        eventArgs.Handled = true;
-        _timeout.Stop();
-        WindowPlacement.BeginNativeDrag(this);
         var bounds = WindowPlacement.BoundsOf(this);
-        var work = WindowPlacement.WorkAreaAt(bounds.Left + ((bounds.Right - bounds.Left) / 2), bounds.Top + ((bounds.Bottom - bounds.Top) / 2));
+        _dragOrigin = (bounds.Left, bounds.Top);
+        _dragStart = WindowPlacement.PointerPosition();
+        _dragging = Root.CapturePointer(eventArgs.Pointer);
+        if (_dragging)
+        {
+            eventArgs.Handled = true;
+            _timeout.Stop();
+        }
+    }
+
+    private void Root_PointerMovedWhileDragging(int pointerX, int pointerY) =>
+        WindowPlacement.MoveTo(
+            this,
+            _dragOrigin.Left + (pointerX - _dragStart.X),
+            _dragOrigin.Top + (pointerY - _dragStart.Y));
+
+    private async void Root_PointerReleased(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        Root.ReleasePointerCapture(eventArgs.Pointer);
+        await EndDragAsync();
+    }
+
+    private async void Root_PointerCaptureLost(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (_dragging)
+        {
+            await EndDragAsync();
+        }
+    }
+
+    private async Task EndDragAsync()
+    {
+        _dragging = false;
+        ResetTimeout();
+        var bounds = WindowPlacement.BoundsOf(this);
+        var work = WindowPlacement.WorkAreaAt(
+            bounds.Left + ((bounds.Right - bounds.Left) / 2),
+            bounds.Top + ((bounds.Bottom - bounds.Top) / 2));
         var (anchorX, anchorY) = CommandPanelPlacement.AnchorFor(
             ToBounds(work),
             bounds.Right - bounds.Left,
@@ -97,7 +144,6 @@ public sealed partial class CommandPaletteWindow : Window
             bounds.Left,
             bounds.Top,
             PixelMargin());
-        ResetTimeout();
         await App.Services.UpdateCommandPanelAnchorAsync(anchorX, anchorY);
     }
 
@@ -273,7 +319,17 @@ public sealed partial class CommandPaletteWindow : Window
         PaletteHidden?.Invoke(this, EventArgs.Empty);
     }
 
-    private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs) => ResetTimeout();
+    private void Root_PointerMoved(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            ResetTimeout();
+            return;
+        }
+        eventArgs.Handled = true;
+        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
+        Root_PointerMovedWhileDragging(pointerX, pointerY);
+    }
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
         PulseStoryboard.Begin();

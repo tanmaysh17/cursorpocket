@@ -13,7 +13,7 @@
     </Window.SystemBackdrop>
     <!-- The whole panel is a drag handle. Presses that land on a button are left
          alone, so every command stays clickable. -->
-    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" PointerPressed="Root_PointerPressed" DoubleTapped="Root_DoubleTapped" Loaded="Root_Loaded" Background="Transparent">
+    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" PointerPressed="Root_PointerPressed" PointerReleased="Root_PointerReleased" PointerCaptureLost="Root_PointerCaptureLost" DoubleTapped="Root_DoubleTapped" Loaded="Root_Loaded" Background="Transparent">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="S" Invoked="CommandAccelerator_Invoked" />
             <KeyboardAccelerator Key="V" Invoked="CommandAccelerator_Invoked" />

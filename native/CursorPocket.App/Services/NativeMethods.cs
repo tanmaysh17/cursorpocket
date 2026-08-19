@@ -17,8 +17,6 @@ internal static class NativeMethods
     internal const uint WmDestroy = 0x0002;
     internal const uint WmLButtonUp = 0x0202;
     internal const uint WmNcHitTest = 0x0084;
-    internal const uint WmNcLButtonDown = 0x00A1;
-    internal const nint HtCaption = 2;
     internal const int WhMouseLl = 14;
     internal const int WmMouseMove = 0x0200;
     internal const int GwlExStyle = -20;
@@ -34,6 +32,7 @@ internal static class NativeMethods
     internal const long WsSysMenu = 0x00080000L;
     internal const uint SwpNoSize = 0x0001;
     internal const uint SwpNoMove = 0x0002;
+    internal const uint SwpNoZOrder = 0x0004;
     internal const uint SwpNoActivate = 0x0010;
     internal const uint SwpShowWindow = 0x0040;
     internal const uint SwpFrameChanged = 0x0020;
@@ -160,14 +159,6 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     internal static extern nint GetForegroundWindow();
 
-    // Hands a borderless window to Windows' own move loop, so dragging the command
-    // panel feels identical to dragging a title bar without giving it one.
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll")]
-    internal static extern nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

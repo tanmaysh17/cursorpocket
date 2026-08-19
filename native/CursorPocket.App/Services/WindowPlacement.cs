@@ -156,15 +156,23 @@ internal static class WindowPlacement
     }
 
     /// <summary>
-    /// Starts a native window drag for a borderless surface. Windows runs its own
-    /// modal move loop, so this call does not return until the user drops the window
-    /// — read the new position from <see cref="BoundsOf"/> afterwards.
+    /// Moves a window to a screen position without resizing, activating, or
+    /// restacking it. Used for drag tracking, where this runs once per pointer move.
     /// </summary>
-    public static void BeginNativeDrag(Window window)
+    public static void MoveTo(Window window, int left, int top) =>
+        NativeMethods.SetWindowPos(
+            WinRT.Interop.WindowNative.GetWindowHandle(window),
+            0,
+            left,
+            top,
+            0,
+            0,
+            NativeMethods.SwpNoSize | NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate);
+
+    public static (int X, int Y) PointerPosition()
     {
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        NativeMethods.ReleaseCapture();
-        NativeMethods.SendMessage(hwnd, NativeMethods.WmNcLButtonDown, NativeMethods.HtCaption, 0);
+        NativeMethods.GetCursorPos(out var cursor);
+        return (cursor.X, cursor.Y);
     }
 
     public static NativeMethods.Rect BoundsOf(Window window)

@@ -39,10 +39,15 @@ public sealed class UtilitySurfaceContractTests
         // Buttons nested inside a Button's content.
         Assert.Contains("IsOverButton", code, StringComparison.Ordinal);
         Assert.Contains("node is ButtonBase", code, StringComparison.Ordinal);
-        // Windows owns the move loop, so the drop position is read back afterwards.
-        Assert.Contains("BeginNativeDrag", code, StringComparison.Ordinal);
-        Assert.Contains("WmNcLButtonDown", placement, StringComparison.Ordinal);
-        Assert.Contains("ReleaseCapture", placement, StringComparison.Ordinal);
+        // The drag is tracked from pointer events, not handed to Windows' modal move
+        // loop: WinUI consumes the messages that loop needs, so the window never moved.
+        Assert.Contains("Root.CapturePointer", code, StringComparison.Ordinal);
+        Assert.Contains("PointerReleased=\"Root_PointerReleased\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("PointerCaptureLost=\"Root_PointerCaptureLost\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("WmNcLButtonDown", placement, StringComparison.Ordinal);
+        Assert.Contains("SwpNoZOrder", placement, StringComparison.Ordinal);
+        // A region clip would take the window off DWM's fast path and make the drag lag.
+        Assert.DoesNotContain("ClipToRoundedPixelRegion", code, StringComparison.Ordinal);
         // Stored as fractions of the free space, so a remembered position cannot come
         // back off screen on a different display.
         Assert.Contains("CommandPanelPlacement.Resolve", code, StringComparison.Ordinal);
