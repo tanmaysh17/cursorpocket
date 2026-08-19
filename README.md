@@ -6,7 +6,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 ## The everyday workflow
 
-1. Enter command mode by drawing two circles with the mouse — any size, fast or slow — clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
+1. Enter command mode by drawing two circles with the mouse, clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
 2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
 3. Screenshots open in a full-resolution annotation surface. Audio and video use a clear recording HUD with save/discard controls. Every successful capture gets a receipt and appears immediately in the Library.
 
@@ -68,7 +68,7 @@ CursorPocket Captures\
 - **Red cursor and recording HUD:** audio or video is recording. The HUD always exposes save and discard.
 - **Tray icon:** right-click it for every capture action, Settings, the capture folder, and Quit.
 - **Hidden mode:** choose **Off** in Settings or **Hide cursor companion** in the tray menu. The tray and confirmed global engagement shortcut remain active.
-- **Mouse gesture:** draw two circles, clockwise or counter-clockwise, to enter command mode. Small wrist circles and wide arm sweeps both work, drawn quickly or slowly; what matters is that the path loops round twice in one direction. It works in hidden mode and can be disabled in Settings.
+- **Mouse gesture:** draw two circles, clockwise or counter-clockwise, to enter command mode. Small wrist circles and fairly wide sweeps both work, drawn quickly or slowly; what matters is that the path loops round roughly twice in one direction, so ordinary mouse movement does not set it off. It works in hidden mode and can be disabled in Settings.
 
 The dot can also be disabled permanently in Settings. It does not replace the Windows cursor and is excluded from screenshots while capturing.
 

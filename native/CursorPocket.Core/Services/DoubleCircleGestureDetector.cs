@@ -13,23 +13,24 @@ namespace CursorPocket.Core.Services;
 /// </summary>
 public sealed class DoubleCircleGestureDetector
 {
-    // Generous enough for two slow, deliberate loops.
-    private const double WindowSeconds = 4.0;
-    private const double CooldownSeconds = 1.2;
-    // A fast wrist flick can finish two small circles in a fraction of a second.
-    // Shape, not duration, is what rules out accidental movement.
-    private const double MinimumDuration = 0.05;
-    private const double MinimumStep = 1.5;
-    private const int MinimumPoints = 10;
-    // From a small wrist circle to an arm-sized sweep on a 4K display.
-    private const double MinimumDiameter = 12;
-    private const double MaximumDiameter = 900;
-    private const double MaximumAspectRatio = 2.8;
-    private const double MaximumRadiusVariation = 0.52;
-    private const double MinimumDirectionality = 0.62;
-    // Still clearly more than one turn, so ordinary arcs and circular scrolling
-    // do not open command mode by accident.
-    private const double MinimumAngularTravel = Math.PI * 3.2;
+    // These sit midway between the original strict thresholds and a much looser pass
+    // that turned out to trigger during ordinary mouse work. Small and large circles
+    // and fast and slow ones all still register; a careless flick no longer does.
+    private const double WindowSeconds = 3.0;
+    private const double CooldownSeconds = 1.4;
+    private const double MinimumDuration = 0.18;
+    private const double MinimumStep = 2;
+    private const int MinimumPoints = 14;
+    // From a wrist circle to a wide sweep, without treating a sweep across a whole
+    // 4K display as a gesture.
+    private const double MinimumDiameter = 18;
+    private const double MaximumDiameter = 520;
+    private const double MaximumAspectRatio = 2.4;
+    private const double MaximumRadiusVariation = 0.46;
+    private const double MinimumDirectionality = 0.68;
+    // Two loops, near enough. This is the strongest guard against false positives,
+    // so it stays where it started.
+    private const double MinimumAngularTravel = Math.PI * 3.4;
     // Bounds the cost of the sliding-window scan below, which runs on the
     // low-level mouse hook for every pointer move.
     private const int MaximumPoints = 320;
@@ -106,12 +107,12 @@ public sealed class DoubleCircleGestureDetector
         var centerY = (minY + maxY) / 2;
         var radii = points.Select(point => Distance(point.X, point.Y, centerX, centerY)).ToArray();
         var meanRadius = radii.Average();
-        if (meanRadius <= 0 || radii.Min() < meanRadius * 0.22)
+        if (meanRadius <= 0 || radii.Min() < meanRadius * 0.25)
         {
             return false;
         }
         var variation = Math.Sqrt(radii.Average(radius => Math.Pow(radius - meanRadius, 2))) / meanRadius;
-        if (variation > MaximumRadiusVariation || Distance(points[0].X, points[0].Y, points[^1].X, points[^1].Y) > Math.Max(24, meanRadius))
+        if (variation > MaximumRadiusVariation || Distance(points[0].X, points[0].Y, points[^1].X, points[^1].Y) > Math.Max(20, meanRadius * 0.9))
         {
             return false;
         }

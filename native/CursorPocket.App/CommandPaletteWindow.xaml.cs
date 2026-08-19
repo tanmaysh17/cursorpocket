@@ -18,7 +18,6 @@ public sealed partial class CommandPaletteWindow : Window
     private const int PanelWidth = 296;
     private const int PanelHeight = 340;
     private const int PanelMargin = 22;
-    private const int PanelRadius = 14;
 
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
     private readonly PaletteHotkeyService _commandKeys = new();
@@ -67,7 +66,10 @@ public sealed partial class CommandPaletteWindow : Window
             settings.CommandPanelAnchorY,
             PixelMargin());
         AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
-        WindowPlacement.ClipToRoundedPixelRegion(this, placement.Width, placement.Height, WindowPlacement.ToPixels(this, PanelRadius));
+        // Deliberately no SetWindowRgn clip here. A window region takes the window off
+        // DWM's fast path for moves, which made dragging the panel visibly lag.
+        // ConfigureUtilityWindow already asks DWM for rounded corners, so the shape is
+        // the same without the cost. Surfaces that are never dragged still clip.
     }
 
     /// <summary>

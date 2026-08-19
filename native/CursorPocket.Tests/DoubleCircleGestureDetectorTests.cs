@@ -40,24 +40,36 @@ public sealed class DoubleCircleGestureDetectorTests
     public void TwoQuickCirclesTriggerOnce() => Assert.Equal(1, DrawCircles(36));
 
     [Theory]
-    [InlineData(10)]
-    [InlineData(18)]
+    [InlineData(12)]
+    [InlineData(20)]
     [InlineData(36)]
     [InlineData(90)]
-    [InlineData(200)]
-    [InlineData(380)]
-    public void CirclesOfAnySizeTrigger(double radius) =>
+    [InlineData(180)]
+    [InlineData(250)]
+    public void CirclesAcrossTheSupportedSizeRangeTrigger(double radius) =>
         Assert.Equal(1, DrawCircles(radius));
 
     [Theory]
-    // A fast wrist flick: two small loops inside a fifth of a second.
-    [InlineData(0.004, 12)]
-    [InlineData(0.010, 20)]
-    // A slow, deliberate sweep spread over three seconds.
+    // A quick flick: two loops in a third of a second.
+    [InlineData(0.008, 20)]
+    [InlineData(0.015, 20)]
+    // A slow, deliberate sweep spread over nearly three seconds.
     [InlineData(0.060, 24)]
-    [InlineData(0.075, 20)]
-    public void CirclesAtAnySpeedTrigger(double secondsPerSample, int samplesPerTurn) =>
+    [InlineData(0.070, 20)]
+    public void CirclesAtAnyReasonableSpeedTrigger(double secondsPerSample, int samplesPerTurn) =>
         Assert.Equal(1, DrawCircles(60, samplesPerTurn: samplesPerTurn, secondsPerSample: secondsPerSample));
+
+    [Theory]
+    // Below the size floor, and a sweep so wide it is ordinary mouse travel.
+    [InlineData(6)]
+    [InlineData(400)]
+    public void CirclesOutsideTheSupportedSizeRangeDoNotTrigger(double radius) =>
+        Assert.Equal(0, DrawCircles(radius));
+
+    [Fact]
+    public void AFlickTooBriefToBeDeliberateDoesNotTrigger() =>
+        // Two loops in under a fifth of a second is jitter, not a gesture.
+        Assert.Equal(0, DrawCircles(60, samplesPerTurn: 20, secondsPerSample: 0.002));
 
     [Fact]
     public void CounterClockwiseCirclesTrigger() => Assert.Equal(1, DrawCircles(40, clockwise: false));
