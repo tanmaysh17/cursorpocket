@@ -1,18 +1,39 @@
 namespace CursorPocket.Core.Services;
 
+/// <summary>
+/// Recognises two quick circles drawn with the pointer.
+/// <para>
+/// The thresholds are deliberately permissive about <b>size</b> and <b>speed</b> — a
+/// tiny flick of the wrist and a wide sweep of the whole arm both count, drawn fast
+/// or slow — and strict only about <b>shape</b>: the path has to loop consistently
+/// around one centre, in one direction, for clearly more than a single turn. That
+/// split is what keeps the gesture easy to perform without firing during ordinary
+/// mouse work.
+/// </para>
+/// </summary>
 public sealed class DoubleCircleGestureDetector
 {
-    private const double WindowSeconds = 1.8;
-    private const double CooldownSeconds = 1.4;
-    private const double MinimumDuration = 0.45;
-    private const double MinimumStep = 2;
-    private const int MinimumPoints = 18;
-    private const double MinimumDiameter = 24;
-    private const double MaximumDiameter = 180;
-    private const double MaximumAspectRatio = 2.2;
-    private const double MaximumRadiusVariation = 0.42;
-    private const double MinimumDirectionality = 0.72;
-    private const double MinimumAngularTravel = Math.PI * 3.4;
+    // Generous enough for two slow, deliberate loops.
+    private const double WindowSeconds = 4.0;
+    private const double CooldownSeconds = 1.2;
+    // A fast wrist flick can finish two small circles in a fraction of a second.
+    // Shape, not duration, is what rules out accidental movement.
+    private const double MinimumDuration = 0.05;
+    private const double MinimumStep = 1.5;
+    private const int MinimumPoints = 10;
+    // From a small wrist circle to an arm-sized sweep on a 4K display.
+    private const double MinimumDiameter = 12;
+    private const double MaximumDiameter = 900;
+    private const double MaximumAspectRatio = 2.8;
+    private const double MaximumRadiusVariation = 0.52;
+    private const double MinimumDirectionality = 0.62;
+    // Still clearly more than one turn, so ordinary arcs and circular scrolling
+    // do not open command mode by accident.
+    private const double MinimumAngularTravel = Math.PI * 3.2;
+    // Bounds the cost of the sliding-window scan below, which runs on the
+    // low-level mouse hook for every pointer move.
+    private const int MaximumPoints = 320;
+    private const int MaximumCandidates = 40;
 
     private readonly Queue<GesturePoint> _points = new();
     private double _cooldownUntil;
@@ -33,13 +54,21 @@ public sealed class DoubleCircleGestureDetector
             return false;
         }
         _points.Enqueue(new GesturePoint(now, x, y));
+        while (_points.Count > MaximumPoints)
+        {
+            _points.Dequeue();
+        }
         if (_points.Count < MinimumPoints)
         {
             return false;
         }
 
         var points = _points.ToArray();
-        for (var start = 0; start <= points.Length - MinimumPoints; start++)
+        var lastStart = points.Length - MinimumPoints;
+        // Test the newest candidate first and stride through older ones, so a long
+        // trail of movement cannot turn this into a quadratic scan.
+        var stride = Math.Max(1, (int)Math.Ceiling((lastStart + 1) / (double)MaximumCandidates));
+        for (var start = 0; start <= lastStart; start += stride)
         {
             var candidate = points[start..];
             if (candidate[^1].Time - candidate[0].Time < MinimumDuration)
@@ -77,12 +106,12 @@ public sealed class DoubleCircleGestureDetector
         var centerY = (minY + maxY) / 2;
         var radii = points.Select(point => Distance(point.X, point.Y, centerX, centerY)).ToArray();
         var meanRadius = radii.Average();
-        if (meanRadius <= 0 || radii.Min() < meanRadius * 0.25)
+        if (meanRadius <= 0 || radii.Min() < meanRadius * 0.22)
         {
             return false;
         }
         var variation = Math.Sqrt(radii.Average(radius => Math.Pow(radius - meanRadius, 2))) / meanRadius;
-        if (variation > MaximumRadiusVariation || Distance(points[0].X, points[0].Y, points[^1].X, points[^1].Y) > Math.Max(18, meanRadius * 0.8))
+        if (variation > MaximumRadiusVariation || Distance(points[0].X, points[0].Y, points[^1].X, points[^1].Y) > Math.Max(24, meanRadius))
         {
             return false;
         }

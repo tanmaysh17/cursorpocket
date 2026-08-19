@@ -1,4 +1,3 @@
-using CursorPocket.Core.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -114,20 +113,47 @@ internal static class WindowPlacement
         }
     }
 
-    public static PaletteRect WorkAreaUnderPointer()
+    /// <summary>
+    /// Brings one of CursorPocket's own windows to the front and gives it focus.
+    /// <para>
+    /// <see cref="Window.Activate"/> alone is not enough: a capture surface is
+    /// created right after a transient surface hid itself, so Windows has already
+    /// handed the foreground to the source app and its foreground lock refuses the
+    /// change — the new window is left behind or minimized. Attaching to the current
+    /// foreground thread's input queue is what makes the handover stick.
+    /// </para>
+    /// This restores only CursorPocket's own windows. Source windows go through
+    /// <c>WindowContextService.RestoreFocus</c>, which deliberately never restores a
+    /// healthy window.
+    /// </summary>
+    public static void ForceForeground(Window window)
     {
-        var bounds = MonitorUnderPointer(true);
-        return PaletteRect.FromEdges(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        window.Activate();
+        var handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundThread = foreground == 0 ? 0 : NativeMethods.GetWindowThreadProcessId(foreground, out _);
+        var currentThread = NativeMethods.GetCurrentThreadId();
+        var attached = foregroundThread != 0 && foregroundThread != currentThread &&
+            NativeMethods.AttachThreadInput(currentThread, foregroundThread, true);
+        try
+        {
+            NativeMethods.ShowWindowAsync(handle, NativeMethods.IsIconic(handle) ? NativeMethods.SwRestore : NativeMethods.SwShow);
+            NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0,
+                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpShowWindow);
+            NativeMethods.BringWindowToTop(handle);
+            NativeMethods.SetForegroundWindow(handle);
+            NativeMethods.SetFocus(handle);
+            NativeMethods.SetWindowPos(handle, NativeMethods.HwndNotTopmost, 0, 0, 0, 0,
+                NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate);
+        }
+        finally
+        {
+            if (attached)
+            {
+                NativeMethods.AttachThreadInput(currentThread, foregroundThread, false);
+            }
+        }
     }
-
-    public static (int X, int Y) PointerPosition()
-    {
-        NativeMethods.GetCursorPos(out var cursor);
-        return (cursor.X, cursor.Y);
-    }
-
-    public static void MoveAndResizeTo(Window window, PaletteRect rect) =>
-        window.AppWindow.MoveAndResize(new RectInt32(rect.Left, rect.Top, rect.Width, rect.Height));
 
     public static void FillCurrentMonitor(Window window)
     {
@@ -149,6 +175,16 @@ internal static class WindowPlacement
         var pixelHeight = ToPixels(height, scale);
         var pixelMargin = ToPixels(margin, scale);
         window.AppWindow.MoveAndResize(new RectInt32(bounds.Right - pixelWidth - pixelMargin, bounds.Bottom - pixelHeight - pixelMargin, pixelWidth, pixelHeight));
+    }
+
+    public static void PlaceTopRight(Window window, int width, int height, int margin = 22)
+    {
+        var bounds = MonitorUnderPointer(true);
+        var scale = ScaleFor(window);
+        var pixelWidth = ToPixels(width, scale);
+        var pixelHeight = ToPixels(height, scale);
+        var pixelMargin = ToPixels(margin, scale);
+        window.AppWindow.MoveAndResize(new RectInt32(bounds.Right - pixelWidth - pixelMargin, bounds.Top + pixelMargin, pixelWidth, pixelHeight));
     }
 
     public static void PlaceTopCenter(Window window, int width, int height, int margin = 18)

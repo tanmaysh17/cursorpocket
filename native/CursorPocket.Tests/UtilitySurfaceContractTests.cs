@@ -3,40 +3,54 @@ namespace CursorPocket.Tests;
 public sealed class UtilitySurfaceContractTests
 {
     [Fact]
-    public void Command_palette_uses_a_desktop_snapshot_instead_of_fallback_acrylic()
-    {
-        var xaml = ReadFixture("CommandPaletteWindow.xaml");
-
-        Assert.Contains("x:Name=\"BackdropImage\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("IBufferByteAccess", ReadFixture("DesktopSnapshot.cs.txt"), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Command_mode_is_a_compact_panel_that_steps_away_from_the_pointer()
+    public void Command_mode_is_a_small_glass_panel_that_holds_one_position()
     {
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
         var xaml = ReadFixture("CommandPaletteWindow.xaml");
         var main = ReadFixture("MainWindow.xaml.cs.txt");
 
-        Assert.Contains("PanelWidth = 372", code, StringComparison.Ordinal);
-        Assert.Contains("PanelHeight = 468", code, StringComparison.Ordinal);
-        Assert.Contains("PalettePlacementPolicy.ChooseCorner", code, StringComparison.Ordinal);
-        Assert.Contains("avoid: _corner", code, StringComparison.Ordinal);
-        Assert.Contains("_panel.Contains(x, y)", code, StringComparison.Ordinal);
-        Assert.Contains("ClipToRoundedPixelRegion", code, StringComparison.Ordinal);
-        Assert.Contains("_palette?.NotifyPointerMoved", main, StringComparison.Ordinal);
-        // The command list has to scroll rather than clip once the panel no longer
-        // owns the whole display, especially at 250% display scale.
+        Assert.Contains("PanelWidth = 296", code, StringComparison.Ordinal);
+        Assert.Contains("PanelHeight = 340", code, StringComparison.Ordinal);
+        // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
+        // per-move realignment are gone along with the keep-away behaviour.
+        Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("BackdropImage", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
+        // One fixed anchor: nothing may move the panel while it is open.
+        Assert.Contains("PlaceTopRight", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotifyPointerMoved", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("NotifyPointerMoved", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
+        // The command list still has to scroll rather than clip at 250% scale.
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Capture_surfaces_are_forced_to_the_foreground_rather_than_merely_activated()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        // Command mode hides itself before a capture surface opens, handing the
+        // foreground to the source app; Activate() alone loses that race and the
+        // annotation window stays minimized.
+        Assert.Contains("WindowPlacement.ForceForeground(editor)", main, StringComparison.Ordinal);
+        Assert.Contains("editor.AppWindow.Show(true)", main, StringComparison.Ordinal);
+        Assert.Contains("AttachThreadInput", placement, StringComparison.Ordinal);
+        Assert.Contains("IsIconic(handle) ? NativeMethods.SwRestore", placement, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Region_selector_keeps_the_desktop_visible_while_selecting()
     {
         var xaml = ReadFixture("RegionSelectorWindow.xaml");
+        var snapshot = ReadFixture("DesktopSnapshot.cs.txt");
 
+        // Region selection is now the only surface using the frozen desktop, so its
+        // fast lossless snapshot path is asserted here rather than on the palette.
         Assert.Contains("x:Name=\"BackdropImage\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ImageFormat.Bmp", snapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("IBufferByteAccess", snapshot, StringComparison.Ordinal);
     }
 
     [Fact]

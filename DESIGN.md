@@ -49,10 +49,11 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 ### Command mode
 
-- A compact panel (372 × 468 dips) anchored in one corner of the work area under the pointer, not a full-monitor overlay. It covers as little of the user's work as possible.
-- Backed by the slice of frozen desktop it happens to cover, re-sliced whenever it moves, so the source stays legible through it rather than behind an opaque fallback surface.
-- One restrained green edge treatment—a top wash and a hairline border—communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
-- **Keep-away is a contract.** When the pointer enters the keep-away band the panel steps to the corner farthest from it, then holds until the pointer leaves the band again. It never moves while the pointer is inside it, so every row stays clickable. Placement decisions live in `PalettePlacementPolicy` and are unit-tested.
+- A small panel (296 × 340 dips) in the top-right of the work area on the pointer's display, not a full-monitor overlay. It covers as little of the user's work as possible.
+- **It always opens in the same place and never moves while open.** An earlier version stepped away from an approaching pointer; predictability proved worth more than the clearance, so nothing—not the pointer, not a mode change—relocates the panel.
+- **Liquid glass.** Command mode is the one transient surface that uses a system backdrop: `DesktopAcrylicBackdrop` blurs the live desktop behind it, with only a thin tint over the top for text contrast. The system paints the whole window, so this is not the transparent-root gutter that the opacity rule guards against. The frozen desktop snapshot it replaced now belongs to region selection alone.
+- Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
+- A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
 - The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
 - The command list scrolls rather than clipping, so nothing critical is lost at high display scale.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
@@ -86,10 +87,12 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 The design-consultation gate requires all of the following before release:
 
 - no opaque gray capture surface or black companion rectangle;
-- the command panel stays compact, preserves readable source context, and has no hard-edged glass slab;
-- the command panel steps away from an approaching pointer, holds still once the pointer is on it, and scrolls instead of clipping at 100–250% scale;
+- the command panel stays small, opens in the same corner every time, never moves while open, and keeps the blurred desktop readable behind it;
+- the command list scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
+- a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
 - `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
+- two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not;
 - named microphone and camera are visible before video begins;
 - recording HUD is readable over both light and dark source content at the active Windows scale;
 - save, failure, and discard states are unmistakable;
