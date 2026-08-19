@@ -59,7 +59,7 @@ if ($LASTEXITCODE -ne 0) { throw "Native publish failed." }
 # are present in TargetDir. An installer without these files starts and then
 # exits with XamlParseException, so stage and verify them explicitly.
 $targetDir = (& $dotnet msbuild $appProject -nologo -getProperty:TargetDir `
-    -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64).Trim()
+    -p:Configuration=Release -p:RuntimeIdentifier=win-x64).Trim()
 if (-not (Test-Path -LiteralPath $targetDir)) {
     throw "Native build output was not found: $targetDir"
 }
