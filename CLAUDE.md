@@ -93,7 +93,8 @@ These were each fixed after a real regression (`AGENTS.md`, `DESIGN.md`, `HANDOF
 - Transient surfaces must be opaque edge-to-edge with no transparent WinUI root gutter (that gutter produced the white frame around HUD/receipt).
 - Green `#43E08D` = ready/saved/primary; red `#FF5A67` = recording/discard/destructive. Never decorative. Recording state must also be non-color-conveyed.
 - No added cloud, sharing, analytics, accounts, decorative glass cards, or raster brand marks without an explicit product decision.
-- `Escape` semantics: during recording it stops **and saves**; in region selection and annotation it cancels without losing the original.
+- `Escape` semantics: during recording it stops **and saves**; in region selection and annotation it cancels without losing the original. `Enter` on the annotation surface saves the screenshot with or without marks — it is bound as a root `KeyboardAccelerator` because the drawing `Canvas` cannot take keyboard focus, so a `KeyDown` handler there never fires.
+- Command mode is a compact corner panel that steps away from an approaching pointer (`PalettePlacementPolicy` in Core decides where). It holds still while the pointer is on it so rows stay clickable, and clicking outside deliberately does not dismiss it.
 - Deletion goes to the Recycle Bin, never a hard delete.
 
 Because the HUD and receipt use capture exclusion, Windows Graphics Capture–based automation screenshots show the source content instead of those surfaces. Verify them by accessibility inspection plus direct visual inspection on an unlocked desktop.
