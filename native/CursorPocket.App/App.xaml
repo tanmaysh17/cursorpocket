@@ -10,36 +10,78 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
-            <Color x:Key="PocketInkColor">#FFF4FAF7</Color>
-            <Color x:Key="PocketMutedColor">#FF98A9A2</Color>
-            <Color x:Key="PocketSurfaceColor">#D9151E24</Color>
-            <Color x:Key="PocketRaisedColor">#EE1C2830</Color>
-            <Color x:Key="PocketLineColor">#2EFFFFFF</Color>
-            <Color x:Key="PocketGreenColor">#FF43E08D</Color>
-            <Color x:Key="PocketGreenSoftColor">#3043E08D</Color>
-            <Color x:Key="PocketRedColor">#FFFF5A67</Color>
-            <Color x:Key="PocketBlueColor">#FF7AB8FF</Color>
+            <!--  Neutrals. Surfaces sit over Mica, so they carry alpha.  -->
+            <Color x:Key="PocketInkColor">#FFF2F7F4</Color>
+            <Color x:Key="PocketInkDimColor">#FFC2CFC9</Color>
+            <Color x:Key="PocketMutedColor">#FF8FA09A</Color>
+            <Color x:Key="PocketBaseColor">#FF0B100F</Color>
+            <Color x:Key="PocketSunkenColor">#66070C0B</Color>
+            <Color x:Key="PocketSurfaceColor">#CC101815</Color>
+            <Color x:Key="PocketRaisedColor">#E0161F1C</Color>
+            <Color x:Key="PocketLineColor">#24FFFFFF</Color>
+            <Color x:Key="PocketLineStrongColor">#40FFFFFF</Color>
+            <Color x:Key="PocketOverlayColor">#14FFFFFF</Color>
+
+            <!--  Accents. Green means ready, live-and-safe, or the one primary action.  -->
+            <!--  Red is only recording, discard, and delete. Blue only marks text and links.  -->
+            <Color x:Key="PocketGreenColor">#FF45E08C</Color>
+            <Color x:Key="PocketGreenSoftColor">#2645E08C</Color>
+            <Color x:Key="PocketOnGreenColor">#FF06120C</Color>
+            <Color x:Key="PocketRedColor">#FFFF5F6B</Color>
+            <Color x:Key="PocketRedSoftColor">#29FF5F6B</Color>
+            <Color x:Key="PocketBlueColor">#FF7FBBFF</Color>
 
             <SolidColorBrush x:Key="PocketInk" Color="{StaticResource PocketInkColor}" />
+            <SolidColorBrush x:Key="PocketInkDim" Color="{StaticResource PocketInkDimColor}" />
             <SolidColorBrush x:Key="PocketMuted" Color="{StaticResource PocketMutedColor}" />
+            <SolidColorBrush x:Key="PocketBase" Color="{StaticResource PocketBaseColor}" />
+            <SolidColorBrush x:Key="PocketSunken" Color="{StaticResource PocketSunkenColor}" />
             <SolidColorBrush x:Key="PocketSurface" Color="{StaticResource PocketSurfaceColor}" />
             <SolidColorBrush x:Key="PocketRaised" Color="{StaticResource PocketRaisedColor}" />
             <SolidColorBrush x:Key="PocketLine" Color="{StaticResource PocketLineColor}" />
+            <SolidColorBrush x:Key="PocketLineStrong" Color="{StaticResource PocketLineStrongColor}" />
+            <SolidColorBrush x:Key="PocketOverlay" Color="{StaticResource PocketOverlayColor}" />
             <SolidColorBrush x:Key="PocketGreen" Color="{StaticResource PocketGreenColor}" />
             <SolidColorBrush x:Key="PocketGreenSoft" Color="{StaticResource PocketGreenSoftColor}" />
+            <SolidColorBrush x:Key="PocketOnGreen" Color="{StaticResource PocketOnGreenColor}" />
             <SolidColorBrush x:Key="PocketRed" Color="{StaticResource PocketRedColor}" />
+            <SolidColorBrush x:Key="PocketRedSoft" Color="{StaticResource PocketRedSoftColor}" />
             <SolidColorBrush x:Key="PocketBlue" Color="{StaticResource PocketBlueColor}" />
+            <SolidColorBrush x:Key="PocketTransparent" Color="Transparent" />
 
+            <!--  One canonical cursor, shared by the icon generator in tools/make_logo.py.
+                  A Setter converts the literal to a Geometry; a plain string resource would
+                  reach Path.Data untyped and fail at load.  -->
+            <Style x:Key="PocketCursorMark" TargetType="Path">
+                <Setter Property="Data" Value="M0,0 L0,26.5 L7.2,20.1 L11.6,30.6 L16.4,28.6 L12.1,18.3 L21.4,17.6 Z" />
+                <Setter Property="Fill" Value="{StaticResource PocketGreen}" />
+                <Setter Property="Stretch" Value="Uniform" />
+            </Style>
+
+            <CornerRadius x:Key="PocketControlCorner">8</CornerRadius>
+            <CornerRadius x:Key="PocketCardCorner">12</CornerRadius>
+            <CornerRadius x:Key="PocketWellCorner">16</CornerRadius>
+
+            <!--  Type. Display for headings, Text for controls, Cascadia Mono for anything
+                  the eye has to compare: keys, timers, sizes, counts, paths.  -->
             <Style x:Key="PocketDisplayText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
-                <Setter Property="FontSize" Value="34" />
+                <Setter Property="FontSize" Value="32" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
-                <Setter Property="CharacterSpacing" Value="-20" />
+                <Setter Property="CharacterSpacing" Value="-21" />
+                <Setter Property="LineHeight" Value="38" />
             </Style>
             <Style x:Key="PocketTitleText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
-                <Setter Property="FontSize" Value="20" />
+                <Setter Property="FontSize" Value="22" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="CharacterSpacing" Value="-12" />
+            </Style>
+            <Style x:Key="PocketSubtitleText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+                <Setter Property="FontSize" Value="16" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
             </Style>
@@ -48,35 +90,221 @@
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
             </Style>
+            <Style x:Key="PocketBodyStrongText" TargetType="TextBlock" BasedOn="{StaticResource PocketBodyText}">
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
             <Style x:Key="PocketCaptionText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="LineHeight" Value="18" />
+            </Style>
+            <Style x:Key="PocketMetaText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Small" />
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="13" />
                 <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
             </Style>
-            <Style x:Key="PocketPrimaryButton" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource PocketGreen}" />
-                <Setter Property="Foreground" Value="#FF07130D" />
+            <Style x:Key="PocketNumericText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="IsTextScaleFactorEnabled" Value="False" />
+            </Style>
+            <Style x:Key="PocketLabelText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono" />
+                <Setter Property="FontSize" Value="11" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Padding" Value="18,10" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="CharacterSpacing" Value="110" />
+                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
             </Style>
-            <Style x:Key="PocketQuietButton" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource PocketRaised}" />
+
+            <!--  Buttons. One template, four roles, so height, radius, and the hover and
+                  pressed response are identical wherever a button appears.  -->
+            <Style x:Key="PocketButtonBase" TargetType="Button">
+                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="Padding" Value="14,0" />
+                <Setter Property="CornerRadius" Value="{StaticResource PocketControlCorner}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Background" Value="Transparent" />
                 <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
-                <Setter Property="Padding" Value="14,9" />
-                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid
+                                x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                                <Border x:Name="Overlay" Background="{StaticResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
+                                <Border x:Name="PressOverlay" Background="{StaticResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
+                                <ContentPresenter
+                                    x:Name="Presenter"
+                                    Padding="{TemplateBinding Padding}"
+                                    HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    AutomationProperties.AccessibilityView="Raw"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    Foreground="{TemplateBinding Foreground}" />
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <Storyboard>
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Overlay"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="1"
+                                                    Duration="0:0:0.09" />
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <Storyboard>
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Overlay"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="1"
+                                                    Duration="0" />
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="PressOverlay"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="1"
+                                                    Duration="0" />
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Presenter"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="0.75"
+                                                    Duration="0" />
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <Storyboard>
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="0.38"
+                                                    Duration="0" />
+                                            </Storyboard>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
-            <Style x:Key="KeyCapButton" TargetType="Button">
-                <Setter Property="MinWidth" Value="42" />
-                <Setter Property="MinHeight" Value="38" />
-                <Setter Property="Padding" Value="10,7" />
-                <Setter Property="CornerRadius" Value="9" />
+
+            <Style x:Key="PocketPrimaryButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Background" Value="{StaticResource PocketGreen}" />
+                <Setter Property="Foreground" Value="{StaticResource PocketOnGreen}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="Padding" Value="16,0" />
+            </Style>
+            <Style x:Key="PocketQuietButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Background" Value="{StaticResource PocketRaised}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+            </Style>
+            <Style x:Key="PocketGhostButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
+            </Style>
+            <Style x:Key="PocketDangerButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Foreground" Value="{StaticResource PocketRed}" />
+            </Style>
+            <Style x:Key="PocketIconButton" TargetType="Button" BasedOn="{StaticResource PocketGhostButton}">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Padding" Value="0" />
+            </Style>
+            <Style x:Key="PocketDangerIconButton" TargetType="Button" BasedOn="{StaticResource PocketDangerButton}">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Padding" Value="0" />
+            </Style>
+            <Style x:Key="PocketTileButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Background" Value="{StaticResource PocketSurface}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="CornerRadius" Value="{StaticResource PocketCardCorner}" />
+                <Setter Property="Padding" Value="18" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            </Style>
+            <Style x:Key="PocketCommandRow" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="CornerRadius" Value="10" />
+                <Setter Property="Padding" Value="10,9" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            </Style>
+
+            <!--  A key chip is a real key: fixed height, mono, and a heavier bottom edge.  -->
+            <Style x:Key="KeyCapButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="MinWidth" Value="32" />
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Height" Value="32" />
+                <Setter Property="Padding" Value="9,0" />
+                <Setter Property="CornerRadius" Value="7" />
                 <Setter Property="FontFamily" Value="Cascadia Mono" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Background" Value="{StaticResource PocketRaised}" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLineStrong}" />
+                <Setter Property="BorderThickness" Value="1,1,1,2" />
+                <Setter Property="IsTextScaleFactorEnabled" Value="False" />
+            </Style>
+            <Style x:Key="KeyCapLargeButton" TargetType="Button" BasedOn="{StaticResource KeyCapButton}">
+                <Setter Property="MinWidth" Value="40" />
+                <Setter Property="MinHeight" Value="40" />
+                <Setter Property="Height" Value="40" />
+                <Setter Property="FontSize" Value="16" />
+                <Setter Property="CornerRadius" Value="9" />
+            </Style>
+
+            <!--  Containers  -->
+            <Style x:Key="PocketCard" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource PocketSurface}" />
                 <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
                 <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{StaticResource PocketCardCorner}" />
+            </Style>
+            <Style x:Key="PocketWell" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource PocketSunken}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{StaticResource PocketWellCorner}" />
+            </Style>
+            <!--  Kind chips stay neutral. The glyph and the mono tag carry the kind, so a
+                  coloured surface always means live state rather than decoration.  -->
+            <Style x:Key="PocketChip" TargetType="Border">
+                <Setter Property="Width" Value="28" />
+                <Setter Property="Height" Value="28" />
+                <Setter Property="Background" Value="{StaticResource PocketSunken}" />
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="{StaticResource PocketControlCorner}" />
+            </Style>
+            <Style x:Key="PocketChipLarge" TargetType="Border" BasedOn="{StaticResource PocketChip}">
+                <Setter Property="Width" Value="32" />
+                <Setter Property="Height" Value="32" />
+            </Style>
+            <Style x:Key="PocketTagBorder" TargetType="Border">
+                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="5" />
+                <Setter Property="Padding" Value="6,3" />
+            </Style>
+            <Style x:Key="PocketTagText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CharacterSpacing" Value="80" />
+                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="IsTextScaleFactorEnabled" Value="False" />
+            </Style>
+
+            <Style x:Key="PocketChipIcon" TargetType="FontIcon">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

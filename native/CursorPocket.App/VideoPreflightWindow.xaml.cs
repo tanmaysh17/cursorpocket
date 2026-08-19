@@ -40,6 +40,11 @@ public sealed partial class VideoPreflightWindow : Window
         SourceBox.SelectedIndex = App.Services.Settings.VideoSourceKind switch { "region" => 1, "window" => 2, _ => 0 };
         CameraPositionBox.SelectedIndex = App.Services.Settings.VideoCameraPosition switch { "bottom-left" => 1, "top-right" => 2, "top-left" => 3, _ => 0 };
         CameraSizeBox.SelectedIndex = App.Services.Settings.VideoCameraWidth switch { 240 => 0, 480 => 2, _ => 1 };
+        CameraOptions.Visibility = CameraToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSummaryTags();
+        FrameRateBox.SelectionChanged += Summary_SelectionChanged;
+        CountdownBox.SelectionChanged += Summary_SelectionChanged;
+        SourceBox.SelectionChanged += Summary_SelectionChanged;
         Activated += OnActivated;
         Closed += (_, _) => CleanupDevices();
     }
@@ -65,6 +70,7 @@ public sealed partial class VideoPreflightWindow : Window
             MicrophoneToggle.IsEnabled = devices.Audio.Count > 0;
             CameraToggle.IsEnabled = devices.Video.Count > 0;
             ReadinessTitle.Text = "Ready when you are";
+            ReadinessDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketGreen"];
             var diskStatus = GetDiskSpaceStatus();
             ReadinessDetail.Text = File.Exists(App.Services.FfmpegPath)
                 ? $"Recording stays local · {diskStatus}"
@@ -79,6 +85,7 @@ public sealed partial class VideoPreflightWindow : Window
         catch (Exception error)
         {
             ReadinessTitle.Text = "Recording devices need attention";
+            ReadinessDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketRed"];
             ReadinessDetail.Text = error.Message;
             StartButton.IsEnabled = false;
         }
@@ -135,9 +142,8 @@ public sealed partial class VideoPreflightWindow : Window
         await StopCameraPreviewAsync();
         if (!CameraToggle.IsOn || CameraBox.SelectedItem is not MediaDeviceDescriptor selected)
         {
-            CameraPreview.Visibility = Visibility.Collapsed;
-            CameraEmpty.Visibility = Visibility.Visible;
-            CameraStatus.Text = CameraToggle.IsOn ? "No camera is available" : "Camera is off";
+            ShowCameraSlot(false, CameraToggle.IsOn ? "no camera" : "camera off");
+            CameraStatus.Text = CameraToggle.IsOn ? "No camera is available" : "Off · no camera device is opened";
             return;
         }
         try
@@ -163,15 +169,35 @@ public sealed partial class VideoPreflightWindow : Window
             _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
             _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
             CameraPreview.SetMediaPlayer(_cameraPlayer);
-            CameraPreview.Visibility = Visibility.Visible;
-            CameraEmpty.Visibility = Visibility.Collapsed;
+            ShowCameraSlot(true, string.Empty);
         }
         catch (Exception error)
         {
-            CameraPreview.Visibility = Visibility.Collapsed;
-            CameraEmpty.Visibility = Visibility.Visible;
+            ShowCameraSlot(false, "camera error");
             CameraStatus.Text = error.Message;
         }
+    }
+
+    private void ShowCameraSlot(bool live, string label)
+    {
+        CameraPreview.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        CameraSlotLabel.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+        CameraSlotLabel.Text = label;
+    }
+
+    /// <summary>Keep the facts under the preview honest about what the file will contain.</summary>
+    private void UpdateSummaryTags()
+    {
+        FrameRateTag.Text = (FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "60" ? "60 FPS" : "30 FPS";
+        MicrophoneTag.Text = MicrophoneToggle.IsOn ? "MIC ON" : "MIC OFF";
+        var countdown = (CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "3";
+        CountdownTag.Text = countdown == "0" ? "NO COUNTDOWN" : $"{countdown} S";
+        FramingLabel.Text = ((SourceBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()) switch
+        {
+            "region" => "SELECTED REGION",
+            "window" => "PREVIOUS WINDOW",
+            _ => "FULL DISPLAY",
+        };
     }
 
     private Task StopCameraPreviewAsync()
@@ -224,14 +250,23 @@ public sealed partial class VideoPreflightWindow : Window
         CameraPositionBox.IsEnabled = CameraToggle.IsOn;
         CameraSizeBox.IsEnabled = CameraToggle.IsOn;
         if (CameraToggle.IsOn) await StartCameraPreviewAsync(); else await StopCameraPreviewAsync();
-        if (!CameraToggle.IsOn) { CameraPreview.Visibility = Visibility.Collapsed; CameraEmpty.Visibility = Visibility.Visible; CameraStatus.Text = "Camera is off"; }
+        if (!CameraToggle.IsOn)
+        {
+            ShowCameraSlot(false, "camera off");
+            CameraStatus.Text = "Off · no camera device is opened";
+        }
+        CameraOptions.Visibility = CameraToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        UpdateSummaryTags();
     }
 
     private void MicrophoneToggle_Toggled(object sender, RoutedEventArgs eventArgs)
     {
         MicrophoneBox.IsEnabled = MicrophoneToggle.IsOn;
         StartMicrophoneMeter();
+        UpdateSummaryTags();
     }
+
+    private void Summary_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs) => UpdateSummaryTags();
 
     private void MicrophoneBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {

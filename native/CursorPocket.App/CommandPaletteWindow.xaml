@@ -4,7 +4,12 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="CursorPocket command mode">
-    <Grid x:Name="Root" KeyDown="Root_KeyDown" PointerMoved="Root_PointerMoved" Loaded="Root_Loaded" Background="#FF030A08">
+    <Grid
+        x:Name="Root"
+        Background="#FF030A08"
+        KeyDown="Root_KeyDown"
+        Loaded="Root_Loaded"
+        PointerMoved="Root_PointerMoved">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="S" Invoked="CommandAccelerator_Invoked" />
             <KeyboardAccelerator Key="V" Invoked="CommandAccelerator_Invoked" />
@@ -20,110 +25,472 @@
             <KeyboardAccelerator Key="Escape" Invoked="CommandAccelerator_Invoked" />
         </Grid.KeyboardAccelerators>
         <Grid.Resources>
-            <Style x:Key="CommandRow" TargetType="Button">
-                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                <Setter Property="Background" Value="Transparent" />
-                <Setter Property="Padding" Value="8,9" />
-                <Setter Property="CornerRadius" Value="10" />
-                <Setter Property="BorderThickness" Value="0" />
-            </Style>
+            <!--  The brand mark breathes instead of duplicating itself, so a still frame
+                  never looks like a rendering fault.  -->
             <Storyboard x:Name="PulseStoryboard" RepeatBehavior="Forever">
-                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="Opacity" From="0.38" To="0.08" Duration="0:0:1.35" />
-                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="0.72" To="1.12" Duration="0:0:1.35" />
-                <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.72" To="1.12" Duration="0:0:1.35" />
+                <DoubleAnimation
+                    AutoReverse="True"
+                    Storyboard.TargetName="BrandMark"
+                    Storyboard.TargetProperty="Opacity"
+                    From="1.0"
+                    To="0.38"
+                    Duration="0:0:1.35" />
             </Storyboard>
         </Grid.Resources>
 
-        <Image x:Name="BackdropImage" Stretch="Fill" IsHitTestVisible="False" />
+        <!--  The frozen desktop keeps the user's context; everything above it is a veil.  -->
+        <Image x:Name="BackdropImage" IsHitTestVisible="False" Stretch="Fill" />
         <Rectangle Fill="#26030A08" IsHitTestVisible="False" />
 
-        <Rectangle Height="92" VerticalAlignment="Top" IsHitTestVisible="False">
-            <Rectangle.Fill><LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1"><GradientStop Color="#3043E08D" Offset="0" /><GradientStop Color="#0043E08D" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
-        </Rectangle>
-        <Rectangle Height="92" VerticalAlignment="Bottom" IsHitTestVisible="False">
-            <Rectangle.Fill><LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0"><GradientStop Color="#3043E08D" Offset="0" /><GradientStop Color="#0043E08D" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
-        </Rectangle>
-        <Rectangle Width="92" HorizontalAlignment="Left" IsHitTestVisible="False">
-            <Rectangle.Fill><LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5"><GradientStop Color="#3043E08D" Offset="0" /><GradientStop Color="#0043E08D" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
-        </Rectangle>
-        <Rectangle Width="92" HorizontalAlignment="Right" IsHitTestVisible="False">
-            <Rectangle.Fill><LinearGradientBrush StartPoint="1,0.5" EndPoint="0,0.5"><GradientStop Color="#3043E08D" Offset="0" /><GradientStop Color="#0043E08D" Offset="1" /></LinearGradientBrush></Rectangle.Fill>
-        </Rectangle>
-
-        <Border BorderBrush="{StaticResource PocketGreen}" BorderThickness="2,2,0,2" Opacity="0.14" />
-        <Border Margin="0" HorizontalAlignment="Right" Width="620">
+        <!--  A single scrim, ramped over 900 px, so there is no panel edge to catch the eye.  -->
+        <Border
+            Width="900"
+            HorizontalAlignment="Right"
+            IsHitTestVisible="False">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                    <GradientStop Color="#00111A16" Offset="0" />
-                    <GradientStop Color="#B20E1714" Offset="0.36" />
-                    <GradientStop Color="#F20A100E" Offset="1" />
+                    <GradientStop Offset="0" Color="#00080E0C" />
+                    <GradientStop Offset="0.34" Color="#57080E0C" />
+                    <GradientStop Offset="0.62" Color="#C7070C0A" />
+                    <GradientStop Offset="1" Color="#F2060B09" />
                 </LinearGradientBrush>
             </Border.Background>
         </Border>
 
-        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Width="440" Margin="0,40,34,0" Spacing="16">
+        <!--  The green field reads on all four edges and sits above the scrim, so command
+              mode is unmistakable no matter what is underneath it.  -->
+        <Grid IsHitTestVisible="False">
+            <Rectangle Height="150" VerticalAlignment="Top">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                        <GradientStop Offset="0" Color="#3345E08C" />
+                        <GradientStop Offset="1" Color="#0045E08C" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Height="150" VerticalAlignment="Bottom">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0.5,1" EndPoint="0.5,0">
+                        <GradientStop Offset="0" Color="#3345E08C" />
+                        <GradientStop Offset="1" Color="#0045E08C" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="150" HorizontalAlignment="Left">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                        <GradientStop Offset="0" Color="#3345E08C" />
+                        <GradientStop Offset="1" Color="#0045E08C" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Width="150" HorizontalAlignment="Right">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="1,0.5" EndPoint="0,0.5">
+                        <GradientStop Offset="0" Color="#3345E08C" />
+                        <GradientStop Offset="1" Color="#0045E08C" />
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
+            <Rectangle Stroke="#5745E08C" StrokeThickness="1" />
+        </Grid>
+
+        <StackPanel
+            Width="452"
+            Margin="0,0,56,0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center">
             <Grid>
-                <StackPanel Spacing="3">
-                    <TextBlock Text="COMMAND MODE" Foreground="{StaticResource PocketGreen}" FontFamily="Cascadia Mono" FontSize="11" FontWeight="SemiBold" CharacterSpacing="110" />
-                    <TextBlock x:Name="PaletteTitle" Text="What do you want to catch?" Style="{StaticResource PocketTitleText}" />
-                    <TextBlock x:Name="PaletteHint" Text="Press one key. Nothing here affects normal typing." Style="{StaticResource PocketCaptionText}" />
+                <StackPanel Spacing="4">
+                    <TextBlock
+                        x:Name="PaletteTitle"
+                        FontSize="26"
+                        Style="{StaticResource PocketTitleText}"
+                        Text="What do you want to catch?" />
+                    <TextBlock
+                        x:Name="PaletteHint"
+                        Style="{StaticResource PocketCaptionText}"
+                        Text="Press one key." />
                 </StackPanel>
-                <Button HorizontalAlignment="Right" VerticalAlignment="Top" Click="Close_Click" Background="Transparent" ToolTipService.ToolTip="Close command mode">
-                    <FontIcon Glyph="&#xE711;" />
+                <Button
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Click="Close_Click"
+                    Style="{StaticResource PocketIconButton}"
+                    ToolTipService.ToolTip="Close command mode">
+                    <FontIcon FontSize="14" Glyph="&#xE711;" />
                 </Button>
             </Grid>
 
-            <StackPanel x:Name="PrimaryCommands" Spacing="3">
-                <Button x:Name="ScreenshotCommand" Style="{StaticResource CommandRow}" Tag="screenshot" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="S" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Screenshot" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Choose a region, window, or display" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE76C;" Foreground="{StaticResource PocketMuted}" /></Grid>
+            <!--  The three captures that carry the product get the weight. Everything else
+                  is demoted below the rule.  -->
+            <StackPanel x:Name="PrimaryCommands" Margin="0,20,0,0">
+                <StackPanel Spacing="4">
+                <Button
+                    x:Name="ScreenshotCommand"
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="screenshot">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Content="S"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapLargeButton}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="15"
+                                Style="{StaticResource PocketSubtitleText}"
+                                Text="Screenshot" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="Region, window, or display" />
+                        </StackPanel>
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="video" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="V" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Video" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Confirm source, microphone, and camera first" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE714;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="video">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Content="V"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapLargeButton}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="15"
+                                Style="{StaticResource PocketSubtitleText}"
+                                Text="Video" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="Screen, microphone, and camera" />
+                        </StackPanel>
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="repeat-video" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal" Spacing="5"><Button Content="Shift" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><TextBlock VerticalAlignment="Center" Text="+" Foreground="{StaticResource PocketMuted}" /><Button Content="V" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /></StackPanel><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Repeat last video setup" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Uses your remembered source and devices" Style="{StaticResource PocketCaptionText}" /></StackPanel></Grid>
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="audio">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Content="A"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapLargeButton}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock
+                                FontSize="15"
+                                Style="{StaticResource PocketSubtitleText}"
+                                Text="Audio note" />
+                            <TextBlock
+                                x:Name="AudioDeviceHint"
+                                Margin="0,2,0,0"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="Starts with your remembered microphone"
+                                TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="audio" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="A" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Audio note" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="AudioDeviceHint" Text="Starts with your remembered microphone" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE720;" Foreground="{StaticResource PocketGreen}" /></Grid>
+                </StackPanel>
+
+                <Rectangle
+                    Height="1"
+                    Margin="0,16"
+                    Fill="{StaticResource PocketLine}" />
+
+                <StackPanel x:Name="SecondaryCommands" Spacing="2">
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="text">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Content="T"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapButton}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource PocketInkDim}"
+                            Style="{StaticResource PocketBodyText}"
+                            Text="Highlighted text" />
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="text" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="T" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Highlighted text" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Saves only the selection in your previous window" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE8C1;" Foreground="{StaticResource PocketBlue}" /></Grid>
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="link">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            Content="L"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapButton}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource PocketInkDim}"
+                            Style="{StaticResource PocketBodyText}"
+                            Text="Current web link" />
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="link" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="L" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Current web link" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Does nothing outside a supported browser" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE71B;" Foreground="{StaticResource PocketBlue}" /></Grid>
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="repeat-video">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel
+                            HorizontalAlignment="Right"
+                            Orientation="Horizontal"
+                            Spacing="4">
+                            <Button
+                                Content="Shift"
+                                FontSize="12"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <Button
+                                Content="V"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                        </StackPanel>
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource PocketInkDim}"
+                            Style="{StaticResource PocketBodyText}"
+                            Text="Repeat last video setup" />
+                    </Grid>
                 </Button>
-                <Button Style="{StaticResource CommandRow}" Tag="library" Click="Command_Click">
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="O" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" FontFamily="Segoe UI Variable Display" AutomationProperties.Name="Letter O" ToolTipService.ToolTip="Letter O" /><StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="Open Library" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Press the letter O · see, play, or reveal captures" Style="{StaticResource PocketCaptionText}" /></StackPanel><FontIcon Grid.Column="2" VerticalAlignment="Center" Glyph="&#xE8B9;" Foreground="{StaticResource PocketMuted}" /></Grid>
+                <Button
+                    Click="Command_Click"
+                    Style="{StaticResource PocketCommandRow}"
+                    Tag="library">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button
+                            HorizontalAlignment="Right"
+                            AutomationProperties.Name="Letter O"
+                            Content="O"
+                            FontFamily="Segoe UI Variable Display"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapButton}"
+                            ToolTipService.ToolTip="Letter O" />
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Foreground="{StaticResource PocketInkDim}"
+                            Style="{StaticResource PocketBodyText}"
+                            Text="Open Library" />
+                    </Grid>
                 </Button>
+                </StackPanel>
             </StackPanel>
 
-            <StackPanel x:Name="ScreenshotCommands" Visibility="Collapsed" Spacing="6">
-                <StackPanel Orientation="Horizontal" Spacing="7"><Button Content="S" IsHitTestVisible="False" Style="{StaticResource KeyCapButton}" /><FontIcon Glyph="&#xE76C;" Foreground="{StaticResource PocketMuted}" /><TextBlock VerticalAlignment="Center" Text="then press one screenshot key" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                    <Button x:Name="RegionCommand" Tag="region" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="{StaticResource PocketRaised}"><StackPanel><TextBlock Text="R" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="18" /><TextBlock Text="Region" Style="{StaticResource PocketBodyText}" /></StackPanel></Button>
-                    <Button Grid.Column="1" Tag="window" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="{StaticResource PocketRaised}"><StackPanel><TextBlock Text="W" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="18" /><TextBlock Text="Window" Style="{StaticResource PocketBodyText}" /></StackPanel></Button>
-                    <Button Grid.Column="2" Tag="display" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="{StaticResource PocketRaised}"><StackPanel><TextBlock Text="D" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="18" /><TextBlock Text="Display" Style="{StaticResource PocketBodyText}" /></StackPanel></Button>
-                    <Button Grid.Row="1" Tag="all-displays" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="{StaticResource PocketRaised}"><StackPanel><TextBlock Text="A" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="18" /><TextBlock Text="All displays" Style="{StaticResource PocketBodyText}" /></StackPanel></Button>
-                    <Button Grid.Row="1" Grid.Column="1" Tag="previous-region" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="{StaticResource PocketRaised}"><StackPanel><TextBlock Text="P" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="18" /><TextBlock Text="Previous" Style="{StaticResource PocketBodyText}" /></StackPanel></Button>
-                    <Button Grid.Row="1" Grid.Column="2" Tag="back" Click="Command_Click" Margin="3" Padding="12" CornerRadius="12" Background="Transparent"><StackPanel><TextBlock Text="Esc" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketMuted}" FontSize="14" /><TextBlock Text="Back" Style="{StaticResource PocketCaptionText}" /></StackPanel></Button>
+            <!--  Screenshot is explicitly sequential: S, then one of five.  -->
+            <StackPanel
+                x:Name="ScreenshotCommands"
+                Margin="0,4,0,0"
+                Spacing="8"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        Content="S"
+                        IsHitTestVisible="False"
+                        IsTabStop="False"
+                        Style="{StaticResource KeyCapButton}" />
+                    <FontIcon
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{StaticResource PocketMuted}"
+                        Glyph="&#xE76C;" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PocketMetaText}"
+                        Text="then press one screenshot key" />
+                </StackPanel>
+                <Grid ColumnSpacing="8" RowSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <Button
+                        x:Name="RegionCommand"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketTileButton}"
+                        Tag="region">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="R"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketBodyText}" Text="Region" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Grid.Column="1"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketTileButton}"
+                        Tag="window">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="W"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketBodyText}" Text="Window" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Grid.Column="2"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketTileButton}"
+                        Tag="display">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="D"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketBodyText}" Text="Display" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Grid.Row="1"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketTileButton}"
+                        Tag="all-displays">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="A"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketBodyText}" Text="All displays" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Grid.Row="1"
+                        Grid.Column="1"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketTileButton}"
+                        Tag="previous-region">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="P"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketBodyText}" Text="Previous" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Grid.Row="1"
+                        Grid.Column="2"
+                        Click="Command_Click"
+                        Style="{StaticResource PocketCommandRow}"
+                        Tag="back">
+                        <StackPanel Spacing="10">
+                            <Button
+                                HorizontalAlignment="Left"
+                                Content="Esc"
+                                FontSize="12"
+                                IsHitTestVisible="False"
+                                IsTabStop="False"
+                                Style="{StaticResource KeyCapButton}" />
+                            <TextBlock Style="{StaticResource PocketMetaText}" Text="Back" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
             </StackPanel>
 
-            <Grid Margin="6,4,6,0">
-                <StackPanel Orientation="Horizontal" Spacing="7"><Ellipse Width="7" Height="7" Fill="{StaticResource PocketGreen}" /><TextBlock Text="Closes after 30 seconds of inactivity" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                <TextBlock HorizontalAlignment="Right" Text="Esc closes" Style="{StaticResource PocketCaptionText}" />
-            </Grid>
+            <StackPanel
+                Margin="0,18,0,0"
+                Orientation="Horizontal"
+                Spacing="10">
+                <Button
+                    Height="24"
+                    MinHeight="24"
+                    MinWidth="24"
+                    Padding="7,0"
+                    Content="Esc"
+                    FontSize="11"
+                    IsHitTestVisible="False"
+                    IsTabStop="False"
+                    Style="{StaticResource KeyCapButton}" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PocketMetaText}"
+                    Text="closes · nothing here changes normal typing" />
+            </StackPanel>
         </StackPanel>
 
-        <Button HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="76" Height="76" Margin="0,0,28,26" Padding="0" Background="Transparent" BorderThickness="0" Click="LibraryPulse_Click" ToolTipService.ToolTip="Open the full CursorPocket Library">
-            <Grid Width="74" Height="74">
-                <Path x:Name="PulseRing" Width="34" Height="42" Data="M2,1 L21,16 L13,18 L17,27 L13,29 L9,20 L2,25 Z" Fill="{StaticResource PocketGreen}" Opacity="0.34" Stretch="Fill" RenderTransformOrigin="0.5,0.5">
-                    <Path.RenderTransform><ScaleTransform ScaleX="0.82" ScaleY="0.82" /></Path.RenderTransform>
-                </Path>
-                <Path Width="24" Height="30" Data="M2,1 L21,16 L13,18 L17,27 L13,29 L9,20 L2,25 Z" Fill="{StaticResource PocketGreen}" Stretch="Fill" />
-            </Grid>
+        <!--  The mark alone, per the brand rule: no disc, no container, no wordmark.  -->
+        <Button
+            Width="56"
+            Height="56"
+            Margin="0,0,32,28"
+            Padding="0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Click="LibraryPulse_Click"
+            Style="{StaticResource PocketGhostButton}"
+            ToolTipService.ToolTip="Open the full CursorPocket Library">
+            <Path
+                x:Name="BrandMark"
+                Width="24"
+                Height="34"
+                Style="{StaticResource PocketCursorMark}" />
         </Button>
     </Grid>
 </Window>

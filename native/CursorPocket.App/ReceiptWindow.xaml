@@ -4,17 +4,81 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Capture saved">
-    <Grid Background="#FF141E1A" PointerEntered="Root_PointerEntered" PointerExited="Root_PointerExited">
-        <Border Padding="14" Background="#FF141E1A" CornerRadius="16" BorderThickness="0">
+    <!--  Opaque and strokeless for the same reason as the HUD: the rounded region is cut
+          by the window itself, so a border would leave an artefact behind it.  -->
+    <Grid
+        Background="#FF141E1A"
+        PointerEntered="Root_PointerEntered"
+        PointerExited="Root_PointerExited">
+        <Border
+            Padding="14"
+            Background="#FF141E1A"
+            BorderThickness="0"
+            CornerRadius="16">
             <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="72" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                <Border Width="72" Height="72" Background="#FF09110E" CornerRadius="12">
-                    <Grid><Image x:Name="PreviewImage" Stretch="UniformToFill" Visibility="Collapsed" /><FontIcon x:Name="ReceiptIcon" Glyph="&#xE73E;" Foreground="{StaticResource PocketGreen}" FontSize="26" /></Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="68" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border
+                    Width="68"
+                    Height="68"
+                    VerticalAlignment="Top"
+                    Background="#FF0A120F"
+                    CornerRadius="10">
+                    <Grid>
+                        <Image
+                            x:Name="PreviewImage"
+                            Stretch="UniformToFill"
+                            Visibility="Collapsed" />
+                        <FontIcon
+                            x:Name="ReceiptIcon"
+                            FontSize="22"
+                            Foreground="{StaticResource PocketGreen}"
+                            Glyph="&#xE73E;" />
+                    </Grid>
                 </Border>
-                <StackPanel Grid.Column="1" Spacing="7">
-                    <StackPanel Spacing="2"><TextBlock x:Name="ReceiptTitle" Text="Capture saved" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="ReceiptDetail" MaxWidth="280" Text="Saved locally" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="7"><Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" /><Button x:Name="RevealButton" Click="Reveal_Click" Content="Reveal" Style="{StaticResource PocketQuietButton}" /><Button Click="Library_Click" Content="Library" Style="{StaticResource PocketQuietButton}" /></StackPanel>
-                </StackPanel>
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Spacing="3">
+                        <TextBlock
+                            x:Name="ReceiptTitle"
+                            Style="{StaticResource PocketBodyStrongText}"
+                            Text="Capture saved" />
+                        <TextBlock
+                            x:Name="ReceiptDetail"
+                            MaxWidth="290"
+                            Style="{StaticResource PocketNumericText}"
+                            Text="Saved locally"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <StackPanel
+                        Grid.Row="2"
+                        Orientation="Horizontal"
+                        Spacing="6">
+                        <Button
+                            x:Name="OpenButton"
+                            MinHeight="32"
+                            Click="Open_Click"
+                            Content="Open"
+                            Style="{StaticResource PocketPrimaryButton}" />
+                        <Button
+                            x:Name="RevealButton"
+                            MinHeight="32"
+                            Click="Reveal_Click"
+                            Content="Reveal"
+                            Style="{StaticResource PocketQuietButton}" />
+                        <Button
+                            MinHeight="32"
+                            Click="Library_Click"
+                            Content="Library"
+                            Style="{StaticResource PocketGhostButton}" />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Border>
     </Grid>

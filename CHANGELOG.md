@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Replaced the brand mark with a geometric cursor entering a pocket, rendered per icon size so the tray and taskbar icons stay legible at 16–32 px; the mark now turns red end to end while recording instead of carrying a corner badge.
+- Reserved green for live state, the primary action, the current selection, and the command-mode field. Capture kinds are told apart by glyph and file-type tag rather than by colour.
+- Rebuilt the shared design system: a full neutral ramp, seven named type styles, and one button template so height, radius, hover, pressed, and disabled match on every surface.
+- Moved the Library to top navigation, 52 px rows with file type and size, filter counts, and a detail pane that states kind, size, saved time, and file name.
+- Reordered command mode into three primary captures above a rule with the rest below, aligned the key chips into one column, and evened out the green field on all four edges.
+- Reordered recording preflight so its numbered steps read down one column, and gave the second column a framing preview with the camera shown in the slot it will occupy.
+- Rebuilt Settings on the Windows settings-card pattern so every non-obvious control explains itself.
+- Fixed the Library at the 720×540 minimum window, where capture titles truncated to ten characters and the detail pane overflowed the window.
+
 ## 0.3.0 — 2026-08-17
 
 - Added local H.264/AAC screen walkthrough recording with `V` to start or stop.

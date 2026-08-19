@@ -127,7 +127,7 @@ public sealed partial class CommandPaletteWindow : Window
         PrimaryCommands.Visibility = Visibility.Collapsed;
         ScreenshotCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "Which part of the screen?";
-        PaletteHint.Text = "Press S, then one of these keys. They are sequential, never held together.";
+        PaletteHint.Text = "Press one key. These are sequential, never held together.";
         RegionCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
@@ -138,7 +138,7 @@ public sealed partial class CommandPaletteWindow : Window
         ScreenshotCommands.Visibility = Visibility.Collapsed;
         PrimaryCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "What do you want to catch?";
-        PaletteHint.Text = "Press one key. Nothing here affects normal typing.";
+        PaletteHint.Text = "Press one key.";
         ScreenshotCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
