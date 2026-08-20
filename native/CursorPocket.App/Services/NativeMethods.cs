@@ -253,6 +253,12 @@ internal static class NativeMethods
     [DllImport("gdi32.dll")]
     internal static extern nint CreateRoundRectRgn(int left, int top, int right, int bottom, int ellipseWidth, int ellipseHeight);
 
+    /// <summary>Polygon fill modes for <see cref="CreatePolygonRgn"/>.</summary>
+    internal const int Winding = 2;
+
+    [DllImport("gdi32.dll")]
+    internal static extern nint CreatePolygonRgn([In] Point[] points, int count, int fillMode);
+
     [DllImport("user32.dll")]
     internal static extern int SetWindowRgn(nint hwnd, nint region, [MarshalAs(UnmanagedType.Bool)] bool redraw);
 

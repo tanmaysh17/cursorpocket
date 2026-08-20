@@ -94,6 +94,21 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
 - A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
 - The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
+- Shape is the user's choice: `rounded` (16:9, the default) or `squircle` (1:1 superellipse). Both are cut by a GDI window region. Regions are 1-bit, so their edges are aliased; the existing hairline border rides that edge and is what keeps it from reading as stairsteps. Never region-clip a surface the user can drag—this one is click-through and never handed to the move loop, which is why it is allowed here.
+- Camera effects render into the self-view, so whatever the user sees is exactly what the file gets. With every effect off the plain `MediaPlayerElement` path still runs; effects swap in an `Image` fed by the frame-reader pipeline. Neither path is ever capture-excluded.
+
+### Camera effects
+
+- Effects are opt-in and all default to off. A user who never opens the controls records the camera untouched, on the pre-effects code path.
+- Everything runs on-device: colour adjustment and blur are plain pixel math, and the person mask comes from a hash-pinned local ONNX model. No frame, mask, or derived data leaves the machine, and there is no network call in the path.
+- Preflight shows the effects live in the framing slot, so the shape and look are settled before recording rather than discovered afterwards.
+- Degrade, never fail. A missing model disables background blur and replacement and says so in words; colour and touch-up keep working. A machine that cannot keep up stretches inference across frames before anything visible drops. Without a mask the background is left alone—blurring everything would erase the user.
+- Brightness, warmth, and contrast are the one place a slider is allowed, because the live preview sits beside them and the value is continuous. Its row is label / slider / mono numeric readout. Every other setting stays an enumerated `ComboBox`.
+
+### Microphone cleanup
+
+- Noise suppression and auto-levelling are applied when the recording is finalized, never live. The raw capture is always written first and only replaced when the cleanup pass succeeds, so a filter problem can cost the cleanup but never the take.
+- Both apply to narration and to standalone audio notes. Audio notes still record and save with no FFmpeg present—cleanup is simply skipped.
 
 ### Recording HUD
 

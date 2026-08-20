@@ -22,7 +22,7 @@ public static class CameraSelfViewPlacement
     public const int MinimumWidth = 160;
     public const int MaximumWidth = 640;
 
-    public static CaptureBounds Compute(CaptureBounds captureArea, string position, int cameraWidth)
+    public static CaptureBounds Compute(CaptureBounds captureArea, string position, int cameraWidth, string shape = "rounded")
     {
         if (captureArea.Width < 2 || captureArea.Height < 2)
         {
@@ -31,7 +31,11 @@ public static class CameraSelfViewPlacement
 
         var width = Math.Clamp(cameraWidth, MinimumWidth, MaximumWidth);
         width = Math.Min(width, captureArea.Width);
-        var height = Math.Max(90, (int)Math.Round(width * 9d / 16d));
+        // The squircle is a 1:1 plump square framing a face; everything else
+        // keeps the 16:9 inset FFmpeg used when it composited the overlay.
+        var height = shape == "squircle"
+            ? width
+            : Math.Max(90, (int)Math.Round(width * 9d / 16d));
         height -= height % 2;
         height = Math.Min(height, captureArea.Height);
 

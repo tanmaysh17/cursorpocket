@@ -912,6 +912,56 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE9D5;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Noise suppression" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Cleans fan and keyboard noise out of narration and audio notes when the recording is saved."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.AudioNoiseSuppression, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Noise suppression" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE767;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Auto-level volume" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Keeps speech at a steady loudness instead of drifting quiet and loud."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.AudioAutoLevel, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Auto-level volume" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
                                             <FontIcon Glyph="&#xE916;" Style="{StaticResource PocketChipIcon}" />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">

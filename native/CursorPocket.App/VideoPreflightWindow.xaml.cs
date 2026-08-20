@@ -21,6 +21,16 @@ public sealed partial class VideoPreflightWindow : Window
     private WaveInEvent? _microphoneMonitor;
     private MediaCapture? _mediaCapture;
     private MediaPlayer? _cameraPlayer;
+    private CameraEffectRenderer? _previewRenderer;
+    private string _customBackgroundPath = string.Empty;
+    private int _lastBackgroundIndex;
+    /// <summary>
+    /// True while the constructor seeds controls from settings. Assigning
+    /// SelectedIndex fires SelectionChanged synchronously, and the background
+    /// handler opens a file picker — which must never happen unprompted just
+    /// because the user previously chose a custom image.
+    /// </summary>
+    private bool _seeding = true;
     private bool _closing;
 
     public VideoPreflightWindow(long sourceWindow)
@@ -41,6 +51,17 @@ public sealed partial class VideoPreflightWindow : Window
         SourceBox.SelectedIndex = App.Services.Settings.VideoSourceKind switch { "region" => 1, "window" => 2, _ => 0 };
         CameraPositionBox.SelectedIndex = App.Services.Settings.VideoCameraPosition switch { "bottom-left" => 1, "top-right" => 2, "top-left" => 3, _ => 0 };
         CameraSizeBox.SelectedIndex = App.Services.Settings.VideoCameraWidth switch { 240 => 0, 480 => 2, _ => 1 };
+        NoiseSuppressionToggle.IsOn = App.Services.Settings.AudioNoiseSuppression;
+        AutoLevelToggle.IsOn = App.Services.Settings.AudioAutoLevel;
+        CameraShapeBox.SelectedIndex = App.Services.Settings.VideoCameraShape == "squircle" ? 1 : 0;
+        CameraTouchUpBox.SelectedIndex = Math.Clamp(App.Services.Settings.VideoCameraTouchUp, 0, 2);
+        SeedBackgroundSelection(App.Services.Settings.VideoCameraBackground, App.Services.Settings.VideoCameraBackgroundImage);
+        BrightnessSlider.Value = App.Services.Settings.VideoCameraBrightness;
+        WarmthSlider.Value = App.Services.Settings.VideoCameraWarmth;
+        ContrastSlider.Value = App.Services.Settings.VideoCameraContrast;
+        UpdateEffectValueReadouts();
+        UpdateCameraSlotShape();
+        _seeding = false;
         CameraOptions.Visibility = CameraToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
         UpdateSummaryTags();
         FrameRateBox.SelectionChanged += Summary_SelectionChanged;
@@ -167,10 +188,17 @@ public sealed partial class VideoPreflightWindow : Window
             {
                 throw new InvalidOperationException("This camera did not provide a color preview.");
             }
-            _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
-            _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
-            CameraPreview.SetMediaPlayer(_cameraPlayer);
+            // The preview always goes through the effect renderer so the slot
+            // shows exactly the frames the recording self-view will render.
+            _previewRenderer = await CameraEffectRenderer.StartAsync(_mediaCapture, source, ReadEffectSettings(), CameraSlotEffectView, DispatcherQueue);
+            if (_previewRenderer is null)
+            {
+                _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
+                _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
+                CameraPreview.SetMediaPlayer(_cameraPlayer);
+            }
             ShowCameraSlot(true, string.Empty);
+            UpdateEffectAssetsNotice();
         }
         catch (Exception error)
         {
@@ -181,7 +209,8 @@ public sealed partial class VideoPreflightWindow : Window
 
     private void ShowCameraSlot(bool live, string label)
     {
-        CameraPreview.Visibility = live ? Visibility.Visible : Visibility.Collapsed;
+        CameraPreview.Visibility = live && _previewRenderer is null ? Visibility.Visible : Visibility.Collapsed;
+        CameraSlotEffectView.Visibility = live && _previewRenderer is not null ? Visibility.Visible : Visibility.Collapsed;
         CameraSlotLabel.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
         CameraSlotLabel.Text = label;
     }
@@ -201,14 +230,189 @@ public sealed partial class VideoPreflightWindow : Window
         };
     }
 
-    private Task StopCameraPreviewAsync()
+    private async Task StopCameraPreviewAsync()
     {
+        var renderer = _previewRenderer;
+        _previewRenderer = null;
+        CameraSlotEffectView.Visibility = Visibility.Collapsed;
         CameraPreview.SetMediaPlayer(null);
         _cameraPlayer?.Dispose();
         _cameraPlayer = null;
+        if (renderer is not null)
+        {
+            // Must complete before the MediaCapture below is released, and
+            // before the recording self-view opens the same device.
+            await renderer.DisposeAsync();
+        }
         _mediaCapture?.Dispose();
         _mediaCapture = null;
-        return Task.CompletedTask;
+    }
+
+    /// <summary>The effect configuration currently described by the controls.</summary>
+    private CursorPocket.Core.Media.CameraEffectSettings ReadEffectSettings()
+    {
+        var (mode, imagePath) = ReadBackgroundSelection();
+        return new CursorPocket.Core.Media.CameraEffectSettings
+        {
+            BackgroundMode = mode,
+            BackgroundImagePath = imagePath,
+            TouchUpLevel = int.TryParse((CameraTouchUpBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var touchUp) ? touchUp : 0,
+            Brightness = (int)Math.Round(BrightnessSlider.Value),
+            Warmth = (int)Math.Round(WarmthSlider.Value),
+            Contrast = (int)Math.Round(ContrastSlider.Value),
+        };
+    }
+
+    private (string Mode, string ImagePath) ReadBackgroundSelection()
+    {
+        var tag = (CameraBackgroundBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "none";
+        return tag switch
+        {
+            "none" => ("none", string.Empty),
+            "blur" => ("blur", string.Empty),
+            "custom" => string.IsNullOrWhiteSpace(_customBackgroundPath) ? ("none", string.Empty) : ("image", _customBackgroundPath),
+            _ => ("image", tag),
+        };
+    }
+
+    private void SeedBackgroundSelection(string mode, string imagePath)
+    {
+        var index = 0;
+        if (mode == "blur")
+        {
+            index = 1;
+        }
+        else if (mode == "image" && !string.IsNullOrWhiteSpace(imagePath))
+        {
+            index = 5;
+            for (var item = 2; item <= 4; item++)
+            {
+                if (string.Equals((CameraBackgroundBox.Items[item] as ComboBoxItem)?.Tag?.ToString(), imagePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    index = item;
+                    break;
+                }
+            }
+            if (index == 5)
+            {
+                _customBackgroundPath = imagePath;
+            }
+        }
+        CameraBackgroundBox.SelectedIndex = index;
+        _lastBackgroundIndex = index;
+    }
+
+    private void UpdateEffectValueReadouts()
+    {
+        // Slider events can fire while XAML is still constructing siblings.
+        if (BrightnessValue is null || WarmthValue is null || ContrastValue is null)
+        {
+            return;
+        }
+        BrightnessValue.Text = ((int)Math.Round(BrightnessSlider.Value)).ToString();
+        WarmthValue.Text = ((int)Math.Round(WarmthSlider.Value)).ToString();
+        ContrastValue.Text = ((int)Math.Round(ContrastSlider.Value)).ToString();
+    }
+
+    private void UpdateEffectAssetsNotice()
+    {
+        if (EffectAssetsNotice is null)
+        {
+            return;
+        }
+        var needsSegmentation = ReadEffectSettings().NeedsSegmentation;
+        EffectAssetsNotice.Visibility = needsSegmentation && _previewRenderer is not null && !_previewRenderer.SegmentationAvailable
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    /// <summary>The squircle records 1:1; keep the framing preview honest about that.</summary>
+    private void UpdateCameraSlotShape()
+    {
+        if (CameraSlot is null)
+        {
+            return;
+        }
+        var squircle = (CameraShapeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "squircle";
+        CameraSlot.Width = squircle ? 88 : 132;
+        CameraSlot.CornerRadius = new CornerRadius(squircle ? 26 : 8);
+    }
+
+    private async void CameraEffect_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        UpdateCameraSlotShape();
+        if (!_seeding)
+        {
+            await PushEffectSettingsAsync();
+        }
+    }
+
+    private async void CameraEffect_SliderChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs eventArgs)
+    {
+        UpdateEffectValueReadouts();
+        if (!_seeding)
+        {
+            await PushEffectSettingsAsync();
+        }
+    }
+
+    private async void CameraBackgroundBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (_seeding)
+        {
+            return;
+        }
+        var tag = (CameraBackgroundBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+        // Re-picking is only prompted when there is nothing remembered, so
+        // reselecting "Custom image…" keeps the image the user already chose.
+        if (tag == "custom" && string.IsNullOrWhiteSpace(_customBackgroundPath))
+        {
+            var picked = await PickCustomBackgroundAsync();
+            if (!picked)
+            {
+                CameraBackgroundBox.SelectedIndex = _lastBackgroundIndex;
+                return;
+            }
+        }
+        _lastBackgroundIndex = CameraBackgroundBox.SelectedIndex;
+        await PushEffectSettingsAsync();
+    }
+
+    private async Task<bool> PickCustomBackgroundAsync()
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.PicturesLibrary,
+            };
+            picker.FileTypeFilter.Add(".png");
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".bmp");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSingleFileAsync();
+            if (file is null)
+            {
+                return false;
+            }
+            _customBackgroundPath = file.Path;
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private async Task PushEffectSettingsAsync()
+    {
+        if (_previewRenderer is null)
+        {
+            return;
+        }
+        await _previewRenderer.UpdateSettingsAsync(ReadEffectSettings());
+        UpdateEffectAssetsNotice();
     }
 
     private async void Start_Click(object sender, RoutedEventArgs eventArgs) => await StartAsync();
@@ -225,6 +429,7 @@ public sealed partial class VideoPreflightWindow : Window
         var sourceValue = (SourceBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "display";
         var microphone = MicrophoneBox.SelectedItem as MediaDeviceDescriptor;
         var camera = CameraBox.SelectedItem as MediaDeviceDescriptor;
+        var effects = ReadEffectSettings();
         var options = new RecordingOptions
         {
             SourceKind = sourceValue switch { "region" => VideoSourceKind.Region, "window" => VideoSourceKind.Window, _ => VideoSourceKind.Display },
@@ -232,10 +437,19 @@ public sealed partial class VideoPreflightWindow : Window
             IncludeMicrophone = MicrophoneToggle.IsOn && microphone is not null,
             MicrophoneId = microphone?.Id ?? string.Empty,
             MicrophoneName = microphone?.Name ?? string.Empty,
+            NoiseSuppression = NoiseSuppressionToggle.IsOn,
+            AutoLevel = AutoLevelToggle.IsOn,
             IncludeCamera = CameraToggle.IsOn && camera is not null,
             CameraName = camera?.Name ?? string.Empty,
             CameraPosition = (CameraPositionBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "bottom-right",
             CameraWidth = int.TryParse((CameraSizeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var cameraWidth) ? cameraWidth : 360,
+            CameraShape = (CameraShapeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "rounded",
+            CameraBackgroundMode = effects.BackgroundMode,
+            CameraBackgroundImagePath = effects.BackgroundImagePath,
+            CameraTouchUpLevel = effects.TouchUpLevel,
+            CameraBrightness = effects.Brightness,
+            CameraWarmth = effects.Warmth,
+            CameraContrast = effects.Contrast,
             FramesPerSecond = int.TryParse((FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var fps) ? fps : 30,
             CountdownSeconds = int.TryParse((CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var countdown) ? countdown : 3,
             DrawCursor = PointerToggle.IsOn,
@@ -250,6 +464,12 @@ public sealed partial class VideoPreflightWindow : Window
         CameraBox.IsEnabled = CameraToggle.IsOn;
         CameraPositionBox.IsEnabled = CameraToggle.IsOn;
         CameraSizeBox.IsEnabled = CameraToggle.IsOn;
+        CameraShapeBox.IsEnabled = CameraToggle.IsOn;
+        CameraTouchUpBox.IsEnabled = CameraToggle.IsOn;
+        CameraBackgroundBox.IsEnabled = CameraToggle.IsOn;
+        BrightnessSlider.IsEnabled = CameraToggle.IsOn;
+        WarmthSlider.IsEnabled = CameraToggle.IsOn;
+        ContrastSlider.IsEnabled = CameraToggle.IsOn;
         if (CameraToggle.IsOn) await StartCameraPreviewAsync(); else await StopCameraPreviewAsync();
         if (!CameraToggle.IsOn)
         {

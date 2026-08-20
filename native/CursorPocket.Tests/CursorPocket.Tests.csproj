@@ -56,6 +56,8 @@
     <None Include="..\CursorPocket.App\Services\PreviewService.cs" Link="Fixtures\PreviewService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\AppServices.cs" Link="Fixtures\AppServices.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\App.xaml.cs" Link="Fixtures\App.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\CameraEffectRenderer.cs" Link="Fixtures\CameraEffectRenderer.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\SelfieSegmenter.cs" Link="Fixtures\SelfieSegmenter.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\build-native.ps1" Link="Fixtures\build-native.ps1.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

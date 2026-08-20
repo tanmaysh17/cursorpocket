@@ -26,6 +26,8 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private bool _videoCameraEnabled = services.Settings.VideoCameraEnabled;
     [ObservableProperty] private int _videoFramesPerSecond = services.Settings.VideoFramesPerSecond;
     [ObservableProperty] private int _videoCountdownSeconds = services.Settings.VideoCountdownSeconds;
+    [ObservableProperty] private bool _audioNoiseSuppression = services.Settings.AudioNoiseSuppression;
+    [ObservableProperty] private bool _audioAutoLevel = services.Settings.AudioAutoLevel;
 
     public string CaptureCountLabel => _allItems.Count switch
     {
@@ -180,6 +182,8 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             VideoCameraEnabled = VideoCameraEnabled,
             VideoFramesPerSecond = VideoFramesPerSecond,
             VideoCountdownSeconds = VideoCountdownSeconds,
+            AudioNoiseSuppression = AudioNoiseSuppression,
+            AudioAutoLevel = AudioAutoLevel,
         };
         await services.UpdateSettingsAsync(updated);
         ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";

@@ -24,6 +24,7 @@ public sealed partial class CameraSelfViewWindow : Window
 {
     private MediaCapture? _mediaCapture;
     private MediaPlayer? _cameraPlayer;
+    private CameraEffectRenderer? _effectRenderer;
     private bool _closed;
 
     private CameraSelfViewWindow()
@@ -46,12 +47,19 @@ public sealed partial class CameraSelfViewWindow : Window
             return null;
         }
         var bounds = ResolveCaptureArea(options, sourceWindow);
-        var placement = CameraSelfViewPlacement.Compute(bounds, options.CameraPosition, options.CameraWidth);
+        var placement = CameraSelfViewPlacement.Compute(bounds, options.CameraPosition, options.CameraWidth, options.CameraShape);
         var window = new CameraSelfViewWindow();
         window.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
-        WindowPlacement.ClipToRoundedPixelRegion(window, placement.Width, placement.Height, 12);
+        if (options.CameraShape == "squircle")
+        {
+            WindowPlacement.ClipToPolygonPixelRegion(window, SquircleGeometry.ComputePolygon(placement.Width, placement.Height));
+        }
+        else
+        {
+            WindowPlacement.ClipToRoundedPixelRegion(window, placement.Width, placement.Height, 12);
+        }
         window.AppWindow.Show(false);
-        if (!await window.StartCameraAsync(options.CameraName))
+        if (!await window.StartCameraAsync(options.CameraName, options.ToCameraEffectSettings()))
         {
             window.Close();
             return null;
@@ -61,13 +69,25 @@ public sealed partial class CameraSelfViewWindow : Window
         return window;
     }
 
-    public void Dismiss()
+    public void Dismiss() => _ = DismissAsync();
+
+    /// <summary>
+    /// Releases the camera and closes. Awaiting this matters: the next preflight
+    /// preview opens the same device, and DirectShow allows a single consumer.
+    /// </summary>
+    public async Task DismissAsync()
     {
         if (_closed)
         {
             return;
         }
         _closed = true;
+        var renderer = _effectRenderer;
+        _effectRenderer = null;
+        if (renderer is not null)
+        {
+            await renderer.DisposeAsync();
+        }
         ReleaseCamera();
         Close();
     }
@@ -92,7 +112,7 @@ public sealed partial class CameraSelfViewWindow : Window
         return new CaptureBounds(monitor.Left, monitor.Top, monitor.Right, monitor.Bottom);
     }
 
-    private async Task<bool> StartCameraAsync(string cameraName)
+    private async Task<bool> StartCameraAsync(string cameraName, CursorPocket.Core.Media.CameraEffectSettings effects)
     {
         try
         {
@@ -116,9 +136,22 @@ public sealed partial class CameraSelfViewWindow : Window
                 ReleaseCamera();
                 return false;
             }
-            _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
-            _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
-            CameraPreview.SetMediaPlayer(_cameraPlayer);
+            if (effects.HasAnyEffect)
+            {
+                _effectRenderer = await CameraEffectRenderer.StartAsync(_mediaCapture, source, effects, CameraEffectView, DispatcherQueue);
+            }
+            if (_effectRenderer is not null)
+            {
+                CameraEffectView.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                // No effects requested, or the frame reader could not start:
+                // the plain preview is exactly the pre-effects pipeline.
+                _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
+                _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
+                CameraPreview.SetMediaPlayer(_cameraPlayer);
+            }
             CameraStatus.Visibility = Visibility.Collapsed;
             return true;
         }
@@ -133,6 +166,8 @@ public sealed partial class CameraSelfViewWindow : Window
 
     private void ReleaseCamera()
     {
+        _effectRenderer?.Dispose();
+        _effectRenderer = null;
         CameraPreview.SetMediaPlayer(null);
         _cameraPlayer?.Dispose();
         _cameraPlayer = null;

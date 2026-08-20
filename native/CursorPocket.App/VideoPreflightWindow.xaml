@@ -129,6 +129,29 @@
                                     Style="{StaticResource PocketMetaText}"
                                     Text="Checking…" />
                             </Grid>
+                            <!--  Cleanup is applied when the recording is finalized, never live,
+                                  so a filter problem can only ever cost the cleanup, not the take.  -->
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition />
+                                </Grid.ColumnDefinitions>
+                                <ToggleSwitch
+                                    x:Name="NoiseSuppressionToggle"
+                                    MinWidth="0"
+                                    Header="Noise suppression"
+                                    OffContent=""
+                                    OnContent=""
+                                    AutomationProperties.Name="Noise suppression" />
+                                <ToggleSwitch
+                                    x:Name="AutoLevelToggle"
+                                    Grid.Column="1"
+                                    MinWidth="0"
+                                    Header="Auto-level volume"
+                                    OffContent=""
+                                    OnContent=""
+                                    AutomationProperties.Name="Auto-level volume" />
+                            </Grid>
                         </StackPanel>
                     </Border>
 
@@ -209,6 +232,141 @@
                                         <ComboBoxItem Content="Medium" Tag="360" />
                                         <ComboBoxItem Content="Large" Tag="480" />
                                     </ComboBox>
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox
+                                        x:Name="CameraShapeBox"
+                                        HorizontalAlignment="Stretch"
+                                        Header="Shape"
+                                        SelectedIndex="0"
+                                        SelectionChanged="CameraEffect_SelectionChanged">
+                                        <ComboBoxItem Content="Rounded 16:9" Tag="rounded" />
+                                        <ComboBoxItem Content="Squircle 1:1" Tag="squircle" />
+                                    </ComboBox>
+                                    <ComboBox
+                                        x:Name="CameraTouchUpBox"
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        Header="Touch-up"
+                                        SelectedIndex="0"
+                                        SelectionChanged="CameraEffect_SelectionChanged">
+                                        <ComboBoxItem Content="Off" Tag="0" />
+                                        <ComboBoxItem Content="Subtle" Tag="1" />
+                                        <ComboBoxItem Content="Strong" Tag="2" />
+                                    </ComboBox>
+                                </Grid>
+                                <ComboBox
+                                    x:Name="CameraBackgroundBox"
+                                    HorizontalAlignment="Stretch"
+                                    Header="Background"
+                                    SelectedIndex="0"
+                                    SelectionChanged="CameraBackgroundBox_SelectionChanged">
+                                    <ComboBoxItem Content="Real background" Tag="none" />
+                                    <ComboBoxItem Content="Blur" Tag="blur" />
+                                    <ComboBoxItem Content="Graphite" Tag="asset:graphite" />
+                                    <ComboBoxItem Content="Slate" Tag="asset:slate" />
+                                    <ComboBoxItem Content="Moss" Tag="asset:moss" />
+                                    <ComboBoxItem Content="Custom image…" Tag="custom" />
+                                </ComboBox>
+                                <StackPanel
+                                    x:Name="EffectAssetsNotice"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    Visibility="Collapsed">
+                                    <FontIcon
+                                        VerticalAlignment="Top"
+                                        FontSize="14"
+                                        Foreground="{StaticResource PocketMuted}"
+                                        Glyph="&#xE7BA;" />
+                                    <TextBlock
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Background effects are unavailable: the effect assets are not installed with this build."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="10" RowSpacing="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="76" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="44" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Brightness" />
+                                    <Slider
+                                        x:Name="BrightnessSlider"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Maximum="100"
+                                        Minimum="-100"
+                                        StepFrequency="5"
+                                        ValueChanged="CameraEffect_SliderChanged"
+                                        Value="0"
+                                        AutomationProperties.Name="Camera brightness" />
+                                    <TextBlock
+                                        x:Name="BrightnessValue"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource PocketNumericText}"
+                                        Text="0" />
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Warmth" />
+                                    <Slider
+                                        x:Name="WarmthSlider"
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Maximum="100"
+                                        Minimum="-100"
+                                        StepFrequency="5"
+                                        ValueChanged="CameraEffect_SliderChanged"
+                                        Value="0"
+                                        AutomationProperties.Name="Camera warmth" />
+                                    <TextBlock
+                                        x:Name="WarmthValue"
+                                        Grid.Row="1"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource PocketNumericText}"
+                                        Text="0" />
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Contrast" />
+                                    <Slider
+                                        x:Name="ContrastSlider"
+                                        Grid.Row="2"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Maximum="100"
+                                        Minimum="-100"
+                                        StepFrequency="5"
+                                        ValueChanged="CameraEffect_SliderChanged"
+                                        Value="0"
+                                        AutomationProperties.Name="Camera contrast" />
+                                    <TextBlock
+                                        x:Name="ContrastValue"
+                                        Grid.Row="2"
+                                        Grid.Column="2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Right"
+                                        Style="{StaticResource PocketNumericText}"
+                                        Text="0" />
                                 </Grid>
                             </StackPanel>
                             <TextBlock
@@ -296,6 +454,12 @@
                                     x:Name="CameraPreview"
                                     AreTransportControlsEnabled="False"
                                     AutoPlay="True"
+                                    Stretch="UniformToFill"
+                                    Visibility="Collapsed" />
+                                <!--  The effects preview: the same pipeline the recording self-view
+                                      runs, so the slot shows exactly what lands in the file.  -->
+                                <Image
+                                    x:Name="CameraSlotEffectView"
                                     Stretch="UniformToFill"
                                     Visibility="Collapsed" />
                                 <TextBlock

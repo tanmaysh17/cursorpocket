@@ -8,6 +8,9 @@
          and this surface is deliberately visible in the recording. -->
     <Grid Background="#FF09110F">
         <MediaPlayerElement x:Name="CameraPreview" AreTransportControlsEnabled="False" Stretch="UniformToFill" />
+        <!-- Effects path: frames processed by the camera effect pipeline land here
+             instead of the MediaPlayerElement. Exactly one of the two is active. -->
+        <Image x:Name="CameraEffectView" Stretch="UniformToFill" Visibility="Collapsed" />
         <TextBlock
             x:Name="CameraStatus"
             Margin="12"

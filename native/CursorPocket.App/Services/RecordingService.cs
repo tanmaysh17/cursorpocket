@@ -30,10 +30,13 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private CaptureReservation? _audioReservation;
     private TaskCompletionSource _audioStopped = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public RecordingService(CaptureStore store, string ffmpegPath)
+    private readonly Func<(bool NoiseSuppression, bool AutoLevel)>? _audioCleanupDefaults;
+
+    public RecordingService(CaptureStore store, string ffmpegPath, Func<(bool NoiseSuppression, bool AutoLevel)>? audioCleanupDefaults = null)
     {
         _store = store;
         _ffmpegPath = ffmpegPath;
+        _audioCleanupDefaults = audioCleanupDefaults;
         _elapsedTimer = new System.Threading.Timer(_ =>
         {
             if (_stopwatch?.IsRunning == true)
@@ -173,6 +176,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
             SetState(RecordingState.Idle);
             return null;
         }
+        var appliedCleanup = await TryCleanupAudioNoteAsync(reservation.AbsolutePath, cancellationToken);
         var record = await _store.RegisterExistingAsync(
             CaptureKind.Audio,
             reservation.AbsolutePath,
@@ -182,6 +186,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
                 ["duration_seconds"] = Math.Round(duration.TotalSeconds, 3),
                 ["sample_rate"] = 48000,
                 ["channels"] = 1,
+                ["audio_filters"] = appliedCleanup,
             },
             cancellationToken);
         SetState(RecordingState.Idle);
@@ -341,7 +346,7 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             try
             {
-                await MuxVideoMicrophoneAsync(rawPath, audioPath, muxPath, cancellationToken);
+                await MuxVideoMicrophoneAsync(rawPath, audioPath, muxPath, AudioCleanupFilterBuilder.Build(options.NoiseSuppression, options.AutoLevel), cancellationToken);
                 File.Move(muxPath, reservation.AbsolutePath, true);
             }
             catch (Exception error) when (error is IOException or InvalidOperationException)
@@ -377,6 +382,9 @@ public sealed class RecordingService : IRecordingService, IDisposable
                 ["camera_name"] = options.CameraName,
                 ["camera_position"] = options.CameraPosition,
                 ["camera_width"] = options.CameraWidth,
+                ["camera_shape"] = options.CameraShape,
+                ["camera_background"] = options.CameraBackgroundMode,
+                ["audio_filters"] = AudioCleanupFilterBuilder.Build(options.NoiseSuppression, options.AutoLevel),
             },
             cancellationToken);
         ClearVideoState();
@@ -485,7 +493,94 @@ public sealed class RecordingService : IRecordingService, IDisposable
         }
     }
 
-    private async Task MuxVideoMicrophoneAsync(string videoPath, string audioPath, string outputPath, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies the configured cleanup chain to a finished audio note. The raw
+    /// WAV is always written first and is only replaced when FFmpeg succeeds,
+    /// so notes keep working with no FFmpeg sidecar at all. Returns the applied
+    /// chain, or null when nothing was changed.
+    /// </summary>
+    private async Task<string?> TryCleanupAudioNoteAsync(string wavPath, CancellationToken cancellationToken)
+    {
+        var defaults = _audioCleanupDefaults?.Invoke() ?? (false, false);
+        var chain = AudioCleanupFilterBuilder.Build(defaults.NoiseSuppression, defaults.AutoLevel);
+        if (chain is null || !File.Exists(_ffmpegPath))
+        {
+            return null;
+        }
+        // Deliberately outside the dated capture folders: anything ending in
+        // .wav under audio/<date> is picked up by CaptureStore's orphan
+        // recovery, so a surviving temp file would reappear as a duplicate
+        // note. The .cursorpocket/temp directory is not a capture category.
+        var temporaryDirectory = Path.Combine(_store.RootDirectory, ".cursorpocket", "temp");
+        var cleanedPath = Path.Combine(temporaryDirectory, Guid.NewGuid().ToString("N") + ".cleanup.wav");
+        try
+        {
+            Directory.CreateDirectory(temporaryDirectory);
+            var originalLength = new FileInfo(wavPath).Length;
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = _ffmpegPath,
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true,
+            };
+            foreach (var argument in new[]
+            {
+                "-y", "-hide_banner", "-loglevel", "error",
+                "-i", wavPath, "-af", chain, "-c:a", "pcm_s16le", cleanedPath,
+            })
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                return null;
+            }
+            // Without this a cancelled stop leaves ffmpeg running and holding
+            // the temp file open.
+            using var cancellation = cancellationToken.Register(() =>
+            {
+                try { process.Kill(true); } catch (Exception) { }
+            });
+            await process.WaitForExitAsync(cancellationToken);
+            if (process.ExitCode != 0 || !File.Exists(cleanedPath))
+            {
+                return null;
+            }
+            // Same format in and out, so a short result means the pass was
+            // truncated — keep the full raw note instead of losing audio.
+            if (new FileInfo(cleanedPath).Length < originalLength * 0.9)
+            {
+                return null;
+            }
+            File.Move(cleanedPath, wavPath, true);
+            return chain;
+        }
+        catch (Exception)
+        {
+            // The untouched raw note is always the safe outcome.
+            return null;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(cleanedPath))
+                {
+                    File.Delete(cleanedPath);
+                }
+            }
+            catch (Exception)
+            {
+                // A leftover temp file is harmless where it lives; never let
+                // cleanup of the cleanup stop the note from being registered.
+            }
+        }
+    }
+
+    private async Task MuxVideoMicrophoneAsync(string videoPath, string audioPath, string outputPath, string? audioFilter, CancellationToken cancellationToken)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -495,14 +590,22 @@ public sealed class RecordingService : IRecordingService, IDisposable
             RedirectStandardOutput = true,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[]
+        var arguments = new List<string>
         {
             "-y", "-hide_banner", "-loglevel", "error",
             "-i", videoPath, "-i", audioPath,
             "-map", "0:v:0", "-map", "1:a:0",
-            "-c:v", "copy", "-c:a", "aac", "-b:a", "128k",
-            "-shortest", "-movflags", "+faststart", outputPath,
-        })
+            "-c:v", "copy",
+        };
+        if (audioFilter is not null)
+        {
+            // Cleanup runs here, at finalize time, where the video is a stream
+            // copy anyway — a filter failure surfaces as the existing
+            // "microphone was not saved" warning instead of losing the take.
+            arguments.AddRange(["-af", audioFilter]);
+        }
+        arguments.AddRange(["-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", outputPath]);
+        foreach (var argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
         }
