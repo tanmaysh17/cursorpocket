@@ -5,19 +5,71 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Select a region">
     <Grid Background="#FF030A08">
-        <Image x:Name="BackdropImage" Stretch="Fill" IsHitTestVisible="False" />
+        <Image x:Name="BackdropImage" IsHitTestVisible="False" Stretch="Fill" />
         <Canvas
             x:Name="Surface"
             Background="#78030907"
             KeyDown="Surface_KeyDown"
-            PointerPressed="Surface_PointerPressed"
             PointerMoved="Surface_PointerMoved"
+            PointerPressed="Surface_PointerPressed"
             PointerReleased="Surface_PointerReleased">
-            <Border Canvas.Left="28" Canvas.Top="28" Padding="16,11" Background="#E80D1713" CornerRadius="12" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-                <StackPanel Spacing="3"><TextBlock Text="Drag the region to capture" Style="{StaticResource PocketBodyText}" /><TextBlock Text="Release to continue · Esc cancels" Style="{StaticResource PocketCaptionText}" /></StackPanel>
+            <Border
+                Canvas.Left="28"
+                Canvas.Top="28"
+                Padding="16,12"
+                Background="#EE0B1310"
+                CornerRadius="{StaticResource PocketCardCorner}">
+                <StackPanel Orientation="Horizontal" Spacing="14">
+                    <StackPanel Spacing="3">
+                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Drag the region to capture" />
+                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Release to continue" />
+                    </StackPanel>
+                    <Rectangle
+                        Width="1"
+                        VerticalAlignment="Stretch"
+                        Fill="{StaticResource PocketLine}" />
+                    <StackPanel
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Button
+                            Height="24"
+                            MinHeight="24"
+                            MinWidth="24"
+                            Padding="7,0"
+                            Content="Esc"
+                            FontSize="11"
+                            IsHitTestVisible="False"
+                            IsTabStop="False"
+                            Style="{StaticResource KeyCapButton}" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PocketMetaText}"
+                            Text="cancels" />
+                    </StackPanel>
+                </StackPanel>
             </Border>
-            <Rectangle x:Name="Selection" Visibility="Collapsed" Stroke="{StaticResource PocketGreen}" StrokeThickness="2" Fill="#1243E08D" RadiusX="8" RadiusY="8" />
-            <Border x:Name="SizeBadge" Visibility="Collapsed" Padding="8,4" Background="#ED0B1511" CornerRadius="7"><TextBlock x:Name="SizeText" FontFamily="Cascadia Mono" FontSize="11" Foreground="{StaticResource PocketGreen}" /></Border>
+            <Rectangle
+                x:Name="Selection"
+                Fill="#1445E08C"
+                RadiusX="8"
+                RadiusY="8"
+                Stroke="{StaticResource PocketGreen}"
+                StrokeThickness="2"
+                Visibility="Collapsed" />
+            <Border
+                x:Name="SizeBadge"
+                Padding="8,4"
+                Background="#ED0B1511"
+                CornerRadius="7"
+                Visibility="Collapsed">
+                <TextBlock
+                    x:Name="SizeText"
+                    FontFamily="Cascadia Mono"
+                    FontSize="12"
+                    Foreground="{StaticResource PocketGreen}"
+                    IsTextScaleFactorEnabled="False" />
+            </Border>
         </Canvas>
     </Grid>
 </Window>

@@ -43,8 +43,21 @@ public sealed partial class MainPage : Page
         CountdownBox.SelectedIndex = ViewModel.VideoCountdownSeconds switch { 0 => 0, 5 => 2, _ => 1 };
         FpsBox.SelectionChanged += VideoDefaults_SelectionChanged;
         CountdownBox.SelectionChanged += VideoDefaults_SelectionChanged;
+        ApplyFilterSelection(ViewModel.SelectedFilter);
+        ShowActivationShortcut();
         UpdateLibraryVisibility();
         await UpdateDetailAsync();
+    }
+
+    /// <summary>Teach the activation shortcut where it is used, not only in Settings.</summary>
+    private void ShowActivationShortcut()
+    {
+        var shortcut = App.Services.Hotkey.RegisteredShortcut;
+        NewCaptureShortcut.Text = shortcut ?? string.Empty;
+        NewCaptureShortcut.Visibility = shortcut is null ? Visibility.Collapsed : Visibility.Visible;
+        ActivationShortcutHint.Text = shortcut is null
+            ? "Choose a working shortcut in Settings"
+            : $"{shortcut} over whatever is on screen";
     }
 
     private void VideoDefaults_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
@@ -86,16 +99,29 @@ public sealed partial class MainPage : Page
         if (sender is Button { Tag: string filter })
         {
             ViewModel.SelectFilter(filter);
-            foreach (var button in FilterBar.Children.OfType<Button>())
-            {
-                button.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                    string.Equals(button.Tag as string, filter, StringComparison.Ordinal) ? "PocketGreenSoft" : "PocketRaised"];
-            }
+            ApplyFilterSelection(filter);
             UpdateLibraryVisibility();
         }
     }
 
+    private void ApplyFilterSelection(string filter)
+    {
+        var resources = Application.Current.Resources;
+        foreach (var button in FilterBar.Children.OfType<Button>())
+        {
+            var selected = string.Equals(button.Tag as string, filter, StringComparison.Ordinal);
+            button.Background = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketRaised" : "PocketTransparent"];
+            button.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketLine" : "PocketTransparent"];
+            button.Foreground = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketInk" : "PocketMuted"];
+        }
+    }
+
     private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs) => await UpdateDetailAsync();
+
+    /// <summary>Opening from the row keeps the primary action reachable when the
+    /// detail pane has given way to the list at narrow widths.</summary>
+    private void CaptureList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs eventArgs)
+        => ViewModel.OpenSelectedCommand.Execute(null);
 
     private async Task UpdateDetailAsync()
     {
@@ -110,15 +136,21 @@ public sealed partial class MainPage : Page
         var item = ViewModel.SelectedItem;
         if (item is null)
         {
-            DetailKind.Text = "Capture preview";
+            DetailKind.Text = "CAPTURE PREVIEW";
             DetailTitle.Text = "Choose something from your library";
             DetailIcon.Glyph = "\uE7C3";
             DetailText.Text = "Screenshots, waveforms, and video posters appear here.";
+            DetailFacts.Visibility = Visibility.Collapsed;
             return;
         }
 
-        DetailKind.Text = $"{item.KindLabel} · {item.CreatedLabel}";
+        DetailFacts.Visibility = Visibility.Visible;
+        DetailKind.Text = item.KindLabel.ToUpperInvariant();
         DetailTitle.Text = item.Preview;
+        FactKind.Text = item.KindLabel;
+        FactSize.Text = item.SizeLabel;
+        FactSaved.Text = item.SavedLabel;
+        FactFile.Text = item.FileName;
         DetailIcon.Glyph = item.IconGlyph;
         DetailText.Text = item.AbsolutePath;
         if (!File.Exists(item.AbsolutePath))
@@ -180,6 +212,7 @@ public sealed partial class MainPage : Page
     }
 
     private void OpenCommand_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowCommandPalette();
+    private void LibraryTile_Click(object sender, RoutedEventArgs eventArgs) => NavigateTo("library");
     private void ScreenshotTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowCommandPalette("screenshot");
     private void VideoTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowVideoPreflight();
     private async void AudioTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.ToggleAudioRecordingAsync();
