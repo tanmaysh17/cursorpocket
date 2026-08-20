@@ -48,6 +48,12 @@ FFmpeg media pipeline verification (encodes screen-only, narrated, webcam, combi
 py -m tools.verify_video_media --ffmpeg .\third_party\ffmpeg\bin\ffmpeg.exe
 ```
 
+Segmentation model verification — asserts the tensor layout, the 0..1 RGB input, and that **high means person**. The unit tests run against a fake `IPersonMaskModel`, so nothing else catches a model whose mask is inverted, which blurs the person instead of the background. Run it after changing the pinned model (needs `onnxruntime` and `numpy`, dev-only):
+
+```powershell
+py -m tools.verify_segmentation_model
+```
+
 `CONTRIBUTING.md` lists the full pre-submit gate. UI changes additionally require a visual pass on the *installed* build at the active display scale — XAML inspection is not sufficient (see `DESIGN.md` acceptance gate).
 
 ## Architecture
