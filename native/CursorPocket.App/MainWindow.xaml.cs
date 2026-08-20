@@ -18,6 +18,7 @@ public sealed partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? _tray;
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
     private long _lastSourceWindow;
+    private (CaptureBounds Bounds, int? OutputIndex)? _displayTarget;
     private CaptureBounds? _lastRegion;
     private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
@@ -67,8 +68,17 @@ public sealed partial class MainWindow : Window
         {
             _lastSourceWindow = source;
         }
+        SnapshotDisplayTarget();
         _palette!.Show(_lastSourceWindow, initialMode);
     }
+
+    /// <summary>
+    /// Remembers which screen the user was on when they asked for CursorPocket. It
+    /// cannot be resolved later from the pointer: by the time Start is pressed the
+    /// pointer is over the preflight window, which Windows may have opened on
+    /// another display.
+    /// </summary>
+    private void SnapshotDisplayTarget() => _displayTarget = WindowPlacement.DisplayTargetUnderPointer();
 
     private void InitializeCommandPalette()
     {
@@ -96,7 +106,11 @@ public sealed partial class MainWindow : Window
         {
             _lastSourceWindow = source;
         }
-        _preflight = new VideoPreflightWindow(_lastSourceWindow);
+        // Opened straight from the tray rather than through command mode, so the
+        // pointer is still on the screen the user means.
+        _displayTarget ??= WindowPlacement.DisplayTargetUnderPointer();
+        var target = _displayTarget.Value;
+        _preflight = new VideoPreflightWindow(_lastSourceWindow, target.Bounds, target.OutputIndex);
         _preflight.RecordingRequested += async (_, options) => await StartVideoAsync(options);
         _preflight.Closed += (_, _) =>
         {
@@ -220,9 +234,20 @@ public sealed partial class MainWindow : Window
         try
         {
             var record = await capture();
-            var editor = new AnnotationWindow(record, App.Services.Library.GetAbsolutePath(record));
-            editor.Saved += (_, _) => ShowReceipt(record, "Screenshot saved");
-            editor.Cancelled += (_, _) => ShowReceipt(record, "Screenshot saved without annotation");
+            var path = App.Services.Library.GetAbsolutePath(record);
+            // Copy immediately, so the shot is pasteable the moment it is taken
+            // rather than only after the annotation surface is dismissed.
+            var copied = await CopyImageToClipboardAsync(path);
+            var editor = new AnnotationWindow(record, path);
+            editor.Saved += async (_, _) =>
+            {
+                // Re-copy so the clipboard holds the marked-up image, not the original.
+                var recopied = await CopyImageToClipboardAsync(path);
+                ShowReceipt(record, recopied ? "Screenshot saved · copied" : "Screenshot saved");
+            };
+            editor.Cancelled += (_, _) => ShowReceipt(record, copied
+                ? "Screenshot saved · copied"
+                : "Screenshot saved without annotation");
             // Command mode has just hidden itself, so the source app already owns the
             // foreground. Activate() alone loses that race and leaves the annotation
             // window behind or minimized.
@@ -313,6 +338,31 @@ public sealed partial class MainWindow : Window
         _selfView = null;
     }
 
+    /// <summary>
+    /// Puts a saved screenshot on the clipboard. Flushed so it outlives CursorPocket:
+    /// without that, quitting the app takes the image back off the clipboard. A failure
+    /// here is reported in the receipt wording but never fails the capture — the file
+    /// is already on disk, which is the part that matters.
+    /// </summary>
+    private static async Task<bool> CopyImageToClipboardAsync(string path)
+    {
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromFile(file));
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+            return true;
+        }
+        catch (Exception)
+        {
+            // Another app can hold the clipboard open, and Flush throws if the
+            // clipboard is locked. The screenshot is saved either way.
+            return false;
+        }
+    }
+
     private void ShowReceipt(CaptureRecord record, string title)
     {
         var receipt = new ReceiptWindow(record, title);
@@ -351,10 +401,19 @@ public sealed partial class MainWindow : Window
             "window" => VideoSourceKind.Window,
             _ => VideoSourceKind.Display,
         };
+        // Repeating a setup still records the screen the user is on now, resolved
+        // when command mode opened.
+        var display = _displayTarget ?? WindowPlacement.DisplayTargetUnderPointer();
         return new RecordingOptions
         {
             SourceKind = sourceKind,
-            Bounds = sourceKind == VideoSourceKind.Region ? _lastRegion : null,
+            Bounds = sourceKind switch
+            {
+                VideoSourceKind.Region => _lastRegion,
+                VideoSourceKind.Display => display.Bounds,
+                _ => null,
+            },
+            DisplayOutputIndex = sourceKind == VideoSourceKind.Display ? display.OutputIndex : null,
             WindowHandle = sourceKind == VideoSourceKind.Window ? _lastSourceWindow : null,
             IncludeMicrophone = settings.VideoMicrophoneEnabled,
             MicrophoneName = settings.VideoMicrophoneName,

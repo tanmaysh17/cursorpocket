@@ -90,7 +90,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - When a recording includes the camera, a live self-view sits inside the area being recorded at the chosen corner and size, so the user can see their own feed while they record.
 - **It is the one CursorPocket surface deliberately visible in captured media.** CursorPocket holds the camera for the whole recording, and the webcam reaches the file by being on screen inside the captured rectangle. FFmpeg must never be given a `dshow` camera input at the same time—DirectShow grants a single consumer exclusive use, and that is exactly what made a live self-view impossible before.
 - Placement is computed by `CameraSelfViewPlacement` and must always land inside the recorded rectangle. Anything outside it is missing from the file.
-- Click-through and never focused: it sits over the work being demonstrated and must not swallow a click or take activation.
+- **Draggable, and clamped to the recorded rectangle.** The user drags it to reposition their camera mid recording, so it accepts pointer input rather than being click-through. The clamp is not cosmetic: the webcam reaches the file by being on screen inside that rectangle, so a self-view dragged outside it would silently vanish from the recording. It never takes activation from the work being demonstrated.
 - Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
 - A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
 - The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
@@ -112,21 +112,29 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ### Recording HUD
 
-- Excluded from the captured media and placed at top center using DPI-aware sizing.
+- Excluded from the captured media and tucked against the top edge, centred, using DPI-aware sizing.
+- **Small by default, complete on approach.** Collapsed it is a 178 × 30 dip pill: live mark, timer, and level meter, nothing else. It opens to the full surface—mode, device, **Stop & save**, **Discard**—as the pointer *approaches*, not when it lands, and draws back up when the pointer leaves. Recording is not a mode the user is asked to look at; it is a mode they occasionally reach for.
+- It moves like a drawer: **one fixed-size window that slides vertically**, mostly above the top edge when closed, over an eased ~190 ms travel with the contents cross-fading. Nothing resizes and no window region is recomputed per frame — both drop the window off DWM's fast path, which is what made an earlier resize-based version stutter. Rounded corners come from DWM instead. Keyboard focus holds it open, tracked explicitly because `FocusManager` reports stale focus on an inactive window.
+- Text is sized to fit the drawer. Type large enough to overflow the panel is worse for legibility than smaller type that fits.
+- `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
 - No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
-- Status and actions are separated by a flexible gap, so stopping is never a near-miss for reading the timer.
-- Timer, device state, **Stop & save**, and **Discard** are simultaneously visible at 100–250% display scale. The timer is mono with tabular figures so it does not jitter.
+- Status and actions are separated, so stopping is never a near-miss for reading the timer.
+- Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale. The timer is mono with tabular figures so it does not jitter.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
+- The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Stems grow from a mid-line in both directions with a bright centre, so the form has a spine and reads as a waveform rather than a bar chart; quiet samples fade back instead of vanishing. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
 
 ### Receipt and Library
 
+- The Library gives the preview the majority of the width, and the preview can take the whole window when the list is collapsed. Video and audio use the full transport controls — seek, volume, playback rate, skip, fast forward and rewind, zoom, repeat, full window.
+- Rows are compact strips carrying the capture's own thumbnail — the screenshot, a video frame, or its waveform — with the kind icon only as a fallback. Each row states kind and file size. Selection is extended, and delete moves every selected capture to the Recycle Bin, saying how many.
 - Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover. Because hovering pauses the countdown indefinitely, it also carries an explicit dismiss control.
-- Receipts use the correct media preview and explicit Open/Reveal/Library actions.
-- Library is a standard resizable Mica window with a top navigation bar, so the wordmark and section names stay visible at every width.
-- Library rows are 52 px: neutral kind chip, title, mono file-type tag, mono size, mono time. Selection is carried by fill, not by a green wash.
-- Filters are one segmented control with a live count per filter.
-- The detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
+- **Every capture is actionable without a mouse.** Because a receipt never takes focus, its actions are reachable through scoped global keys: `Ctrl+Alt+O` open or play, `Ctrl+Alt+R` reveal, `Ctrl+Alt+L` Library, `Ctrl+Alt+X` dismiss. Those combinations carry modifiers deliberately — a receipt is up while the user keeps working, and bare keys would swallow their typing for twelve seconds. The receipt states the keys, since nothing else would teach them.
+- The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy path, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Every one stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
+- Receipts use the correct media preview and explicit Open/Reveal/Library actions. A screenshot is also copied to the clipboard the moment it is taken, and again after annotation so the clipboard holds the marked-up image; the receipt says so.
+- Library is a standard resizable Mica window with a top navigation bar, so the wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
+- Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter.
+- Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
 
 ## Brand mark
@@ -148,7 +156,8 @@ The design-consultation gate requires all of the following before release:
 - the command list scrolls instead of clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
 - a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
-- `Enter` saves a screenshot from the annotation surface whether or not anything was drawn;
+- `Enter` saves a screenshot from the annotation surface whether or not anything was drawn, and the shot is on the clipboard without asking;
+- a dragged region is captured in full, with nothing missing from its right or bottom edge at any display scale;
 - two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not — and ordinary mouse work over a working session never opens it;
 - named microphone and camera are visible before video begins;
 - the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;

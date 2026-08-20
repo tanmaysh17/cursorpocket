@@ -16,7 +16,19 @@ public sealed record CaptureBounds(int Left, int Top, int Right, int Bottom)
 public sealed record RecordingOptions
 {
     public VideoSourceKind SourceKind { get; init; } = VideoSourceKind.Display;
-    public int DisplayIndex { get; init; }
+
+    /// <summary>
+    /// The DXGI output index for Desktop Duplication. This is its own ordering, not a
+    /// monitor enumeration index, and must only ever come from
+    /// <c>DisplayOutputLocator</c>. Null means the target monitor could not be
+    /// addressed that way, so <see cref="Bounds"/> is captured directly instead.
+    /// </summary>
+    public int? DisplayOutputIndex { get; init; }
+
+    /// <summary>
+    /// The exact rectangle being recorded. Set for a region, and also for a display
+    /// so the right screen is captured even without a usable output index.
+    /// </summary>
     public CaptureBounds? Bounds { get; init; }
     public long? WindowHandle { get; init; }
     public int FramesPerSecond { get; init; } = 30;

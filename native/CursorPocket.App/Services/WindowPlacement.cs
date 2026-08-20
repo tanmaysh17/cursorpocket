@@ -1,3 +1,4 @@
+using CursorPocket.Core.Models;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -18,54 +19,32 @@ internal static class WindowPlacement
         return new NativeMethods.Rect { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
     }
 
-    public static int DisplayIndexUnderPointer()
+    /// <summary>
+    /// Identifies the monitor under the pointer for recording: its exact rectangle,
+    /// plus the DXGI output index Desktop Duplication needs, which is null when the
+    /// monitor cannot be addressed that way and its rectangle must be grabbed instead.
+    /// <para>
+    /// Capture this the moment the user asks to record, not when they later press
+    /// Start — by then the pointer is over the preflight window, which Windows may
+    /// have placed on a different screen.
+    /// </para>
+    /// </summary>
+    public static (CaptureBounds Bounds, int? OutputIndex) DisplayTargetUnderPointer()
     {
         NativeMethods.GetCursorPos(out var cursor);
-        var target = NativeMethods.MonitorFromPoint(cursor, NativeMethods.MonitorDefaultToNearest);
-        var current = 0;
-        var result = 0;
-        NativeMethods.EnumDisplayMonitors(0, 0, (nint monitor, nint hdc, ref NativeMethods.Rect rect, nint data) =>
+        var monitor = NativeMethods.MonitorFromPoint(cursor, NativeMethods.MonitorDefaultToNearest);
+        var info = new NativeMethods.MonitorInfoEx
         {
-            if (monitor == target)
-            {
-                result = current;
-                return false;
-            }
-            current++;
-            return true;
-        }, 0);
-        return result;
-    }
-
-    public static NativeMethods.Rect MonitorBoundsAt(int index)
-    {
-        var current = 0;
-        NativeMethods.Rect? result = null;
-        NativeMethods.EnumDisplayMonitors(0, 0, (nint monitor, nint hdc, ref NativeMethods.Rect rect, nint data) =>
+            Size = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfoEx>(),
+            DeviceName = string.Empty,
+        };
+        if (!NativeMethods.GetMonitorInfoEx(monitor, ref info))
         {
-            if (current++ != index)
-            {
-                return true;
-            }
-            result = rect;
-            return false;
-        }, 0);
-        return result ?? MonitorUnderPointer();
-    }
-
-    /// <summary>
-    /// Lets the pointer through to whatever is underneath. Used by the camera
-    /// self-view, which sits over the user's work while they demonstrate it and
-    /// must never swallow a click.
-    /// </summary>
-    public static void MakeClickThrough(Window window)
-    {
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        var existing = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GwlExStyle).ToInt64();
-        NativeMethods.SetWindowLongPtr(
-            hwnd,
-            NativeMethods.GwlExStyle,
-            new nint(existing | NativeMethods.WsExTransparent | NativeMethods.WsExNoActivate | NativeMethods.WsExToolWindow));
+            var fallback = MonitorUnderPointer();
+            return (new CaptureBounds(fallback.Left, fallback.Top, fallback.Right, fallback.Bottom), null);
+        }
+        var bounds = new CaptureBounds(info.Monitor.Left, info.Monitor.Top, info.Monitor.Right, info.Monitor.Bottom);
+        return (bounds, DisplayOutputLocator.FindOutputIndex(info.DeviceName));
     }
 
     public static void ConfigureUtilityWindow(Window window, bool topmost = true, bool excludeFromCapture = true)
@@ -292,6 +271,14 @@ internal static class WindowPlacement
     /// contract as <see cref="ClipToRoundedPixelRegion"/>: physical pixels, and
     /// only ever applied to click-through windows the user cannot drag.
     /// </summary>
+    /// <summary>
+    /// Removes any window region, putting the surface back on DWM's fast path.
+    /// Dragging a region-clipped window visibly lags, so a draggable surface drops
+    /// its clip for the duration of the drag and re-cuts it on release.
+    /// </summary>
+    public static void ClearWindowRegion(Window window) =>
+        NativeMethods.SetWindowRgn(WinRT.Interop.WindowNative.GetWindowHandle(window), 0, true);
+
     public static void ClipToPolygonPixelRegion(Window window, IReadOnlyList<(int X, int Y)> points)
     {
         var nativePoints = new NativeMethods.Point[points.Count];

@@ -6,7 +6,14 @@
     Title="CursorPocket camera">
     <!-- Opaque edge to edge: a transparent WinUI root would show a light gutter,
          and this surface is deliberately visible in the recording. -->
-    <Grid Background="#FF09110F">
+    <Grid
+        x:Name="Root"
+        Background="#FF09110F"
+        PointerPressed="Root_PointerPressed"
+        PointerMoved="Root_PointerMoved"
+        PointerReleased="Root_PointerReleased"
+        PointerCaptureLost="Root_PointerCaptureLost"
+        ToolTipService.ToolTip="Drag to move your camera inside the recording">
         <MediaPlayerElement x:Name="CameraPreview" AreTransportControlsEnabled="False" Stretch="UniformToFill" />
         <!-- Effects path: frames processed by the camera effect pipeline land here
              instead of the MediaPlayerElement. Exactly one of the two is active. -->

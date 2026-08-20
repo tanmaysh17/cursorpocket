@@ -43,6 +43,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <StackPanel Spacing="3">
                         <TextBlock
@@ -68,19 +69,32 @@
                             MinHeight="32"
                             Click="Open_Click"
                             Content="Open"
-                            Style="{StaticResource PocketPrimaryButton}" />
+                            Style="{StaticResource PocketPrimaryButton}"
+                            ToolTipService.ToolTip="Ctrl+Alt+O" />
                         <Button
                             x:Name="RevealButton"
                             MinHeight="32"
                             Click="Reveal_Click"
                             Content="Reveal"
-                            Style="{StaticResource PocketQuietButton}" />
+                            Style="{StaticResource PocketQuietButton}"
+                            ToolTipService.ToolTip="Ctrl+Alt+R" />
                         <Button
                             MinHeight="32"
                             Click="Library_Click"
                             Content="Library"
-                            Style="{StaticResource PocketGhostButton}" />
+                            Style="{StaticResource PocketGhostButton}"
+                            ToolTipService.ToolTip="Ctrl+Alt+L" />
                     </StackPanel>
+                    <!--  The receipt never takes focus, so the keys are the only way to
+                          act on it without reaching for the mouse. Say so.  -->
+                    <TextBlock
+                        x:Name="ReceiptKeysHint"
+                        Grid.Row="3"
+                        Margin="0,7,0,0"
+                        FontFamily="Cascadia Mono"
+                        FontSize="10"
+                        Foreground="{StaticResource PocketMuted}"
+                        Text="Ctrl+Alt · O open · R reveal · L library · X dismiss" />
                 </Grid>
             </Grid>
         </Border>

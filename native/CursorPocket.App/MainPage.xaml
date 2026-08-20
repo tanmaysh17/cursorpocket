@@ -27,6 +27,24 @@
     </Page.Resources>
 
     <Grid Background="Transparent">
+        <!-- The Library is fully keyboard-drivable. These are page accelerators, so
+             they never affect other applications, and every handler stands down while
+             a text box has focus or the Library is not the visible panel. -->
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Enter" Invoked="OpenAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Space" Invoked="PlayAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Delete" Invoked="DeleteAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RevealAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyPathAccelerator_Invoked" />
+            <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="MaximizeAccelerator_Invoked" />
+            <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number2" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number3" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number4" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number5" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number6" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
         <NavigationView
             x:Name="Navigation"
             IsBackButtonVisible="Collapsed"
@@ -183,14 +201,21 @@
                                     </VisualState.StateTriggers>
                                     <VisualState.Setters>
                                         <Setter Target="DetailFacts.Visibility" Value="Visible" />
-                                        <Setter Target="DetailWell.MinHeight" Value="130" />
+                                        <!--  A preview too small to judge is not a preview. With the
+                                              room a 660 px window has, the well gets a real floor.  -->
+                                        <Setter Target="DetailWell.MinHeight" Value="260" />
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="6*" MinWidth="330" />
-                            <ColumnDefinition x:Name="DetailColumn" Width="4*" MinWidth="308" />
+                            <!--  The preview takes the larger share: at 4*/6* a screenshot is
+                                  big enough to judge, which is the point of having a preview.
+                                  Both columns are named because each collapses independently —
+                                  DetailColumn by the narrow-window state, ListColumn by the
+                                  maximize-preview toggle in code-behind.  -->
+                            <ColumnDefinition x:Name="ListColumn" Width="4*" MinWidth="240" />
+                            <ColumnDefinition x:Name="DetailColumn" Width="6*" MinWidth="308" />
                         </Grid.ColumnDefinitions>
 
                         <Border x:Name="ListPane" Style="{StaticResource PocketCard}">
@@ -202,52 +227,53 @@
                                     DoubleTapped="CaptureList_DoubleTapped"
                                     ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
                                     SelectedItem="{x:Bind ViewModel.SelectedItem, Mode=TwoWay}"
-                                    SelectionChanged="CaptureList_SelectionChanged">
+                                    SelectionChanged="CaptureList_SelectionChanged"
+                                    SelectionMode="Extended">
                                     <ListView.ItemContainerStyle>
                                         <Style TargetType="ListViewItem">
                                             <Setter Property="Padding" Value="0" />
-                                            <Setter Property="MinHeight" Value="52" />
+                                            <Setter Property="MinHeight" Value="46" />
                                             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                         </Style>
                                     </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:CaptureItemViewModel">
-                                            <Grid
-                                                Height="52"
-                                                Padding="10,0"
-                                                ColumnSpacing="12">
+                                            <Grid MinHeight="46" Padding="6,4" ColumnSpacing="10">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="52" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="76" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Style="{StaticResource PocketChip}">
-                                                    <FontIcon Glyph="{x:Bind IconGlyph}" Style="{StaticResource PocketChipIcon}" />
+                                                <!--  The capture itself wherever one can be rendered. The kind
+                                                      icon sits underneath as the fallback: it shows while the
+                                                      thumbnail loads, and stays for text and links.  -->
+                                                <Border
+                                                    Width="52"
+                                                    Height="34"
+                                                    Background="#66070D0B"
+                                                    CornerRadius="7">
+                                                    <Grid>
+                                                        <FontIcon
+                                                            FontSize="14"
+                                                            Foreground="{StaticResource PocketGreen}"
+                                                            Glyph="{x:Bind IconGlyph}" />
+                                                        <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="UniformToFill" />
+                                                    </Grid>
                                                 </Border>
-                                                <TextBlock
+                                                <StackPanel
                                                     Grid.Column="1"
                                                     VerticalAlignment="Center"
-                                                    Style="{StaticResource PocketBodyText}"
-                                                    Text="{x:Bind Preview}"
-                                                    TextTrimming="CharacterEllipsis" />
-                                                <Border
+                                                    Spacing="1">
+                                                    <TextBlock
+                                                        Style="{StaticResource PocketBodyText}"
+                                                        Text="{x:Bind Preview}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                    <!--  Kind and size on one line, so the row stays a strip
+                                                          instead of the four columns this replaced.  -->
+                                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="{x:Bind MetaLabel}" />
+                                                </StackPanel>
+                                                <TextBlock
                                                     Grid.Column="2"
-                                                    VerticalAlignment="Center"
-                                                    Style="{StaticResource PocketTagBorder}">
-                                                    <TextBlock Style="{StaticResource PocketTagText}" Text="{x:Bind KindTag}" />
-                                                </Border>
-                                                <TextBlock
-                                                    Grid.Column="3"
-                                                    MinWidth="52"
-                                                    HorizontalAlignment="Right"
-                                                    VerticalAlignment="Center"
-                                                    Style="{StaticResource PocketNumericText}"
-                                                    Text="{x:Bind SizeLabel}" />
-                                                <TextBlock
-                                                    Grid.Column="4"
-                                                    HorizontalAlignment="Right"
                                                     VerticalAlignment="Center"
                                                     Style="{StaticResource PocketNumericText}"
                                                     Text="{x:Bind TimeLabel}" />
@@ -297,21 +323,40 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <StackPanel Spacing="6">
-                                    <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="CAPTURE PREVIEW" />
-                                    <TextBlock
-                                        x:Name="DetailTitle"
-                                        MaxLines="2"
-                                        Style="{StaticResource PocketSubtitleText}"
-                                        Text="Choose something from your library"
-                                        TextTrimming="CharacterEllipsis"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
+                                <!--  The header carries the maximize toggle: the preview is the
+                                      reason this pane exists, so filling the window with it is one
+                                      click (or Ctrl+M) away.  -->
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="CAPTURE PREVIEW" />
+                                        <TextBlock
+                                            x:Name="DetailTitle"
+                                            MaxLines="2"
+                                            Style="{StaticResource PocketSubtitleText}"
+                                            Text="Choose something from your library"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button
+                                        x:Name="MaximizePreviewButton"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Top"
+                                        Click="MaximizePreview_Click"
+                                        Style="{StaticResource PocketIconButton}"
+                                        ToolTipService.ToolTip="Fill the window with the preview · Ctrl+M"
+                                        AutomationProperties.Name="Fill the window with the preview">
+                                        <FontIcon x:Name="MaximizePreviewIcon" FontSize="14" Glyph="&#xE740;" />
+                                    </Button>
+                                </Grid>
                                 <Border
                                     x:Name="DetailWell"
                                     Grid.Row="1"
                                     Margin="0,14"
-                                    MinHeight="130"
+                                    MinHeight="260"
                                     Style="{StaticResource PocketWell}">
                                     <Grid>
                                         <Image
@@ -319,11 +364,36 @@
                                             Margin="8"
                                             Stretch="Uniform"
                                             Visibility="Collapsed" />
+                                        <!--  Full transport controls: a recording is reviewed here, which
+                                              means scrubbing and speed, not just play.  -->
                                         <MediaPlayerElement
                                             x:Name="DetailPlayer"
                                             AreTransportControlsEnabled="True"
                                             AutoPlay="False"
-                                            Visibility="Collapsed" />
+                                            Visibility="Collapsed">
+                                            <MediaPlayerElement.TransportControls>
+                                                <MediaTransportControls
+                                                    IsCompact="False"
+                                                    IsFastForwardButtonVisible="True"
+                                                    IsFastForwardEnabled="True"
+                                                    IsFastRewindButtonVisible="True"
+                                                    IsFastRewindEnabled="True"
+                                                    IsPlaybackRateButtonVisible="True"
+                                                    IsPlaybackRateEnabled="True"
+                                                    IsRepeatButtonVisible="True"
+                                                    IsRepeatEnabled="True"
+                                                    IsSeekBarVisible="True"
+                                                    IsSeekEnabled="True"
+                                                    IsSkipBackwardButtonVisible="True"
+                                                    IsSkipBackwardEnabled="True"
+                                                    IsSkipForwardButtonVisible="True"
+                                                    IsSkipForwardEnabled="True"
+                                                    IsVolumeButtonVisible="True"
+                                                    IsVolumeEnabled="True"
+                                                    IsZoomButtonVisible="True"
+                                                    IsZoomEnabled="True" />
+                                            </MediaPlayerElement.TransportControls>
+                                        </MediaPlayerElement>
                                         <StackPanel
                                             x:Name="DetailTextPanel"
                                             Margin="16"
@@ -413,12 +483,20 @@
                                             <FontIcon FontSize="14" Glyph="&#xE8C8;" />
                                         </Button>
                                     </StackPanel>
+                                    <!--  Named and click-handled rather than command-bound: with
+                                          extended selection the button also reports how many
+                                          captures the one press will move.  -->
                                     <Button
+                                        x:Name="DeleteButton"
                                         HorizontalAlignment="Right"
-                                        Command="{x:Bind ViewModel.DeleteSelectedCommand}"
+                                        Click="DeleteSelected_Click"
                                         Style="{StaticResource PocketDangerIconButton}"
-                                        ToolTipService.ToolTip="Move to Recycle Bin">
-                                        <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                        ToolTipService.ToolTip="Move to Recycle Bin"
+                                        AutomationProperties.Name="Move selected captures to the Recycle Bin">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                            <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" />
+                                        </StackPanel>
                                     </Button>
                                 </Grid>
                             </Grid>
