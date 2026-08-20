@@ -41,9 +41,27 @@ public static class FfmpegCommandBuilder
         string screenFilter;
         switch (options.SourceKind)
         {
-            case VideoSourceKind.Display:
-                command.AddRange(["-thread_queue_size", "1024", "-f", "lavfi", "-i", $"ddagrab=output_idx={Math.Max(0, options.DisplayIndex)}:framerate={options.FramesPerSecond}:draw_mouse={drawMouse}"]);
+            case VideoSourceKind.Display when options.DisplayOutputIndex is int outputIndex:
+                // output_idx is a DXGI output index resolved from the monitor itself.
+                // Never pass a monitor enumeration index here: the two orderings
+                // disagree, which silently records a different screen.
+                command.AddRange(["-thread_queue_size", "1024", "-f", "lavfi", "-i", $"ddagrab=output_idx={Math.Max(0, outputIndex)}:framerate={options.FramesPerSecond}:draw_mouse={drawMouse}"]);
                 screenFilter = $"[{screenIndex}:v]hwdownload,format=bgra,setpts=PTS-STARTPTS,format=yuv420p[screen]";
+                break;
+            case VideoSourceKind.Display when options.Bounds is null:
+                // Neither an output index nor a rectangle: fall back to the first
+                // output rather than failing, which is what callers got before a
+                // monitor could be identified at all.
+                command.AddRange(["-thread_queue_size", "1024", "-f", "lavfi", "-i", $"ddagrab=output_idx=0:framerate={options.FramesPerSecond}:draw_mouse={drawMouse}"]);
+                screenFilter = $"[{screenIndex}:v]hwdownload,format=bgra,setpts=PTS-STARTPTS,format=yuv420p[screen]";
+                break;
+            case VideoSourceKind.Display:
+                // Desktop Duplication cannot address this monitor — it hangs off
+                // another adapter, or DXGI would not identify it. Grab its exact
+                // rectangle so the correct screen is still what gets recorded.
+                var display = NormalizeBounds(options.Bounds);
+                command.AddRange(["-thread_queue_size", "1024", "-f", "gdigrab", "-framerate", options.FramesPerSecond.ToString(), "-draw_mouse", drawMouse, "-offset_x", display.Left.ToString(), "-offset_y", display.Top.ToString(), "-video_size", $"{display.Width}x{display.Height}", "-i", "desktop"]);
+                screenFilter = $"[{screenIndex}:v]setpts=PTS-STARTPTS,format=yuv420p[screen]";
                 break;
             case VideoSourceKind.Region:
                 var bounds = NormalizeBounds(options.Bounds);

@@ -18,14 +18,19 @@ namespace CursorPocket_App;
 public sealed partial class VideoPreflightWindow : Window
 {
     private readonly long _sourceWindow;
+    // Resolved when the user asked to record, not when Start is pressed.
+    private readonly CaptureBounds _displayBounds;
+    private readonly int? _displayOutputIndex;
     private WaveInEvent? _microphoneMonitor;
     private MediaCapture? _mediaCapture;
     private MediaPlayer? _cameraPlayer;
     private bool _closing;
 
-    public VideoPreflightWindow(long sourceWindow)
+    public VideoPreflightWindow(long sourceWindow, CaptureBounds displayBounds, int? displayOutputIndex)
     {
         _sourceWindow = sourceWindow;
+        _displayBounds = displayBounds;
+        _displayOutputIndex = displayOutputIndex;
         InitializeComponent();
         WindowPlacement.ResizeInDips(this, 940, 720);
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
@@ -229,6 +234,8 @@ public sealed partial class VideoPreflightWindow : Window
         {
             SourceKind = sourceValue switch { "region" => VideoSourceKind.Region, "window" => VideoSourceKind.Window, _ => VideoSourceKind.Display },
             WindowHandle = sourceValue == "window" ? _sourceWindow : null,
+            Bounds = sourceValue == "display" ? _displayBounds : null,
+            DisplayOutputIndex = sourceValue == "display" ? _displayOutputIndex : null,
             IncludeMicrophone = MicrophoneToggle.IsOn && microphone is not null,
             MicrophoneId = microphone?.Id ?? string.Empty,
             MicrophoneName = microphone?.Name ?? string.Empty,
@@ -239,7 +246,6 @@ public sealed partial class VideoPreflightWindow : Window
             FramesPerSecond = int.TryParse((FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var fps) ? fps : 30,
             CountdownSeconds = int.TryParse((CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var countdown) ? countdown : 3,
             DrawCursor = PointerToggle.IsOn,
-            DisplayIndex = sourceValue == "display" ? WindowPlacement.DisplayIndexUnderPointer() : 0,
         };
         RecordingRequested?.Invoke(this, options);
         Close();

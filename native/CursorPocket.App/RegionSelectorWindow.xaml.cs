@@ -1,4 +1,5 @@
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -14,6 +15,7 @@ public sealed partial class RegionSelectorWindow : Window
 {
     private readonly IDisposable _escapeLease;
     private Point _start;
+    private (int X, int Y) _startPhysical;
     private bool _dragging;
     private int _virtualLeft;
     private int _virtualTop;
@@ -45,6 +47,11 @@ public sealed partial class RegionSelectorWindow : Window
     {
         _dragging = true;
         _start = eventArgs.GetCurrentPoint(Surface).Position;
+        // The capture itself is in physical pixels, so the corners are recorded from
+        // the cursor rather than from XAML's device-independent coordinates. That also
+        // stays correct across monitors with different scale factors, which a single
+        // window's scale cannot describe.
+        _startPhysical = WindowPlacement.PointerPosition();
         Surface.CapturePointer(eventArgs.Pointer);
         Selection.Visibility = Visibility.Visible;
         SizeBadge.Visibility = Visibility.Visible;
@@ -67,17 +74,13 @@ public sealed partial class RegionSelectorWindow : Window
         }
         _dragging = false;
         Surface.ReleasePointerCapture(eventArgs.Pointer);
-        var end = eventArgs.GetCurrentPoint(Surface).Position;
-        var left = (int)Math.Round(Math.Min(_start.X, end.X));
-        var top = (int)Math.Round(Math.Min(_start.Y, end.Y));
-        var right = (int)Math.Round(Math.Max(_start.X, end.X));
-        var bottom = (int)Math.Round(Math.Max(_start.Y, end.Y));
-        if (right - left < 4 || bottom - top < 4)
+        var (endX, endY) = WindowPlacement.PointerPosition();
+        var bounds = RegionSelection.FromCorners(_startPhysical.X, _startPhysical.Y, endX, endY);
+        if (!RegionSelection.IsUsable(bounds))
         {
             Close();
             return;
         }
-        var bounds = new CaptureBounds(left + _virtualLeft, top + _virtualTop, right + _virtualLeft, bottom + _virtualTop);
         Close();
         RegionSelected?.Invoke(this, bounds);
     }
@@ -92,7 +95,11 @@ public sealed partial class RegionSelectorWindow : Window
         Canvas.SetTop(Selection, top);
         Selection.Width = width;
         Selection.Height = height;
-        SizeText.Text = $"{Math.Round(width)} × {Math.Round(height)}";
+        // Report the pixels that will actually be saved, not the scaled-down
+        // device-independent size the rubber band is drawn in.
+        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
+        var physical = RegionSelection.FromCorners(_startPhysical.X, _startPhysical.Y, pointerX, pointerY);
+        SizeText.Text = $"{physical.Width} × {physical.Height}";
         Canvas.SetLeft(SizeBadge, left);
         Canvas.SetTop(SizeBadge, Math.Max(4, top - 30));
     }

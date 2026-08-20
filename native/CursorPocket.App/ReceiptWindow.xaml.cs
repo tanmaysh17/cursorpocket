@@ -2,21 +2,44 @@ using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.System;
 
 namespace CursorPocket_App;
 
 public sealed partial class ReceiptWindow : Window
 {
+    private const int Width = 430;
+    private const int Height = 150;
+
     private readonly CaptureRecord? _record;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(12) };
+    // A receipt never takes focus, so its actions are reachable only through global
+    // keys. They are modified combinations on purpose: the receipt stays up while the
+    // user carries on working, and bare keys would swallow their typing.
+    private readonly PaletteHotkeyService _keys = new(
+        [
+            new(VirtualKey.O, Control: true, Alt: true),
+            new(VirtualKey.R, Control: true, Alt: true),
+            new(VirtualKey.L, Control: true, Alt: true),
+            new(VirtualKey.X, Control: true, Alt: true),
+        ],
+        "CursorPocket.ReceiptKeys");
 
     public ReceiptWindow(CaptureRecord? record, string title, string? detail = null)
     {
         _record = record;
         InitializeComponent();
         WindowPlacement.ConfigureUtilityWindow(this);
-        WindowPlacement.PlaceBottomRight(this, 430, 128);
-        WindowPlacement.ClipToRoundedRegion(this, 430, 128, 16);
+        WindowPlacement.PlaceBottomRight(this, Width, Height);
+        WindowPlacement.ClipToRoundedRegion(this, Width, Height, 16);
+        _keys.Invoked += Keys_Invoked;
+        _keys.SetEnabled(true);
+        Closed += (_, _) =>
+        {
+            _keys.SetEnabled(false);
+            _keys.Invoked -= Keys_Invoked;
+            _keys.Dispose();
+        };
         ReceiptTitle.Text = title;
         ReceiptDetail.Text = detail ?? record?.Preview ?? "Nothing was saved";
         OpenButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
@@ -82,6 +105,25 @@ public sealed partial class ReceiptWindow : Window
         }
         Close();
     }
+
+    private void Keys_Invoked(object? sender, PaletteHotkeyEventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
+    {
+        switch (eventArgs.Key)
+        {
+            case VirtualKey.O when _record is not null:
+                Open_Click(this, new RoutedEventArgs());
+                break;
+            case VirtualKey.R when _record is not null:
+                Reveal_Click(this, new RoutedEventArgs());
+                break;
+            case VirtualKey.L:
+                Library_Click(this, new RoutedEventArgs());
+                break;
+            case VirtualKey.X:
+                Dismiss_Click(this, new RoutedEventArgs());
+                break;
+        }
+    });
 
     private void Library_Click(object sender, RoutedEventArgs eventArgs) { OpenLibraryRequested?.Invoke(this, EventArgs.Empty); Close(); }
     private void Dismiss_Click(object sender, RoutedEventArgs eventArgs) { _timer.Stop(); Close(); }

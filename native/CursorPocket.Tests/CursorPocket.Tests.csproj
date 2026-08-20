@@ -48,8 +48,10 @@
     <None Include="..\CursorPocket.App\RecordingHudWindow.xaml" Link="Fixtures\RecordingHudWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RecordingHudWindow.xaml.cs" Link="Fixtures\RecordingHudWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\ReceiptWindow.xaml" Link="Fixtures\ReceiptWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\ReceiptWindow.xaml.cs" Link="Fixtures\ReceiptWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\RecordingService.cs" Link="Fixtures\RecordingService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\WindowPlacement.cs" Link="Fixtures\WindowPlacement.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\DisplayOutputLocator.cs" Link="Fixtures\DisplayOutputLocator.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CameraSelfViewWindow.xaml" Link="Fixtures\CameraSelfViewWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CameraSelfViewWindow.xaml.cs" Link="Fixtures\CameraSelfViewWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\MainWindow.xaml.cs" Link="Fixtures\MainWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />

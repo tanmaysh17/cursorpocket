@@ -1,13 +1,23 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
+using Microsoft.UI.Xaml.Media;
 
 namespace CursorPocket_App.ViewModels;
 
-public sealed class CaptureItemViewModel(CaptureRecord record, string absolutePath)
+public sealed partial class CaptureItemViewModel(CaptureRecord record, string absolutePath) : ObservableObject
 {
     public CaptureRecord Record { get; } = record;
     public string AbsolutePath { get; } = absolutePath;
     public string Id => Record.Id;
     public string Preview => Record.Preview;
+
+    /// <summary>
+    /// The real screenshot, video frame, or waveform for this capture. Filled in after
+    /// the list appears so a folder of large captures does not delay it.
+    /// </summary>
+    [ObservableProperty] private ImageSource? _thumbnail;
+
     public string KindLabel => Record.CaptureKind switch
     {
         CaptureKind.Screenshot => "Screenshot",
@@ -19,12 +29,12 @@ public sealed class CaptureItemViewModel(CaptureRecord record, string absolutePa
     };
     public string IconGlyph => Record.CaptureKind switch
     {
-        CaptureKind.Screenshot => "\uE91B",
-        CaptureKind.Video => "\uE714",
-        CaptureKind.Audio => "\uE720",
-        CaptureKind.Text => "\uE8C1",
-        CaptureKind.Link => "\uE71B",
-        _ => "\uE7C3",
+        CaptureKind.Screenshot => "",
+        CaptureKind.Video => "",
+        CaptureKind.Audio => "",
+        CaptureKind.Text => "",
+        CaptureKind.Link => "",
+        _ => "",
     };
 
     /// <summary>The file type, shown as a chip so a scan down the list separates kinds.</summary>
@@ -82,6 +92,12 @@ public sealed class CaptureItemViewModel(CaptureRecord record, string absolutePa
     public string CreatedLabel => Record.Created == DateTimeOffset.MinValue
         ? string.Empty
         : Record.Created.LocalDateTime.ToString("MMM d · h:mm tt");
+
+    /// <summary>Kind and file size on one line, so a row stays a single compact strip.</summary>
+    public string MetaLabel => FileSize.Describe(AbsolutePath) is { Length: > 0 } size
+        ? $"{KindLabel} · {size}"
+        : KindLabel;
+
     public string SavedLabel => Record.Created == DateTimeOffset.MinValue
         ? "Unknown"
         : Record.Created.LocalDateTime.ToString("d MMM yyyy, h:mm tt");

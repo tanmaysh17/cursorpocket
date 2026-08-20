@@ -2,6 +2,7 @@ using CursorPocket.Core.Models;
 using CursorPocket_App.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.Core;
@@ -46,7 +47,15 @@ public sealed partial class MainPage : Page
         ApplyFilterSelection(ViewModel.SelectedFilter);
         ShowActivationShortcut();
         UpdateLibraryVisibility();
+        SyncDeleteAffordance();
         await UpdateDetailAsync();
+        // Focus the list so arrow keys work without clicking into it first.
+        if (ViewModel.Items.Count > 0)
+        {
+            CaptureList.Focus(FocusState.Programmatic);
+        }
+        // Fire and forget: the list is already usable, thumbnails fill in behind it.
+        _ = LoadThumbnailsAsync();
     }
 
     /// <summary>Teach the activation shortcut where it is used, not only in Settings.</summary>
@@ -90,7 +99,9 @@ public sealed partial class MainPage : Page
         {
             await ViewModel.CaptureAddedAsync(eventArgs.Record);
             UpdateLibraryVisibility();
+            SyncDeleteAffordance();
             await UpdateDetailAsync();
+            await LoadThumbnailsAsync();
         });
     }
 
@@ -104,6 +115,178 @@ public sealed partial class MainPage : Page
         }
     }
 
+    /// <summary>
+    /// Library shortcuts stand down while a text box has focus — the capture folder
+    /// box would otherwise lose Space and Ctrl+A — and while another panel is showing.
+    /// </summary>
+    private bool LibraryKeysActive() =>
+        LibraryPanel.Visibility == Visibility.Visible &&
+        FocusManager.GetFocusedElement(XamlRoot) is not TextBox;
+
+    private void OpenAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        ViewModel.OpenSelectedCommand.Execute(null);
+    }
+
+    private void RevealAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        ViewModel.RevealSelectedCommand.Execute(null);
+    }
+
+    private void CopyPathAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        CopyPath_Click(this, new RoutedEventArgs());
+    }
+
+    private void DeleteAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || CaptureList.SelectedItems.Count == 0)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        DeleteSelected_Click(this, new RoutedEventArgs());
+    }
+
+    /// <summary>Play or pause whatever is loaded, so a recording can be reviewed without the mouse.</summary>
+    private void PlayAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || DetailPlayer.MediaPlayer is null || DetailPlayer.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        var player = DetailPlayer.MediaPlayer;
+        if (player.PlaybackSession.PlaybackState == Windows.Media.Playback.MediaPlaybackState.Playing)
+        {
+            player.Pause();
+        }
+        else
+        {
+            player.Play();
+        }
+    }
+
+    private void MaximizeAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive())
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        MaximizePreview_Click(this, new RoutedEventArgs());
+    }
+
+    private void SelectAllAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive())
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        CaptureList.SelectAll();
+    }
+
+    private void FilterAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive())
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        var index = sender.Key - Windows.System.VirtualKey.Number1;
+        if (index >= 0 && index < FilterBar.Children.Count && FilterBar.Children[index] is Button filter)
+        {
+            Filter_Click(filter, new RoutedEventArgs());
+        }
+    }
+
+    private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        SyncDeleteAffordance();
+        await UpdateDetailAsync();
+    }
+
+    /// <summary>
+    /// Delete acts on the whole selection, so the button has to say how many captures
+    /// are about to move to the Recycle Bin.
+    /// </summary>
+    private void SyncDeleteAffordance()
+    {
+        var count = CaptureList.SelectedItems.Count;
+        DeleteButton.IsEnabled = count > 0;
+        DeleteCountText.Text = count.ToString();
+        DeleteCountText.Visibility = count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void DeleteSelected_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var selected = CaptureList.SelectedItems.OfType<CaptureItemViewModel>().ToList();
+        if (selected.Count == 0)
+        {
+            return;
+        }
+        // Deletion goes to the Recycle Bin, so this stays recoverable without a prompt.
+        await ViewModel.DeleteAsync(selected);
+        SyncDeleteAffordance();
+        await UpdateDetailAsync();
+    }
+
+    /// <summary>
+    /// Hides the list so the preview gets the whole window. The Library window itself
+    /// is resizable and remembers its size, so this is about the split, not the window.
+    /// </summary>
+    private void MaximizePreview_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var maximized = ListColumn.Width.Value > 0;
+        ListColumn.Width = maximized ? new GridLength(0) : new GridLength(4, GridUnitType.Star);
+        ListColumn.MinWidth = maximized ? 0 : 240;
+        MaximizePreviewIcon.Glyph = maximized ? "" : "";
+        ToolTipService.SetToolTip(MaximizePreviewButton, maximized ? "Show the capture list" : "Fill the window with the preview");
+    }
+
+    /// <summary>
+    /// Fills in the real screenshot, video frame, or waveform for each row. Runs after
+    /// the list is already on screen and one at a time, so a folder full of large
+    /// recordings never delays the Library appearing.
+    /// </summary>
+    private async Task LoadThumbnailsAsync()
+    {
+        foreach (var item in ViewModel.Items.ToList())
+        {
+            if (item.Thumbnail is not null)
+            {
+                continue;
+            }
+            try
+            {
+                var preview = await App.Services.Previews.GetPreviewAsync(item.Record);
+                if (preview is not null)
+                {
+                    item.Thumbnail = new BitmapImage(new Uri(preview)) { DecodePixelWidth = 104 };
+                }
+            }
+            catch (Exception)
+            {
+                // A capture whose preview cannot be produced keeps its kind icon.
+            }
+        }
+    }
     private void ApplyFilterSelection(string filter)
     {
         var resources = Application.Current.Resources;
@@ -115,8 +298,6 @@ public sealed partial class MainPage : Page
             button.Foreground = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketInk" : "PocketMuted"];
         }
     }
-
-    private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs) => await UpdateDetailAsync();
 
     /// <summary>Opening from the row keeps the primary action reachable when the
     /// detail pane has given way to the list at narrow widths.</summary>

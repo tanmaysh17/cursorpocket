@@ -56,6 +56,34 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Every_capture_can_be_acted_on_without_a_mouse()
+    {
+        var receipt = ReadFixture("ReceiptWindow.xaml.cs.txt");
+        var receiptXaml = ReadFixture("ReceiptWindow.xaml");
+        var page = ReadFixture("MainPage.xaml.cs.txt");
+        var pageXaml = ReadFixture("MainPage.xaml");
+        var hotkeys = ReadFixture("PaletteHotkeyService.cs.txt");
+
+        // A receipt never takes focus, so its actions are reachable only through global
+        // keys — and those must carry modifiers, or they would swallow the typing the
+        // user does during the twelve seconds the receipt is up.
+        Assert.Contains("Control: true, Alt: true", receipt, StringComparison.Ordinal);
+        Assert.Contains("ModControl", hotkeys, StringComparison.Ordinal);
+        Assert.Contains("_keys.SetEnabled(false)", receipt, StringComparison.Ordinal);
+        Assert.Contains("ReceiptKeysHint", receiptXaml, StringComparison.Ordinal);
+
+        // The Library is driven by page accelerators, which cannot affect other apps.
+        Assert.Contains("OpenAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("PlayAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("DeleteAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("RevealAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        // ...and they stand down while a text box has focus, or Settings would lose
+        // Space and Ctrl+A to the Library.
+        Assert.Contains("is not TextBox", page, StringComparison.Ordinal);
+        Assert.Contains("LibraryKeysActive()", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Capture_surfaces_are_forced_to_the_foreground_rather_than_merely_activated()
     {
         var main = ReadFixture("MainWindow.xaml.cs.txt");
@@ -68,6 +96,20 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("editor.AppWindow.Show(true)", main, StringComparison.Ordinal);
         Assert.Contains("AttachThreadInput", placement, StringComparison.Ordinal);
         Assert.Contains("IsIconic(handle) ? NativeMethods.SwRestore", placement, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Region_selection_captures_physical_pixels_not_layout_coordinates()
+    {
+        var code = ReadFixture("RegionSelectorWindow.xaml.cs.txt");
+
+        // Screen capture is in physical pixels. Taking the corners from the cursor
+        // rather than from XAML positions is what keeps a scaled display from losing
+        // the right and bottom of every region.
+        Assert.Contains("WindowPlacement.PointerPosition()", code, StringComparison.Ordinal);
+        Assert.Contains("RegionSelection.FromCorners", code, StringComparison.Ordinal);
+        Assert.Contains("RegionSelection.IsUsable", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Math.Min(_start.X, end.X)", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -112,13 +154,35 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
-    public void Video_preflight_does_not_start_before_readiness_and_targets_the_pointer_display()
+    public void Video_preflight_does_not_start_before_readiness()
     {
         var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
 
         Assert.Contains("!StartButton.IsEnabled", code, StringComparison.Ordinal);
-        Assert.Contains("DisplayIndexUnderPointer", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_display_recording_captures_the_screen_command_mode_was_opened_on()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+        var locator = ReadFixture("DisplayOutputLocator.cs.txt");
+
+        // Resolved when the user asks to record. Resolving it at Start instead reads
+        // the pointer over the preflight window, which Windows may have opened on
+        // another screen.
+        Assert.Contains("SnapshotDisplayTarget", main, StringComparison.Ordinal);
+        Assert.Contains("DisplayTargetUnderPointer", placement, StringComparison.Ordinal);
+        Assert.Contains("_displayBounds", preflight, StringComparison.Ordinal);
+        Assert.Contains("_displayOutputIndex", preflight, StringComparison.Ordinal);
+        // ddagrab's output_idx is a DXGI ordering, so it must come from DXGI and never
+        // from a monitor enumeration index.
+        Assert.Contains("EnumOutputs", locator, StringComparison.Ordinal);
+        Assert.Contains("DeviceName", locator, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisplayIndexUnderPointer", preflight, StringComparison.Ordinal);
+        Assert.DoesNotContain("DisplayIndexUnderPointer", placement, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -133,11 +197,14 @@ public sealed class UtilitySurfaceContractTests
         // reaches the file by being on screen inside the recorded area.
         Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
-        // It sits over the user's work while they demonstrate it, so it must not
-        // take clicks or focus.
-        Assert.Contains("MakeClickThrough", code, StringComparison.Ordinal);
-        Assert.Contains("WsExTransparent", placement, StringComparison.Ordinal);
+        // It is dragged to reposition the camera mid recording, so it accepts pointer
+        // input — but it must never take activation from the work being demonstrated.
+        Assert.Contains("Root.CapturePointer", code, StringComparison.Ordinal);
         Assert.Contains("RestoreFocus(sourceWindow)", code, StringComparison.Ordinal);
+        // The clamp is not cosmetic: outside the recorded rectangle the webcam is
+        // simply absent from the file.
+        Assert.Contains("_captureArea.Right - width", code, StringComparison.Ordinal);
+        Assert.Contains("_captureArea.Bottom - height", code, StringComparison.Ordinal);
         Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
         // Opaque edge to edge, like every other transient surface.
         Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
@@ -167,13 +234,43 @@ public sealed class UtilitySurfaceContractTests
         var xaml = ReadFixture("RecordingHudWindow.xaml");
 
         Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"22\"", xaml, StringComparison.Ordinal);
+        // Sized to fit the drawer. The previous 17/22 pt text overflowed the panel and
+        // was cut off, which is worse for legibility than smaller text that fits.
+        Assert.Contains("FontSize=\"15\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"12\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontSize=\"22\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Stop &amp; save\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderThickness=\"0\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ThemeShadow", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_recording_hud_sits_small_at_the_top_edge_and_opens_on_hover()
+    {
+        var xaml = ReadFixture("RecordingHudWindow.xaml");
+        var code = ReadFixture("RecordingHudWindow.xaml.cs.txt");
+
+        Assert.Contains("PointerEntered=\"Root_PointerEntered\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("PointerExited=\"Root_PointerExited\"", xaml, StringComparison.Ordinal);
+        // Keyboard users must be able to reach the actions without a pointer.
+        Assert.Contains("GotFocus=\"Root_GotFocus\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("StripHeight = 32", code, StringComparison.Ordinal);
+        // The window is one fixed size that slides; resizing it or recomputing a window
+        // region per frame is what made the travel stutter.
+        Assert.Contains("WindowPlacement.MoveTo(this, _panelLeft, top)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClipToRoundedRegion", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PlaceTopCenter", code, StringComparison.Ordinal);
+        // Opens on approach, not on contact.
+        Assert.Contains("DrawerAnimation.IsPointerNear", code, StringComparison.Ordinal);
+        Assert.Contains("DrawerAnimation.Advance", code, StringComparison.Ordinal);
+        // Escape still stops and saves, so a collapsed HUD never traps a recording.
+        Assert.Contains("EscapeHotkey.Capture", code, StringComparison.Ordinal);
+        // The level meter is a rolling waveform, not one bar sliding left and right.
+        Assert.Contains("AudioLevelHistory", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProgressBar", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("LevelBar", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,7 +291,11 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("SwpFrameChanged", placement, StringComparison.Ordinal);
         Assert.Contains("DwmNcRenderingDisabled", placement, StringComparison.Ordinal);
         Assert.Contains("SetWindowRgn", placement, StringComparison.Ordinal);
-        Assert.Contains("ClipToRoundedRegion", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        // The HUD deliberately takes its rounded corners from DWM instead of a window
+        // region: it slides every frame, and a region clip drops the window off DWM's
+        // fast path. ConfigureUtilityWindow is what asks for the rounding.
+        Assert.Contains("WindowPlacement.ConfigureUtilityWindow(this)", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("DwmwaWindowCornerPreference", placement, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -126,17 +126,42 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DeleteSelectedAsync()
+    private async Task DeleteSelectedAsync() =>
+        await DeleteAsync(SelectedItem is null ? [] : [SelectedItem]);
+
+    /// <summary>
+    /// Moves every given capture to the Recycle Bin. One capture that refuses to
+    /// delete does not abandon the rest, and the count is reported so a multiple
+    /// selection does not silently drop items.
+    /// </summary>
+    public async Task DeleteAsync(IReadOnlyList<CaptureItemViewModel> items)
     {
-        if (SelectedItem is null)
+        if (items.Count == 0)
         {
             return;
         }
-        var item = SelectedItem;
-        await services.Library.DeleteAsync(item.Record);
-        _allItems.Remove(item);
+        var deleted = 0;
+        var failed = 0;
+        foreach (var item in items)
+        {
+            try
+            {
+                await services.Library.DeleteAsync(item.Record);
+                _allItems.Remove(item);
+                deleted++;
+            }
+            catch (Exception)
+            {
+                failed++;
+            }
+        }
+        SelectedItem = null;
         ApplyFilter();
-        StatusMessage = "Moved capture to the Recycle Bin";
+        StatusMessage = failed == 0
+            ? deleted == 1
+                ? "Moved capture to the Recycle Bin"
+                : $"Moved {deleted} captures to the Recycle Bin"
+            : $"Moved {deleted} to the Recycle Bin · {failed} could not be removed";
         RaiseCounts();
     }
 
