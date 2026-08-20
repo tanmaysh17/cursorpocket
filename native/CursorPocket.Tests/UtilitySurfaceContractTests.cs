@@ -56,6 +56,34 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Every_capture_can_be_acted_on_without_a_mouse()
+    {
+        var receipt = ReadFixture("ReceiptWindow.xaml.cs.txt");
+        var receiptXaml = ReadFixture("ReceiptWindow.xaml");
+        var page = ReadFixture("MainPage.xaml.cs.txt");
+        var pageXaml = ReadFixture("MainPage.xaml");
+        var hotkeys = ReadFixture("PaletteHotkeyService.cs.txt");
+
+        // A receipt never takes focus, so its actions are reachable only through global
+        // keys — and those must carry modifiers, or they would swallow the typing the
+        // user does during the twelve seconds the receipt is up.
+        Assert.Contains("Control: true, Alt: true", receipt, StringComparison.Ordinal);
+        Assert.Contains("ModControl", hotkeys, StringComparison.Ordinal);
+        Assert.Contains("_keys.SetEnabled(false)", receipt, StringComparison.Ordinal);
+        Assert.Contains("ReceiptKeysHint", receiptXaml, StringComparison.Ordinal);
+
+        // The Library is driven by page accelerators, which cannot affect other apps.
+        Assert.Contains("OpenAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("PlayAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("DeleteAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        Assert.Contains("RevealAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
+        // ...and they stand down while a text box has focus, or Settings would lose
+        // Space and Ctrl+A to the Library.
+        Assert.Contains("is not TextBox", page, StringComparison.Ordinal);
+        Assert.Contains("LibraryKeysActive()", page, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Capture_surfaces_are_forced_to_the_foreground_rather_than_merely_activated()
     {
         var main = ReadFixture("MainWindow.xaml.cs.txt");

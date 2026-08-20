@@ -5,6 +5,8 @@ namespace CursorPocket_App.Services;
 internal sealed class PaletteHotkeyService : IDisposable
 {
     private const int FirstId = 0xC20;
+    private const uint ModAlt = 0x0001;
+    private const uint ModControl = 0x0002;
     private const uint ModShift = 0x0004;
     private const uint ModNoRepeat = 0x4000;
     private const uint WmSetEnabled = 0x8001;
@@ -12,33 +14,51 @@ internal sealed class PaletteHotkeyService : IDisposable
     private readonly ManualResetEventSlim _enabledChanged = new(false);
     private readonly Thread _thread;
     private readonly NativeMethods.WindowProc _windowProcedure;
-    private readonly Dictionary<int, (VirtualKey Key, bool Shift)> _commands = new();
+    private readonly Dictionary<int, ScopedKey> _commands = new();
+    private readonly IReadOnlyList<ScopedKey> _definitions;
     private nint _window;
     private bool _disposed;
     private bool _enabled;
-    private static readonly (VirtualKey Key, bool Shift)[] Definitions =
+
+    /// <summary>
+    /// Command mode's mnemonics. Bare keys, which is only safe because they are
+    /// registered solely while the palette is on screen.
+    /// </summary>
+    public static readonly ScopedKey[] CommandModeKeys =
     [
-        (VirtualKey.S, false),
-        (VirtualKey.V, false),
-        (VirtualKey.V, true),
-        (VirtualKey.A, false),
-        (VirtualKey.T, false),
-        (VirtualKey.L, false),
-        (VirtualKey.O, false),
-        (VirtualKey.R, false),
-        (VirtualKey.W, false),
-        (VirtualKey.D, false),
-        (VirtualKey.P, false),
-        (VirtualKey.Escape, false),
+        new(VirtualKey.S),
+        new(VirtualKey.V),
+        new(VirtualKey.V, Shift: true),
+        new(VirtualKey.A),
+        new(VirtualKey.T),
+        new(VirtualKey.L),
+        new(VirtualKey.O),
+        new(VirtualKey.R),
+        new(VirtualKey.W),
+        new(VirtualKey.D),
+        new(VirtualKey.P),
+        new(VirtualKey.Escape),
     ];
 
     public PaletteHotkeyService()
+        : this(CommandModeKeys, "CursorPocket.CommandKeys")
     {
+    }
+
+    /// <summary>
+    /// A scoped set of global keys, live only between <see cref="SetEnabled"/> calls.
+    /// Surfaces that stay up while the user keeps working — a capture receipt, say —
+    /// must pass modified combinations: bare keys would swallow ordinary typing for
+    /// as long as the surface is visible.
+    /// </summary>
+    public PaletteHotkeyService(IReadOnlyList<ScopedKey> definitions, string threadName)
+    {
+        _definitions = definitions;
         _windowProcedure = HandleMessage;
         _thread = new Thread(RunMessageWindow)
         {
             IsBackground = true,
-            Name = "CursorPocket.CommandKeys",
+            Name = threadName,
         };
         _thread.SetApartmentState(ApartmentState.STA);
         _thread.Start();
@@ -108,11 +128,14 @@ internal sealed class PaletteHotkeyService : IDisposable
     private void RegisterCommands(nint hwnd)
     {
         UnregisterCommands(hwnd);
-        for (var index = 0; index < Definitions.Length; index++)
+        for (var index = 0; index < _definitions.Count; index++)
         {
             var id = FirstId + index;
-            var definition = Definitions[index];
-            var modifiers = ModNoRepeat | (definition.Shift ? ModShift : 0);
+            var definition = _definitions[index];
+            var modifiers = ModNoRepeat
+                | (definition.Shift ? ModShift : 0)
+                | (definition.Control ? ModControl : 0)
+                | (definition.Alt ? ModAlt : 0);
             if (NativeMethods.RegisterHotKey(hwnd, id, modifiers, (uint)definition.Key))
             {
                 _commands[id] = definition;
@@ -147,3 +170,5 @@ internal sealed class PaletteHotkeyService : IDisposable
 }
 
 internal sealed record PaletteHotkeyEventArgs(VirtualKey Key, bool Shift);
+
+internal sealed record ScopedKey(VirtualKey Key, bool Shift = false, bool Control = false, bool Alt = false);

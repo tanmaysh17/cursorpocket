@@ -11,6 +11,24 @@
     mc:Ignorable="d">
 
     <Grid Background="Transparent">
+        <!-- The Library is fully keyboard-drivable. These are page accelerators, so
+             they never affect other applications, and every handler stands down while
+             a text box has focus or the Library is not the visible panel. -->
+        <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="Enter" Invoked="OpenAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Space" Invoked="PlayAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Delete" Invoked="DeleteAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RevealAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyPathAccelerator_Invoked" />
+            <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="MaximizeAccelerator_Invoked" />
+            <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number2" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number3" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number4" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number5" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number6" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
+        </Grid.KeyboardAccelerators>
         <NavigationView
             x:Name="Navigation"
             IsBackButtonVisible="Collapsed"

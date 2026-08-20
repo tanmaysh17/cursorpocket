@@ -30,6 +30,33 @@ These are individual one-key actions: enter command mode, then tap one key. The 
 
 For text, highlight what you want, open CursorPocket, and press `T`. CursorPocket copies only that active selection. For a link, leave the webpage open, open CursorPocket, and press `L`; it reads the current address from Chrome, Edge, Firefox, Brave, Vivaldi, or Opera. It creates no file when the source is not a complete `http://` or `https://` webpage.
 
+### Keyboard only
+
+Every capture can be dealt with without touching the mouse.
+
+A receipt appears after each capture and never steals focus, so its actions are on global keys while it is showing:
+
+| Key | Action |
+| --- | --- |
+| `Ctrl + Alt + O` | Open, or play a recording |
+| `Ctrl + Alt + R` | Reveal in the capture folder |
+| `Ctrl + Alt + L` | Open the Library |
+| `Ctrl + Alt + X` | Dismiss the receipt |
+
+Inside the Library, ordinary keys work because the window has focus:
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` | Move through captures |
+| `Enter` | Open the selected capture |
+| `Space` | Play or pause |
+| `Ctrl + R` | Reveal in the capture folder |
+| `Ctrl + C` | Copy the file path |
+| `Delete` | Move the selection to the Recycle Bin |
+| `Ctrl + A` | Select everything |
+| `Ctrl + M` | Fill the window with the preview |
+| `Ctrl + 1` … `Ctrl + 6` | Switch filter |
+
 ### Screenshot annotation
 
 Every screenshot is copied to your clipboard the moment you take it, so it is ready to paste, and opens a full-resolution markup preview. Saving with marks copies the marked-up version. Choose **Pen**, **Highlight**, **Arrow**, **Rectangle**, or **Text**, pick a color, and draw directly on the image. `Ctrl + Z` undoes the last mark, `Enter` saves, and `Escape` keeps the original screenshot without markup.

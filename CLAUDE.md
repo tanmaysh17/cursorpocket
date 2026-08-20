@@ -93,6 +93,7 @@ Consequence: renaming an element, a local variable, or an offset in App code can
 
 These were each fixed after a real regression (`AGENTS.md`, `DESIGN.md`, `HANDOFF.md`):
 
+- Global keys registered while a surface is visible must be **bare only if that surface owns the user's attention**. Command mode does, so its mnemonics are bare; a capture receipt does not — the user carries on working while it is up — so its keys are `Ctrl+Alt`-modified. `PaletteHotkeyService` takes the key set as a constructor argument for exactly this. Anything the user can act on without a mouse should also be reachable through page `KeyboardAccelerator`s where the surface can take focus, since those cannot leak into other applications.
 - Bare command keys (`S/V/A/T/L/O`) are registered **only while the command palette is visible**. Leaving them registered would steal ordinary typing — do not "optimize" that away. The palette itself is constructed once and kept warm while hidden.
 - Never restore, resize, unmaximize, or minimize a healthy source window just to return focus to it.
 - Release the preflight camera preview before the recording self-view acquires the same device.

@@ -13,7 +13,10 @@
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="7">
                     <StackPanel Spacing="2"><TextBlock x:Name="ReceiptTitle" MaxWidth="252" Text="Capture saved" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="ReceiptDetail" MaxWidth="252" Text="Saved locally" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                    <StackPanel Orientation="Horizontal" Spacing="7"><Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" /><Button x:Name="RevealButton" Click="Reveal_Click" Content="Reveal" Style="{StaticResource PocketQuietButton}" /><Button Click="Library_Click" Content="Library" Style="{StaticResource PocketQuietButton}" /></StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="7"><Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" ToolTipService.ToolTip="Ctrl+Alt+O" /><Button x:Name="RevealButton" Click="Reveal_Click" Content="Reveal" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Ctrl+Alt+R" /><Button Click="Library_Click" Content="Library" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Ctrl+Alt+L" /></StackPanel>
+                    <!-- The receipt never takes focus, so the keys are the only way to
+                         act on it without reaching for the mouse. Say so. -->
+                    <TextBlock x:Name="ReceiptKeysHint" FontFamily="Cascadia Mono" FontSize="10" Foreground="{StaticResource PocketMuted}" Text="Ctrl+Alt · O open · R reveal · L library · X dismiss" />
                 </StackPanel>
             </Grid>
         </Border>
