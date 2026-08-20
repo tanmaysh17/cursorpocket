@@ -37,7 +37,7 @@
                 <Setter Property="BorderThickness" Value="0" />
             </Style>
             <Style x:Key="CompactKeyCap" TargetType="Button" BasedOn="{StaticResource KeyCapButton}">
-                <Setter Property="MinWidth" Value="28" />
+                <Setter Property="MinWidth" Value="34" />
                 <Setter Property="MinHeight" Value="24" />
                 <Setter Property="Padding" Value="5,2" />
                 <Setter Property="CornerRadius" Value="7" />
@@ -110,13 +110,13 @@
                 <Grid>
                     <StackPanel x:Name="PrimaryCommands" Spacing="1">
                         <Button x:Name="ScreenshotCommand" Style="{StaticResource CommandRow}" Tag="screenshot" Click="Command_Click">
-                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="S" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Screenshot" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE76C;" Foreground="{StaticResource PocketMuted}" /></Grid>
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="S" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Screenshot" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE91B;" Foreground="{StaticResource PocketGreen}" /></Grid>
                         </Button>
                         <Button Style="{StaticResource CommandRow}" Tag="video" Click="Command_Click">
                             <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="V" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Video" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE714;" Foreground="{StaticResource PocketGreen}" /></Grid>
                         </Button>
                         <Button Style="{StaticResource CommandRow}" Tag="repeat-video" Click="Command_Click">
-                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal" Spacing="3"><Button Content="⇧" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" AutomationProperties.Name="Shift" ToolTipService.ToolTip="Shift" /><Button Content="V" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /></StackPanel><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Repeat last video" Style="{StaticResource PocketBodyText}" FontSize="13" /></Grid>
+                            <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="⇧V" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" AutomationProperties.Name="Shift plus V" ToolTipService.ToolTip="Shift + V" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Repeat last video" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE72C;" Foreground="{StaticResource PocketGreen}" /></Grid>
                         </Button>
                         <Button Style="{StaticResource CommandRow}" Tag="audio" Click="Command_Click">
                             <Grid ColumnSpacing="9"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button Content="A" IsHitTestVisible="False" Style="{StaticResource CompactKeyCap}" /><TextBlock Grid.Column="1" VerticalAlignment="Center" Text="Audio note" Style="{StaticResource PocketBodyText}" FontSize="13" /><FontIcon Grid.Column="2" VerticalAlignment="Center" FontSize="12" Glyph="&#xE720;" Foreground="{StaticResource PocketGreen}" /></Grid>

@@ -4,74 +4,387 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Set up screen recording">
-    <Window.SystemBackdrop><MicaBackdrop Kind="BaseAlt" /></Window.SystemBackdrop>
-    <Grid x:Name="Root" Padding="28" KeyDown="Root_KeyDown">
-        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="BaseAlt" />
+    </Window.SystemBackdrop>
+    <Grid
+        x:Name="Root"
+        Padding="24"
+        KeyDown="Root_KeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
         <Grid>
-            <StackPanel Spacing="4">
-                <TextBlock Text="SCREEN RECORDING" Foreground="{StaticResource PocketGreen}" FontFamily="Cascadia Mono" FontSize="11" FontWeight="SemiBold" CharacterSpacing="110" />
-                <TextBlock Text="Set the room before you record" Style="{StaticResource PocketDisplayText}" />
-                <TextBlock Text="Nothing starts until you confirm the source, microphone, and camera." Style="{StaticResource PocketCaptionText}" />
+            <StackPanel Spacing="6">
+                <TextBlock Style="{StaticResource PocketDisplayText}" Text="Before you record" />
+                <TextBlock Style="{StaticResource PocketCaptionText}" Text="Nothing is captured until you press start." />
             </StackPanel>
-            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Click="Cancel_Click" Background="Transparent"><FontIcon Glyph="&#xE711;" /></Button>
+            <Button
+                HorizontalAlignment="Right"
+                VerticalAlignment="Top"
+                Click="Cancel_Click"
+                Style="{StaticResource PocketIconButton}"
+                ToolTipService.ToolTip="Cancel">
+                <FontIcon FontSize="14" Glyph="&#xE711;" />
+            </Button>
         </Grid>
 
-        <Grid Grid.Row="1" Margin="0,24,0,20" ColumnSpacing="18">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="5*" /><ColumnDefinition Width="4*" /></Grid.ColumnDefinitions>
+        <!--  The three decisions read straight down the left column, in the order they are
+              numbered. The right column answers the only question the numbers cannot:
+              what will actually end up in the file.  -->
+        <Grid
+            Grid.Row="1"
+            Margin="0,20"
+            ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="11*" />
+                <ColumnDefinition Width="9*" />
+            </Grid.ColumnDefinitions>
 
-            <ScrollViewer x:Name="OptionsScroll" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel Margin="0,0,8,0" Spacing="16">
-                <Border Padding="18" Background="{StaticResource PocketSurface}" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-                    <StackPanel Spacing="12">
-                        <TextBlock Text="1 · Screen" Style="{StaticResource PocketTitleText}" />
-                        <ComboBox x:Name="SourceBox" Header="Recording source" SelectedIndex="0" SelectionChanged="SourceBox_SelectionChanged">
-                            <ComboBoxItem Content="Display under pointer" Tag="display" />
-                            <ComboBoxItem Content="Select a region after setup" Tag="region" />
-                            <ComboBoxItem Content="Window used before CursorPocket" Tag="window" />
-                        </ComboBox>
-                        <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE7F4;" Foreground="{StaticResource PocketGreen}" /><TextBlock x:Name="SourceSummary" Text="Current display · pointer included" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                    </StackPanel>
-                </Border>
+            <ScrollViewer
+                x:Name="OptionsScroll"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Visible">
+                <StackPanel Margin="0,0,8,0" Spacing="12">
+                    <Border Style="{StaticResource PocketCard}">
+                        <StackPanel Padding="16" Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource PocketNumericText}"
+                                    Text="01" />
+                                <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Screen" />
+                            </StackPanel>
+                            <ComboBox
+                                x:Name="SourceBox"
+                                HorizontalAlignment="Stretch"
+                                AutomationProperties.Name="Recording source"
+                                SelectedIndex="0"
+                                SelectionChanged="SourceBox_SelectionChanged">
+                                <ComboBoxItem Content="Display under pointer" Tag="display" />
+                                <ComboBoxItem Content="Select a region after setup" Tag="region" />
+                                <ComboBoxItem Content="Window used before CursorPocket" Tag="window" />
+                            </ComboBox>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    VerticalAlignment="Center"
+                                    FontSize="13"
+                                    Foreground="{StaticResource PocketMuted}"
+                                    Glyph="&#xE7F4;" />
+                                <TextBlock
+                                    x:Name="SourceSummary"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource PocketMetaText}"
+                                    Text="Current display · pointer included" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-                <Border Padding="18" Background="{StaticResource PocketSurface}" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-                    <StackPanel Spacing="12">
-                        <Grid><TextBlock Text="2 · Microphone" Style="{StaticResource PocketTitleText}" /><ToggleSwitch x:Name="MicrophoneToggle" HorizontalAlignment="Right" Toggled="MicrophoneToggle_Toggled" /></Grid>
-                        <ComboBox x:Name="MicrophoneBox" Header="Microphone" DisplayMemberPath="Name" SelectionChanged="MicrophoneBox_SelectionChanged" />
-                        <StackPanel Spacing="6"><ProgressBar x:Name="MicrophoneLevel" Minimum="0" Maximum="1" Value="0" Foreground="{StaticResource PocketGreen}" /><TextBlock x:Name="MicrophoneStatus" Text="Checking microphone permission and signal…" Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                    </StackPanel>
-                </Border>
+                    <Border Style="{StaticResource PocketCard}">
+                        <StackPanel Padding="16" Spacing="12">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PocketNumericText}"
+                                        Text="02" />
+                                    <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Microphone" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="MicrophoneToggle"
+                                    MinWidth="0"
+                                    HorizontalAlignment="Right"
+                                    OffContent=""
+                                    OnContent=""
+                                    Toggled="MicrophoneToggle_Toggled"
+                                    AutomationProperties.Name="Record the microphone" />
+                            </Grid>
+                            <ComboBox
+                                x:Name="MicrophoneBox"
+                                HorizontalAlignment="Stretch"
+                                DisplayMemberPath="Name"
+                                SelectionChanged="MicrophoneBox_SelectionChanged"
+                                AutomationProperties.Name="Microphone" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ProgressBar
+                                    x:Name="MicrophoneLevel"
+                                    Height="6"
+                                    VerticalAlignment="Center"
+                                    Background="{StaticResource PocketSunken}"
+                                    Foreground="{StaticResource PocketGreen}"
+                                    Maximum="1"
+                                    Minimum="0"
+                                    Value="0" />
+                                <TextBlock
+                                    x:Name="MicrophoneStatus"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource PocketMetaText}"
+                                    Text="Checking…" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
 
-                <Expander Header="More recording options" Expanding="MoreOptions_Expanding">
-                    <StackPanel Padding="0,12,0,4" Spacing="12">
-                        <ToggleSwitch x:Name="PointerToggle" Header="Include the Windows pointer" IsOn="True" />
-                        <ComboBox x:Name="FrameRateBox" Header="Frame rate" SelectedIndex="0"><ComboBoxItem Content="30 fps · balanced" Tag="30" /><ComboBoxItem Content="60 fps · smoother" Tag="60" /></ComboBox>
-                        <ComboBox x:Name="CountdownBox" Header="Countdown" SelectedIndex="1"><ComboBoxItem Content="No countdown" Tag="0" /><ComboBoxItem Content="3 seconds" Tag="3" /><ComboBoxItem Content="5 seconds" Tag="5" /></ComboBox>
-                    </StackPanel>
-                </Expander>
-            </StackPanel>
+                    <Border Style="{StaticResource PocketCard}">
+                        <Grid Padding="16">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock
+                                        VerticalAlignment="Center"
+                                        Style="{StaticResource PocketNumericText}"
+                                        Text="03" />
+                                    <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Camera" />
+                                </StackPanel>
+                                <ToggleSwitch
+                                    x:Name="CameraToggle"
+                                    MinWidth="0"
+                                    HorizontalAlignment="Right"
+                                    OffContent=""
+                                    OnContent=""
+                                    Toggled="CameraToggle_Toggled"
+                                    AutomationProperties.Name="Record the camera" />
+                            </Grid>
+                            <StackPanel
+                                x:Name="CameraOptions"
+                                Grid.Row="1"
+                                Margin="0,12,0,0"
+                                Spacing="12"
+                                Visibility="Collapsed">
+                                <ComboBox
+                                    x:Name="CameraBox"
+                                    HorizontalAlignment="Stretch"
+                                    DisplayMemberPath="Name"
+                                    SelectionChanged="CameraBox_SelectionChanged"
+                                    AutomationProperties.Name="Camera" />
+                                <StackPanel
+                                    x:Name="CameraSourceNotice"
+                                    Orientation="Horizontal"
+                                    Spacing="8"
+                                    Visibility="Collapsed">
+                                    <FontIcon
+                                        VerticalAlignment="Top"
+                                        FontSize="14"
+                                        Foreground="{StaticResource PocketMuted}"
+                                        Glyph="&#xE7BA;" />
+                                    <TextBlock
+                                        x:Name="CameraSourceNoticeText"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Window recordings capture only that window, so the camera will be visible on screen but will not appear in the saved file."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition />
+                                        <ColumnDefinition />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox
+                                        x:Name="CameraPositionBox"
+                                        HorizontalAlignment="Stretch"
+                                        Header="Position"
+                                        SelectedIndex="0">
+                                        <ComboBoxItem Content="Bottom right" Tag="bottom-right" />
+                                        <ComboBoxItem Content="Bottom left" Tag="bottom-left" />
+                                        <ComboBoxItem Content="Top right" Tag="top-right" />
+                                        <ComboBoxItem Content="Top left" Tag="top-left" />
+                                    </ComboBox>
+                                    <ComboBox
+                                        x:Name="CameraSizeBox"
+                                        Grid.Column="1"
+                                        HorizontalAlignment="Stretch"
+                                        Header="Size"
+                                        SelectedIndex="1">
+                                        <ComboBoxItem Content="Small" Tag="240" />
+                                        <ComboBoxItem Content="Medium" Tag="360" />
+                                        <ComboBoxItem Content="Large" Tag="480" />
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                            <TextBlock
+                                x:Name="CameraStatus"
+                                Grid.Row="2"
+                                Margin="0,10,0,0"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="Off · no camera device is opened" />
+                        </Grid>
+                    </Border>
+
+                    <Expander
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch"
+                        Expanding="MoreOptions_Expanding">
+                        <Expander.Header>
+                            <StackPanel Padding="0,4">
+                                <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="More recording options" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    Style="{StaticResource PocketMetaText}"
+                                    Text="Pointer, frame rate, countdown" />
+                            </StackPanel>
+                        </Expander.Header>
+                        <StackPanel Padding="0,12,0,4" Spacing="12">
+                            <ToggleSwitch
+                                x:Name="PointerToggle"
+                                Header="Include the Windows pointer"
+                                IsOn="True" />
+                            <ComboBox
+                                x:Name="FrameRateBox"
+                                HorizontalAlignment="Stretch"
+                                Header="Frame rate"
+                                SelectedIndex="0">
+                                <ComboBoxItem Content="30 fps · balanced" Tag="30" />
+                                <ComboBoxItem Content="60 fps · smoother" Tag="60" />
+                            </ComboBox>
+                            <ComboBox
+                                x:Name="CountdownBox"
+                                HorizontalAlignment="Stretch"
+                                Header="Countdown"
+                                SelectedIndex="1">
+                                <ComboBoxItem Content="No countdown" Tag="0" />
+                                <ComboBoxItem Content="3 seconds" Tag="3" />
+                                <ComboBoxItem Content="5 seconds" Tag="5" />
+                            </ComboBox>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
             </ScrollViewer>
 
-            <Border Grid.Column="1" Padding="18" Background="{StaticResource PocketRaised}" CornerRadius="14" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-                <Grid>
-                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                    <Grid><TextBlock Text="3 · Camera" Style="{StaticResource PocketTitleText}" /><ToggleSwitch x:Name="CameraToggle" HorizontalAlignment="Right" Toggled="CameraToggle_Toggled" /></Grid>
-                    <Grid Grid.Row="1" Margin="0,14">
-                        <Border Background="#FF080D0F" CornerRadius="12" />
-                        <MediaPlayerElement x:Name="CameraPreview" AreTransportControlsEnabled="False" AutoPlay="True" Visibility="Collapsed" />
-                        <StackPanel x:Name="CameraEmpty" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10"><Grid Width="58" Height="58"><Ellipse Fill="{StaticResource PocketGreenSoft}" /><FontIcon Glyph="&#xE714;" Foreground="{StaticResource PocketGreen}" FontSize="22" /></Grid><TextBlock x:Name="CameraStatus" Text="Camera is off" Style="{StaticResource PocketCaptionText}" /></StackPanel>
+            <Border Grid.Column="1" Style="{StaticResource PocketCard}">
+                <Grid Padding="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource PocketLabelText}" Text="WHAT GETS RECORDED" />
+                    <Grid Grid.Row="1" Margin="0,12">
+                        <Border
+                            Background="#FF0F171C"
+                            BorderBrush="{StaticResource PocketLineStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource PocketWellCorner}" />
+                        <TextBlock
+                            x:Name="FramingLabel"
+                            Margin="14"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Style="{StaticResource PocketTagText}"
+                            Text="FULL DISPLAY" />
+                        <Border
+                            x:Name="CameraSlot"
+                            Width="132"
+                            Height="88"
+                            Margin="18"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            BorderBrush="{StaticResource PocketLineStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource PocketControlCorner}">
+                            <Grid>
+                                <MediaPlayerElement
+                                    x:Name="CameraPreview"
+                                    AreTransportControlsEnabled="False"
+                                    AutoPlay="True"
+                                    Stretch="UniformToFill"
+                                    Visibility="Collapsed" />
+                                <TextBlock
+                                    x:Name="CameraSlotLabel"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource PocketMetaText}"
+                                    Text="camera off" />
+                            </Grid>
+                        </Border>
                     </Grid>
-                    <StackPanel Grid.Row="2" Spacing="12">
-                        <ComboBox x:Name="CameraBox" Header="Camera" DisplayMemberPath="Name" SelectionChanged="CameraBox_SelectionChanged" />
-                        <StackPanel x:Name="CameraSourceNotice" Orientation="Horizontal" Spacing="8" Visibility="Collapsed"><FontIcon Glyph="&#xE7BA;" FontSize="14" Foreground="{StaticResource PocketMuted}" /><TextBlock x:Name="CameraSourceNoticeText" MaxWidth="300" TextWrapping="Wrap" Text="Window recordings capture only that window, so the camera will be visible on screen but will not appear in the saved file." Style="{StaticResource PocketCaptionText}" /></StackPanel>
-                        <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions><ComboBox x:Name="CameraPositionBox" Header="Position" SelectedIndex="0"><ComboBoxItem Content="Bottom right" Tag="bottom-right" /><ComboBoxItem Content="Bottom left" Tag="bottom-left" /><ComboBoxItem Content="Top right" Tag="top-right" /><ComboBoxItem Content="Top left" Tag="top-left" /></ComboBox><ComboBox x:Name="CameraSizeBox" Grid.Column="1" Header="Size" SelectedIndex="1"><ComboBoxItem Content="Small" Tag="240" /><ComboBoxItem Content="Medium" Tag="360" /><ComboBoxItem Content="Large" Tag="480" /></ComboBox></Grid>
+                    <!--  Format facts belong on the surface, not inside a settings dialog.  -->
+                    <StackPanel
+                        Grid.Row="2"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Border Style="{StaticResource PocketTagBorder}">
+                            <TextBlock Style="{StaticResource PocketTagText}" Text="MP4 · H.264" />
+                        </Border>
+                        <Border Style="{StaticResource PocketTagBorder}">
+                            <TextBlock
+                                x:Name="FrameRateTag"
+                                Style="{StaticResource PocketTagText}"
+                                Text="30 FPS" />
+                        </Border>
+                        <Border Style="{StaticResource PocketTagBorder}">
+                            <TextBlock
+                                x:Name="MicrophoneTag"
+                                Style="{StaticResource PocketTagText}"
+                                Text="MIC ON" />
+                        </Border>
+                        <Border Style="{StaticResource PocketTagBorder}">
+                            <TextBlock
+                                x:Name="CountdownTag"
+                                Style="{StaticResource PocketTagText}"
+                                Text="3 S" />
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Border>
         </Grid>
 
-        <Grid Grid.Row="2">
-            <StackPanel Spacing="4"><TextBlock x:Name="ReadinessTitle" Text="Checking recording devices…" Style="{StaticResource PocketBodyText}" /><TextBlock x:Name="ReadinessDetail" Text="CursorPocket will show a countdown after this setup closes." Style="{StaticResource PocketCaptionText}" /></StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8"><Button Click="Cancel_Click" Content="Cancel" Style="{StaticResource PocketQuietButton}" /><Button x:Name="StartButton" Click="Start_Click" Content="Start recording  ↵" Style="{StaticResource PocketPrimaryButton}" /></StackPanel>
+        <Grid Grid.Row="2" ColumnSpacing="12">
+            <StackPanel
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="10">
+                <Ellipse
+                    x:Name="ReadinessDot"
+                    Width="6"
+                    Height="6"
+                    VerticalAlignment="Center"
+                    Fill="{StaticResource PocketMuted}" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock
+                        x:Name="ReadinessTitle"
+                        Style="{StaticResource PocketBodyText}"
+                        Text="Checking recording devices…" />
+                    <TextBlock
+                        x:Name="ReadinessDetail"
+                        Margin="0,2,0,0"
+                        Style="{StaticResource PocketMetaText}"
+                        Text="A countdown runs after this window closes." />
+                </StackPanel>
+            </StackPanel>
+            <StackPanel
+                HorizontalAlignment="Right"
+                Orientation="Horizontal"
+                Spacing="8">
+                <Button
+                    Click="Cancel_Click"
+                    Content="Cancel"
+                    Style="{StaticResource PocketQuietButton}" />
+                <Button
+                    x:Name="StartButton"
+                    Click="Start_Click"
+                    Style="{StaticResource PocketPrimaryButton}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Start recording" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontFamily="Cascadia Mono"
+                            FontSize="12"
+                            IsTextScaleFactorEnabled="False"
+                            Opacity="0.62"
+                            Text="&#x21B5;" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

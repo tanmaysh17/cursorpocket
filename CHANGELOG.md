@@ -6,6 +6,14 @@
 - Moved camera ownership from FFmpeg to CursorPocket. The webcam is now recorded from the screen at the chosen corner and size, which is what makes a live self-view possible; DirectShow grants a single consumer exclusive use of the device.
 - Window-source recordings keep the on-screen self-view but cannot carry it into the saved file, and the preflight now says so before recording starts.
 - A camera Windows will not open no longer prevents a recording; the screen still records without a webcam inset.
+- Replaced the brand mark with a geometric cursor entering a pocket, rendered per icon size so the tray and taskbar icons stay legible at 16–32 px; the mark now turns red end to end while recording instead of carrying a corner badge.
+- Reserved green for live state, the primary action, the current selection, and the command-mode field. Capture kinds are told apart by glyph and file-type tag rather than by colour.
+- Rebuilt the shared design system: a full neutral ramp, seven named type styles, and one button template so height, radius, hover, pressed, and disabled match on every surface.
+- Moved the Library to top navigation, 52 px rows with file type and size, filter counts, and a detail pane that states kind, size, saved time, and file name.
+- Reordered command mode into three primary captures above a rule with the rest below, aligned the key chips into one column, and dropped a trailing icon column that mixed a submenu chevron with category glyphs.
+- Reordered recording preflight so its numbered steps read down one column, and gave the second column a framing preview with the camera shown in the slot it will occupy.
+- Rebuilt Settings on the Windows settings-card pattern so every non-obvious control explains itself.
+- Fixed the Library at the 720×540 minimum window, where capture titles truncated to ten characters and the detail pane overflowed the window.
 
 ## 0.3.0 — 2026-08-17
 

@@ -12,31 +12,44 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 ## Visual direction
 
-The visual direction is **cursor-field Fluent**: quiet graphite Mica for persistent surfaces, a compact command panel over the frozen desktop with a restrained green edge, and the product logo used sparingly as the brand mark—at command-panel header scale, never as page decoration. Avoid floating glass cards with arbitrary borders, excessive gradients, decorative spheres, or ornamental copy.
+The visual direction is **instrument, not app**. Quiet graphite Mica for persistent surfaces, a compact command panel over the frozen desktop with a restrained green edge, and the cursor mark used sparingly as the brand: at command-panel header scale, never as page decoration. Structure comes from a strict grid, hairline rules, and a real type scale — never from tinted blobs. Avoid floating glass cards with arbitrary borders, excessive gradients, decorative spheres, glossy or three-dimensional marks, and ornamental copy.
 
-### Color roles
+### Colour roles
 
 | Role | Token | Usage |
 | --- | --- | --- |
-| Ink | `#F4FAF7` | Primary text on dark surfaces |
-| Muted | `#98A9A2` | Supporting text; never critical recording state |
-| Surface | `#D9151E24` | Mica-supported panels and cards |
-| Raised | `#EE1C2830` | Inputs and secondary controls |
-| Divider | `#2EFFFFFF` | Restrained structural separation |
-| Ready | `#43E08D` | Ready, saved, audio activity, primary action |
-| Recording | `#FF5A67` | Live recording, discard, destructive state |
-| Informational | `#7AB8FF` | Text/link capture only; use sparingly |
+| Ink | `#F2F7F4` | Primary text |
+| Ink dim | `#C2CFC9` | Descriptions and supporting copy |
+| Muted | `#8FA09A` | Tertiary only: timestamps, counts, paths; never critical recording state |
+| Base | `#0B100F` | Opaque transient surfaces (HUD, receipt) |
+| Sunken | `#66070C0B` | Wells and inset groups inside a card |
+| Surface | `#CC101815` | Mica-supported panels and cards |
+| Raised | `#E0161F1C` | Inputs, key chips, and secondary controls |
+| Line | `#24FFFFFF` | Restrained structural separation |
+| Line strong | `#40FFFFFF` | Key chip edges and framing rectangles |
+| Ready | `#45E08C` | Ready, saved, audio activity, the one primary action |
+| Recording | `#FF5F6B` | Live recording, discard, destructive state |
+| Informational | `#7FBBFF` | Text/link capture only; use sparingly |
 
-Green is not used as generic decoration inside dense surfaces. Red is never used for ordinary navigation.
+**Green is load-bearing, not decorative.** It is allowed on exactly four things: live or ready state, the single primary action on a surface, the current selection, and the command-mode edge field. It is never a background wash behind a list of items, and never a tint on a per-kind icon. Red is never used for ordinary navigation.
+
+Capture kinds are distinguished by their glyph and a mono file-type tag, never by hue. That keeps a coloured surface meaning "something is live" everywhere in the app.
 
 ### Type and spacing
 
-- Segoe UI Variable Display for display and section headings.
-- Segoe UI Variable Text/Small for controls and supporting copy.
-- Cascadia Mono only for key chips, timers, dimensions, and compact status labels.
-- Base spacing unit: 8 px. Normal sequences use 8, 16, 24, or 32 px.
-- Corner radii: 10 px controls, 12–14 px cards, 16–20 px transient receipts/HUD.
-- Minimum critical text: 12 px with high contrast; recording state and timer are 17–22 px.
+- Segoe UI Variable Display for `PocketDisplayText` (32) and `PocketTitleText` (22), both with negative tracking.
+- Segoe UI Variable Text for `PocketSubtitleText` (16), `PocketBodyText` (14), and `PocketCaptionText` (13).
+- Segoe UI Variable Small for `PocketMetaText` (13, muted).
+- Cascadia Mono for anything the eye has to compare: `PocketNumericText` (12) for sizes, counts, timers, and paths; `PocketLabelText` (11, tracked, uppercase) for section labels; `PocketTagText` (11) for file-type tags; and every key chip.
+- Base spacing unit: 4 px. Normal sequences use 8, 12, 16, 20, 24, or 32 px.
+- Corner radii: 8 px controls, 12 px cards, 16 px wells and transient receipts, 20 px HUD.
+- Minimum critical text: 13 px with high contrast. Recording state and timer are 17–22 px.
+
+### Controls
+
+All buttons share one template, so height (36 px), radius (8 px), hover, pressed, and disabled response are identical everywhere. Four roles: `PocketPrimaryButton` (green, one per surface), `PocketQuietButton` (raised with a hairline), `PocketGhostButton` (transparent), and `PocketDangerButton` (red text). A destructive action is never adjacent to a benign one; it sits at the opposite end of its row.
+
+Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px), mono, with a heavier bottom edge. The same chip renders a shortcut wherever it appears — capture tiles, command mode, settings, region selector — so the app teaches its own keys.
 
 ## Surface contracts
 
@@ -57,6 +70,8 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
 - A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
 - The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
+- The row icon column says one thing on every row: which kind of capture it is. It never mixes a submenu chevron with kind glyphs, and no row is left without one.
+- Every key chip is the same width and a combination rides in a single chip, so a two-key shortcut cannot shift its label out of line with the rest.
 - The command list scrolls rather than clipping, so nothing critical is lost at high display scale.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
 - Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent. Because the panel no longer covers the screen it can lose activation while still shown; the global bare-key service is what keeps the keys working, and clicking elsewhere deliberately does **not** dismiss it.
@@ -64,9 +79,10 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 ### Recording preflight
 
 - Normal inspectable setup surface; never excluded from screen readers or visual QA before recording.
-- Three numbered decisions: source, microphone, camera.
+- Three numbered decisions read straight down the left column in the order they are numbered: screen, microphone, camera.
+- The right column answers what the numbers cannot: a framing preview with the camera picture-in-picture shown in the slot it will actually occupy, plus mono tags stating container, frame rate, microphone, and countdown.
 - Microphone and camera show named Windows devices, availability, live signal/preview, and remembered selection.
-- Start remains disabled until discovery completes and FFmpeg is available.
+- Start remains disabled until discovery completes and FFmpeg is available. Readiness is stated by a dot colour as well as words.
 - The preflight camera preview is released before the recording self-view opens the same device.
 
 ### Camera self-view
@@ -88,7 +104,8 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
 - No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
-- Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale.
+- Status and actions are separated, so stopping is never a near-miss for reading the timer.
+- Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale. The timer is mono with tabular figures so it does not jitter.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
 - The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Stems grow from a mid-line in both directions with a bright centre, so the form has a spine and reads as a waveform rather than a bar chart; quiet samples fade back instead of vanishing. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
 
@@ -100,8 +117,20 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 - **Every capture is actionable without a mouse.** Because a receipt never takes focus, its actions are reachable through scoped global keys: `Ctrl+Alt+O` open or play, `Ctrl+Alt+R` reveal, `Ctrl+Alt+L` Library, `Ctrl+Alt+X` dismiss. Those combinations carry modifiers deliberately — a receipt is up while the user keeps working, and bare keys would swallow their typing for twelve seconds. The receipt states the keys, since nothing else would teach them.
 - The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy path, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Every one stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
 - Receipts use the correct media preview and explicit Open/Reveal/Library actions. A screenshot is also copied to the clipboard the moment it is taken, and again after annotation so the clipboard holds the marked-up image; the receipt says so.
-- Library is a standard resizable Mica window with date grouping and All/Screenshots/Video/Audio/Text/Links filters.
+- Library is a standard resizable Mica window with a top navigation bar, so the wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
+- Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter.
+- Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
+
+## Brand mark
+
+The mark is one idea: a cursor crossing into a pocket. Above the pocket mouth the arrow is solid; where it crosses, a keyline cuts the pocket back so the arrow reads as passing in front of it. Nothing is shaded, glossed, or beveled.
+
+- The canonical cursor geometry lives in two places that must agree: `PocketCursorPath` in `App.xaml` and `CURSOR` in `tools/make_logo.py`.
+- Below 40 px the pocket and its keyline collapse, so the icon falls back to the cursor alone. `tools/make_icon.py` renders every `.ico` frame at its own size rather than downscaling one raster.
+- The tray icon turns red end to end while recording, matching the cursor companion. It never gains a corner badge, which would swallow a 16 px icon.
+- The command panel header is the one place a raster of the mark is used, at 26 dips over a green pulse. `tools/make_logo.py` writes that asset in the cursor-only form so it stays crisp from 100% to 250% scale.
+- Regenerate with `python tools/make_logo.py && python tools/make_icon.py`.
 
 ## Design acceptance gate
 
@@ -120,7 +149,9 @@ The design-consultation gate requires all of the following before release:
 - recording HUD is readable over both light and dark source content at the active Windows scale;
 - save, failure, and discard states are unmistakable;
 - Library remains readable and scrollable at its minimum size;
-- green/red semantics and typography match this document;
+- green appears only on live state, the primary action, the current selection, and the command-mode field;
+- typography matches the scale above and every button shares one height and hover response;
+- the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
 
 Approval is based on an end-to-end visual and interaction pass of the installed build, not on XAML inspection alone.

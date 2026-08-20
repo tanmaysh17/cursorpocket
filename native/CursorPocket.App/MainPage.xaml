@@ -10,6 +10,22 @@
     Loaded="Page_Loaded"
     mc:Ignorable="d">
 
+    <Page.Resources>
+        <!--  Filter pills read as one segmented control, so the selected one is unmistakable.  -->
+        <Style x:Key="FilterPill" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Height" Value="30" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style x:Key="SettingsRow" TargetType="Grid">
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="ColumnSpacing" Value="14" />
+        </Style>
+    </Page.Resources>
+
     <Grid Background="Transparent">
         <!-- The Library is fully keyboard-drivable. These are page accelerators, so
              they never affect other applications, and every handler stands down while
@@ -32,34 +48,19 @@
         <NavigationView
             x:Name="Navigation"
             IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
-            IsPaneToggleButtonVisible="True"
-            OpenPaneLength="208"
-            PaneDisplayMode="LeftCompact"
+            PaneDisplayMode="Top"
             SelectionChanged="Navigation_SelectionChanged">
-            <NavigationView.PaneHeader>
-                <StackPanel Margin="4,12,0,12" Orientation="Horizontal" Spacing="10">
-                    <Grid Width="28" Height="28">
-                        <Ellipse Fill="{StaticResource PocketGreenSoft}" />
-                        <Path
-                            Width="16"
-                            Height="19"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Data="M2,1 L14,11 L8.5,12 L11.5,18 L8.8,19 L5.8,13 L2,17 Z"
-                            Fill="{StaticResource PocketGreen}"
-                            Stretch="Fill" />
-                    </Grid>
-                    <TextBlock VerticalAlignment="Center" Text="CursorPocket" Style="{StaticResource PocketTitleText}" />
-                </StackPanel>
-            </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="LibraryNav" Content="Library" Icon="Pictures" IsSelected="True" Tag="library" />
                 <NavigationViewItem x:Name="CaptureNav" Content="Capture" Icon="Camera" Tag="capture" />
                 <NavigationViewItem x:Name="SettingsNav" Content="Settings" Icon="Setting" Tag="settings" />
             </NavigationView.MenuItems>
-            <Grid Margin="0">
-                <Grid x:Name="LibraryPanel" Padding="28,22,28,24">
+
+            <Grid>
+                <!--  ============================ LIBRARY ============================  -->
+                <Grid x:Name="LibraryPanel" Padding="28,22,28,18">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -67,51 +68,174 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Everything you caught" Style="{StaticResource PocketDisplayText}" />
-                            <TextBlock Text="{x:Bind ViewModel.CaptureCountLabel, Mode=OneWay}" Style="{StaticResource PocketCaptionText}" />
+                    <Grid VerticalAlignment="Bottom">
+                        <StackPanel Spacing="6">
+                            <TextBlock Style="{StaticResource PocketDisplayText}" Text="Everything you caught" />
+                            <TextBlock
+                                FontSize="13"
+                                Style="{StaticResource PocketNumericText}"
+                                Text="{x:Bind ViewModel.LibrarySummary, Mode=OneWay}" />
                         </StackPanel>
-                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
-                            <Button Click="OpenFolder_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Open the organized capture folder">
-                                <FontIcon Glyph="&#xE838;" />
+                        <StackPanel
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Bottom"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button
+                                Click="OpenFolder_Click"
+                                Style="{StaticResource PocketQuietButton}"
+                                ToolTipService.ToolTip="Open the capture folder in File Explorer">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE838;" />
+                                    <TextBlock Text="Capture folder" />
+                                </StackPanel>
                             </Button>
                             <Button Click="OpenCommand_Click" Style="{StaticResource PocketPrimaryButton}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE722;" FontSize="14" />
+                                    <FontIcon FontSize="14" Glyph="&#xE722;" />
                                     <TextBlock Text="New capture" />
+                                    <TextBlock
+                                        x:Name="NewCaptureShortcut"
+                                        VerticalAlignment="Center"
+                                        FontFamily="Cascadia Mono"
+                                        FontSize="12"
+                                        IsTextScaleFactorEnabled="False"
+                                        Opacity="0.62"
+                                        Text="" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Grid>
 
-                    <ScrollViewer Grid.Row="1" Margin="0,22,0,18" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
-                        <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="8">
-                            <Button Content="All" Tag="All" Click="Filter_Click" Background="{StaticResource PocketGreenSoft}" Style="{StaticResource PocketQuietButton}" />
-                            <Button Content="Screenshots" Tag="Screenshots" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
-                            <Button Content="Video" Tag="Video" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
-                            <Button Content="Audio" Tag="Audio" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
-                            <Button Content="Text" Tag="Text" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
-                            <Button Content="Links" Tag="Links" Click="Filter_Click" Style="{StaticResource PocketQuietButton}" />
+                    <Border
+                        Grid.Row="1"
+                        Margin="0,20,0,16"
+                        Padding="3"
+                        HorizontalAlignment="Left"
+                        Background="{StaticResource PocketSunken}"
+                        BorderBrush="{StaticResource PocketLine}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                        <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="All">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="All" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AllCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Screenshots">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="Screenshots" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.ScreenshotCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Video">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="Video" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.VideoCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Audio">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="Audio" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AudioCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Text">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="Text" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.TextCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Links">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="Links" />
+                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.LinkCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
-                    </ScrollViewer>
+                    </Border>
 
-                    <Grid Grid.Row="2" ColumnSpacing="18">
+                    <Grid Grid.Row="2" ColumnSpacing="16">
+                        <!--  At the 720 px minimum window there is not enough width for both
+                              panes without truncating every title, so the detail pane gives
+                              way and the list takes the room. Double-tap still opens a
+                              capture, which is the action the pane would have offered.  -->
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup>
+                                <VisualState x:Name="LibraryNarrow">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowWidth="0" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="DetailPane.Visibility" Value="Collapsed" />
+                                        <Setter Target="DetailColumn.MinWidth" Value="0" />
+                                        <Setter Target="DetailColumn.Width" Value="0" />
+                                        <Setter Target="ListPane.Margin" Value="0,0,-16,0" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="LibraryWide">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowWidth="920" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="DetailPane.Visibility" Value="Visible" />
+                                        <Setter Target="DetailColumn.MinWidth" Value="308" />
+                                        <Setter Target="ListPane.Margin" Value="0" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                            <VisualStateGroup>
+                                <VisualState x:Name="DetailShort">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowHeight="0" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="DetailFacts.Visibility" Value="Collapsed" />
+                                        <Setter Target="DetailWell.MinHeight" Value="0" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="DetailTall">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowHeight="660" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="DetailFacts.Visibility" Value="Visible" />
+                                        <!--  A preview too small to judge is not a preview. With the
+                                              room a 660 px window has, the well gets a real floor.  -->
+                                        <Setter Target="DetailWell.MinHeight" Value="260" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <Grid.ColumnDefinitions>
+                            <!--  The preview takes the larger share: at 4*/6* a screenshot is
+                                  big enough to judge, which is the point of having a preview.
+                                  Both columns are named because each collapses independently —
+                                  DetailColumn by the narrow-window state, ListColumn by the
+                                  maximize-preview toggle in code-behind.  -->
                             <ColumnDefinition x:Name="ListColumn" Width="4*" MinWidth="240" />
-                            <ColumnDefinition Width="6*" MinWidth="360" />
+                            <ColumnDefinition x:Name="DetailColumn" Width="6*" MinWidth="308" />
                         </Grid.ColumnDefinitions>
 
-                        <Border Background="{StaticResource PocketSurface}" CornerRadius="16" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
+                        <Border x:Name="ListPane" Style="{StaticResource PocketCard}">
                             <Grid>
                                 <ListView
                                     x:Name="CaptureList"
+                                    Padding="6"
+                                    IsItemClickEnabled="False"
+                                    DoubleTapped="CaptureList_DoubleTapped"
                                     ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
                                     SelectedItem="{x:Bind ViewModel.SelectedItem, Mode=TwoWay}"
                                     SelectionChanged="CaptureList_SelectionChanged"
-                                    IsItemClickEnabled="False"
-                                    SelectionMode="Extended"
-                                    Padding="6">
+                                    SelectionMode="Extended">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="MinHeight" Value="46" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:CaptureItemViewModel">
                                             <Grid MinHeight="46" Padding="6,4" ColumnSpacing="10">
@@ -120,206 +244,838 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <!-- The capture itself wherever one can be rendered. The kind
-                                                     icon sits underneath as the fallback: it shows while the
-                                                     thumbnail loads, and stays for text and links. -->
-                                                <Border Width="52" Height="34" Background="#66070D0B" CornerRadius="7">
+                                                <!--  The capture itself wherever one can be rendered. The kind
+                                                      icon sits underneath as the fallback: it shows while the
+                                                      thumbnail loads, and stays for text and links.  -->
+                                                <Border
+                                                    Width="52"
+                                                    Height="34"
+                                                    Background="#66070D0B"
+                                                    CornerRadius="7">
                                                     <Grid>
-                                                        <FontIcon Glyph="{x:Bind IconGlyph}" Foreground="{StaticResource PocketGreen}" FontSize="14" />
+                                                        <FontIcon
+                                                            FontSize="14"
+                                                            Foreground="{StaticResource PocketGreen}"
+                                                            Glyph="{x:Bind IconGlyph}" />
                                                         <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="UniformToFill" />
                                                     </Grid>
                                                 </Border>
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-                                                    <TextBlock Text="{x:Bind Preview}" FontSize="13" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketBodyText}" />
-                                                    <TextBlock Text="{x:Bind MetaLabel}" FontSize="11" Style="{StaticResource PocketCaptionText}" />
+                                                <StackPanel
+                                                    Grid.Column="1"
+                                                    VerticalAlignment="Center"
+                                                    Spacing="1">
+                                                    <TextBlock
+                                                        Style="{StaticResource PocketBodyText}"
+                                                        Text="{x:Bind Preview}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                    <!--  Kind and size on one line, so the row stays a strip
+                                                          instead of the four columns this replaced.  -->
+                                                    <TextBlock Style="{StaticResource PocketMetaText}" Text="{x:Bind MetaLabel}" />
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CreatedLabel}" FontSize="11" Style="{StaticResource PocketCaptionText}" />
+                                                <TextBlock
+                                                    Grid.Column="2"
+                                                    VerticalAlignment="Center"
+                                                    Style="{StaticResource PocketNumericText}"
+                                                    Text="{x:Bind TimeLabel}" />
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
                                 </ListView>
 
-                                <StackPanel x:Name="EmptyLibrary" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                                    <Grid Width="76" Height="76">
-                                        <Ellipse Fill="{StaticResource PocketGreenSoft}" />
-                                        <FontIcon Glyph="&#xE8B9;" Foreground="{StaticResource PocketGreen}" FontSize="28" />
-                                    </Grid>
-                                    <TextBlock HorizontalAlignment="Center" Text="Your pocket is ready" Style="{StaticResource PocketTitleText}" />
-                                    <TextBlock MaxWidth="320" Text="{x:Bind ViewModel.ActivationHint, Mode=OneWay}" TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" />
-                                    <Button HorizontalAlignment="Center" Click="OpenCommand_Click" Content="Make the first capture" Style="{StaticResource PocketPrimaryButton}" />
+                                <StackPanel
+                                    x:Name="EmptyLibrary"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Spacing="14">
+                                    <Path
+                                        Width="26"
+                                        Height="37"
+                                        HorizontalAlignment="Center"
+                                        Style="{StaticResource PocketCursorMark}" />
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        Style="{StaticResource PocketTitleText}"
+                                        Text="Your pocket is ready" />
+                                    <TextBlock
+                                        MaxWidth="340"
+                                        HorizontalAlignment="Center"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="{x:Bind ViewModel.ActivationHint, Mode=OneWay}"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                    <Button
+                                        HorizontalAlignment="Center"
+                                        Click="OpenCommand_Click"
+                                        Content="Make the first capture"
+                                        Style="{StaticResource PocketPrimaryButton}" />
                                 </StackPanel>
                             </Grid>
                         </Border>
 
-                        <Border Grid.Column="1" Background="{StaticResource PocketRaised}" CornerRadius="16" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
-                            <Grid Padding="18">
+                        <Border
+                            x:Name="DetailPane"
+                            Grid.Column="1"
+                            Style="{StaticResource PocketCard}">
+                            <Grid Padding="16">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
+                                <!--  The header carries the maximize toggle: the preview is the
+                                      reason this pane exists, so filling the window with it is one
+                                      click (or Ctrl+M) away.  -->
                                 <Grid ColumnSpacing="10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="4">
-                                        <TextBlock x:Name="DetailKind" Text="Capture preview" Style="{StaticResource PocketCaptionText}" />
-                                        <TextBlock x:Name="DetailTitle" Text="Choose something from your library" TextWrapping="Wrap" Style="{StaticResource PocketTitleText}" />
+                                    <StackPanel Spacing="6">
+                                        <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="CAPTURE PREVIEW" />
+                                        <TextBlock
+                                            x:Name="DetailTitle"
+                                            MaxLines="2"
+                                            Style="{StaticResource PocketSubtitleText}"
+                                            Text="Choose something from your library"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Button x:Name="MaximizePreviewButton" Grid.Column="1" VerticalAlignment="Top" Click="MaximizePreview_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Fill the window with the preview" AutomationProperties.Name="Fill the window with the preview">
-                                        <FontIcon x:Name="MaximizePreviewIcon" Glyph="&#xE740;" FontSize="14" />
+                                    <Button
+                                        x:Name="MaximizePreviewButton"
+                                        Grid.Column="1"
+                                        VerticalAlignment="Top"
+                                        Click="MaximizePreview_Click"
+                                        Style="{StaticResource PocketIconButton}"
+                                        ToolTipService.ToolTip="Fill the window with the preview · Ctrl+M"
+                                        AutomationProperties.Name="Fill the window with the preview">
+                                        <FontIcon x:Name="MaximizePreviewIcon" FontSize="14" Glyph="&#xE740;" />
                                     </Button>
                                 </Grid>
-                                <Grid Grid.Row="1" Margin="0,12" MinHeight="320">
-                                    <Border Background="#CC05080A" CornerRadius="12" />
-                                    <Image x:Name="DetailImage" Margin="6" Stretch="Uniform" Visibility="Collapsed" />
-                                    <MediaPlayerElement x:Name="DetailPlayer" AreTransportControlsEnabled="True" AutoPlay="False" Visibility="Collapsed">
-                                        <MediaPlayerElement.TransportControls>
-                                            <MediaTransportControls
-                                                IsSeekBarVisible="True"
-                                                IsSeekEnabled="True"
-                                                IsPlaybackRateButtonVisible="True"
-                                                IsPlaybackRateEnabled="True"
-                                                IsVolumeButtonVisible="True"
-                                                IsVolumeEnabled="True"
-                                                IsSkipForwardButtonVisible="True"
-                                                IsSkipForwardEnabled="True"
-                                                IsSkipBackwardButtonVisible="True"
-                                                IsSkipBackwardEnabled="True"
-                                                IsFastForwardButtonVisible="True"
-                                                IsFastForwardEnabled="True"
-                                                IsFastRewindButtonVisible="True"
-                                                IsFastRewindEnabled="True"
-                                                IsZoomButtonVisible="True"
-                                                IsZoomEnabled="True"
-                                                IsRepeatButtonVisible="True"
-                                                IsRepeatEnabled="True"
-                                                IsCompact="False" />
-                                        </MediaPlayerElement.TransportControls>
-                                    </MediaPlayerElement>
-                                    <StackPanel x:Name="DetailTextPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                                        <FontIcon x:Name="DetailIcon" Glyph="&#xE7C3;" Foreground="{StaticResource PocketGreen}" FontSize="32" />
-                                        <TextBlock x:Name="DetailText" MaxWidth="310" Text="Screenshots, waveforms, and video posters appear here." TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PocketBodyText}" />
+                                <Border
+                                    x:Name="DetailWell"
+                                    Grid.Row="1"
+                                    Margin="0,14"
+                                    MinHeight="260"
+                                    Style="{StaticResource PocketWell}">
+                                    <Grid>
+                                        <Image
+                                            x:Name="DetailImage"
+                                            Margin="8"
+                                            Stretch="Uniform"
+                                            Visibility="Collapsed" />
+                                        <!--  Full transport controls: a recording is reviewed here, which
+                                              means scrubbing and speed, not just play.  -->
+                                        <MediaPlayerElement
+                                            x:Name="DetailPlayer"
+                                            AreTransportControlsEnabled="True"
+                                            AutoPlay="False"
+                                            Visibility="Collapsed">
+                                            <MediaPlayerElement.TransportControls>
+                                                <MediaTransportControls
+                                                    IsCompact="False"
+                                                    IsFastForwardButtonVisible="True"
+                                                    IsFastForwardEnabled="True"
+                                                    IsFastRewindButtonVisible="True"
+                                                    IsFastRewindEnabled="True"
+                                                    IsPlaybackRateButtonVisible="True"
+                                                    IsPlaybackRateEnabled="True"
+                                                    IsRepeatButtonVisible="True"
+                                                    IsRepeatEnabled="True"
+                                                    IsSeekBarVisible="True"
+                                                    IsSeekEnabled="True"
+                                                    IsSkipBackwardButtonVisible="True"
+                                                    IsSkipBackwardEnabled="True"
+                                                    IsSkipForwardButtonVisible="True"
+                                                    IsSkipForwardEnabled="True"
+                                                    IsVolumeButtonVisible="True"
+                                                    IsVolumeEnabled="True"
+                                                    IsZoomButtonVisible="True"
+                                                    IsZoomEnabled="True" />
+                                            </MediaPlayerElement.TransportControls>
+                                        </MediaPlayerElement>
+                                        <StackPanel
+                                            x:Name="DetailTextPanel"
+                                            Margin="16"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Spacing="12">
+                                            <FontIcon
+                                                x:Name="DetailIcon"
+                                                FontSize="24"
+                                                Foreground="{StaticResource PocketMuted}"
+                                                Glyph="&#xE7C3;" />
+                                            <TextBlock
+                                                x:Name="DetailText"
+                                                MaxWidth="300"
+                                                MaxLines="6"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Screenshots, waveforms, and video posters appear here."
+                                                TextAlignment="Center"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel x:Name="DetailFacts" Grid.Row="2">
+                                    <Grid Padding="0,7" ColumnSpacing="12">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Kind" />
+                                        <TextBlock
+                                            x:Name="FactKind"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource PocketNumericText}"
+                                            Text="—" />
+                                    </Grid>
+                                    <Grid
+                                        Padding="0,7"
+                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderThickness="0,1,0,0"
+                                        ColumnSpacing="12">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Size" />
+                                        <TextBlock
+                                            x:Name="FactSize"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource PocketNumericText}"
+                                            Text="—" />
+                                    </Grid>
+                                    <Grid
+                                        Padding="0,7"
+                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderThickness="0,1,0,0"
+                                        ColumnSpacing="12">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Saved" />
+                                        <TextBlock
+                                            x:Name="FactSaved"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource PocketNumericText}"
+                                            Text="—" />
+                                    </Grid>
+                                    <Grid
+                                        Padding="0,7"
+                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderThickness="0,1,0,0"
+                                        ColumnSpacing="12">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="File" />
+                                        <TextBlock
+                                            x:Name="FactFile"
+                                            HorizontalAlignment="Right"
+                                            Style="{StaticResource PocketNumericText}"
+                                            Text="—"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <Grid Grid.Row="3" Margin="0,14,0,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button
+                                            Command="{x:Bind ViewModel.OpenSelectedCommand}"
+                                            Content="Open"
+                                            Style="{StaticResource PocketPrimaryButton}" />
+                                        <Button
+                                            Command="{x:Bind ViewModel.RevealSelectedCommand}"
+                                            Content="Reveal"
+                                            Style="{StaticResource PocketQuietButton}" />
+                                        <Button
+                                            Click="CopyPath_Click"
+                                            Style="{StaticResource PocketIconButton}"
+                                            ToolTipService.ToolTip="Copy file path">
+                                            <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                        </Button>
                                     </StackPanel>
-                                </Grid>
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8">
-                                    <Button Command="{x:Bind ViewModel.OpenSelectedCommand}" Style="{StaticResource PocketPrimaryButton}" Content="Open" />
-                                    <Button Command="{x:Bind ViewModel.RevealSelectedCommand}" Style="{StaticResource PocketQuietButton}" Content="Reveal" />
-                                    <Button Click="CopyPath_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Copy file path">
-                                        <FontIcon Glyph="&#xE8C8;" />
-                                    </Button>
-                                    <Button x:Name="DeleteButton" HorizontalAlignment="Right" Click="DeleteSelected_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Move to Recycle Bin" AutomationProperties.Name="Move selected captures to the Recycle Bin">
+                                    <!--  Named and click-handled rather than command-bound: with
+                                          extended selection the button also reports how many
+                                          captures the one press will move.  -->
+                                    <Button
+                                        x:Name="DeleteButton"
+                                        HorizontalAlignment="Right"
+                                        Click="DeleteSelected_Click"
+                                        Style="{StaticResource PocketDangerIconButton}"
+                                        ToolTipService.ToolTip="Move to Recycle Bin"
+                                        AutomationProperties.Name="Move selected captures to the Recycle Bin">
                                         <StackPanel Orientation="Horizontal" Spacing="7">
-                                            <FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" />
-                                            <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" Foreground="{StaticResource PocketRed}" />
+                                            <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                            <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" />
                                         </StackPanel>
                                     </Button>
-                                </StackPanel>
+                                </Grid>
                             </Grid>
                         </Border>
                     </Grid>
 
-                    <Grid Grid.Row="3" Margin="0,14,0,0">
-                        <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Style="{StaticResource PocketCaptionText}" />
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="6">
-                            <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource PocketGreen}" />
-                            <TextBlock Text="Local only · no upload" Style="{StaticResource PocketCaptionText}" />
+                    <Grid Grid.Row="3" Margin="0,14,0,0" ColumnSpacing="8">
+                        <StackPanel
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Ellipse
+                                Width="6"
+                                Height="6"
+                                VerticalAlignment="Center"
+                                Fill="{StaticResource PocketGreen}" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
                         </StackPanel>
+                        <TextBlock
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource PocketNumericText}"
+                            Text="{x:Bind ViewModel.CaptureDirectory, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis" />
                     </Grid>
                 </Grid>
 
+                <!--  ============================ CAPTURE ============================  -->
                 <ScrollViewer x:Name="CapturePanel" Visibility="Collapsed">
-                    <StackPanel MaxWidth="940" Padding="32,26,32,40" HorizontalAlignment="Stretch" Spacing="24">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Catch it while it matters" Style="{StaticResource PocketDisplayText}" />
-                            <TextBlock Text="One memorable key per capture. No key rows to memorize and nothing to hold together." Style="{StaticResource PocketCaptionText}" />
+                    <StackPanel
+                        MaxWidth="1040"
+                        Padding="28,22,28,32"
+                        HorizontalAlignment="Stretch"
+                        Spacing="22">
+                        <StackPanel Spacing="6">
+                            <TextBlock Style="{StaticResource PocketDisplayText}" Text="Catch it while it matters" />
+                            <TextBlock
+                                MaxWidth="580"
+                                HorizontalAlignment="Left"
+                                Style="{StaticResource PocketCaptionText}"
+                                Text="Every capture is one key. The same keys work inside command mode, so what you learn here works everywhere."
+                                TextWrapping="Wrap" />
                         </StackPanel>
-                        <Grid ColumnSpacing="14" RowSpacing="14">
-                            <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition /><ColumnDefinition /></Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions><RowDefinition /><RowDefinition /></Grid.RowDefinitions>
-                            <Button Click="ScreenshotTile_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketRaised}">
-                                <StackPanel Spacing="18"><TextBlock Text="S" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="24" FontWeight="SemiBold" /><StackPanel><TextBlock Text="Screenshot" Style="{StaticResource PocketTitleText}" /><TextBlock Text="Region, window, display, or every screen" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                        <Grid ColumnSpacing="12" RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Button
+                                MinHeight="132"
+                                Click="ScreenshotTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button
+                                        HorizontalAlignment="Left"
+                                        Content="S"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                                        <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Screenshot" />
+                                        <TextBlock
+                                            Margin="0,4,0,0"
+                                            Style="{StaticResource PocketCaptionText}"
+                                            Text="Region, window, one display, or all of them"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
                             </Button>
-                            <Button Grid.Column="1" Click="VideoTile_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketRaised}">
-                                <StackPanel Spacing="18"><TextBlock Text="V" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="24" FontWeight="SemiBold" /><StackPanel><TextBlock Text="Video" Style="{StaticResource PocketTitleText}" /><TextBlock Text="Confirm screen, microphone, and camera first" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                            <Button
+                                Grid.Column="1"
+                                MinHeight="132"
+                                Click="VideoTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button
+                                        HorizontalAlignment="Left"
+                                        Content="V"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                                        <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Video" />
+                                        <TextBlock
+                                            Margin="0,4,0,0"
+                                            Style="{StaticResource PocketCaptionText}"
+                                            Text="Screen with optional microphone and camera"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
                             </Button>
-                            <Button Grid.Column="2" Click="AudioTile_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketRaised}">
-                                <StackPanel Spacing="18"><TextBlock Text="A" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketGreen}" FontSize="24" FontWeight="SemiBold" /><StackPanel><TextBlock Text="Audio note" Style="{StaticResource PocketTitleText}" /><TextBlock Text="Starts with your remembered microphone" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                            <Button
+                                Grid.Column="2"
+                                MinHeight="132"
+                                Click="AudioTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button
+                                        HorizontalAlignment="Left"
+                                        Content="A"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                                        <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Audio note" />
+                                        <TextBlock
+                                            Margin="0,4,0,0"
+                                            Style="{StaticResource PocketCaptionText}"
+                                            Text="Starts on your remembered microphone"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
                             </Button>
-                            <Button Grid.Row="1" Click="TextTile_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketRaised}">
-                                <StackPanel Spacing="18"><TextBlock Text="T" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketBlue}" FontSize="24" FontWeight="SemiBold" /><StackPanel><TextBlock Text="Highlighted text" Style="{StaticResource PocketTitleText}" /><TextBlock Text="Saves only the selection in your previous window" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                            <Button
+                                Grid.Row="1"
+                                Padding="16,14"
+                                Click="TextTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button
+                                        VerticalAlignment="Center"
+                                        Content="T"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapButton}" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Highlighted text" />
+                                        <TextBlock
+                                            Margin="0,2,0,0"
+                                            Style="{StaticResource PocketMetaText}"
+                                            Text="From the window you were just in" />
+                                    </StackPanel>
+                                </StackPanel>
                             </Button>
-                            <Button Grid.Row="1" Grid.Column="1" Click="LinkTile_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketRaised}">
-                                <StackPanel Spacing="18"><TextBlock Text="L" FontFamily="Cascadia Mono" Foreground="{StaticResource PocketBlue}" FontSize="24" FontWeight="SemiBold" /><StackPanel><TextBlock Text="Current link" Style="{StaticResource PocketTitleText}" /><TextBlock Text="Saves nothing unless a browser page is active" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                            <Button
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Padding="16,14"
+                                Click="LinkTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button
+                                        VerticalAlignment="Center"
+                                        Content="L"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapButton}" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Current link" />
+                                        <TextBlock
+                                            Margin="0,2,0,0"
+                                            Style="{StaticResource PocketMetaText}"
+                                            Text="Browser address bar" />
+                                    </StackPanel>
+                                </StackPanel>
                             </Button>
-                            <Button Grid.Row="1" Grid.Column="2" Click="OpenCommand_Click" HorizontalContentAlignment="Stretch" Padding="18" CornerRadius="14" Background="{StaticResource PocketGreenSoft}">
-                                <StackPanel Spacing="18"><FontIcon HorizontalAlignment="Left" Glyph="&#xE945;" Foreground="{StaticResource PocketGreen}" FontSize="24" /><StackPanel><TextBlock Text="Command mode" Style="{StaticResource PocketTitleText}" /><TextBlock Text="The fast edge-lit overlay on the current display" TextWrapping="Wrap" Style="{StaticResource PocketCaptionText}" /></StackPanel></StackPanel>
+
+                            <Button
+                                Grid.Row="1"
+                                Grid.Column="2"
+                                Padding="16,14"
+                                Click="LibraryTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button
+                                        VerticalAlignment="Center"
+                                        AutomationProperties.Name="Letter O"
+                                        Content="O"
+                                        IsHitTestVisible="False"
+                                        IsTabStop="False"
+                                        Style="{StaticResource KeyCapButton}" />
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Open Library" />
+                                        <TextBlock
+                                            Margin="0,2,0,0"
+                                            Style="{StaticResource PocketMetaText}"
+                                            Text="Every capture, newest first" />
+                                    </StackPanel>
+                                </StackPanel>
                             </Button>
                         </Grid>
-                    </StackPanel>
-                </ScrollViewer>
 
-                <ScrollViewer x:Name="SettingsPanel" Visibility="Collapsed">
-                    <StackPanel MaxWidth="760" HorizontalAlignment="Left" Padding="32,26,32,50" Spacing="24">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Settings" Style="{StaticResource PocketDisplayText}" />
-                            <TextBlock Text="CursorPocket stays ready without getting in the way." Style="{StaticResource PocketCaptionText}" />
-                        </StackPanel>
-
-                        <Border Padding="20" Background="{StaticResource PocketSurface}" BorderBrush="{StaticResource PocketLine}" BorderThickness="1" CornerRadius="14">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="Storage" Style="{StaticResource PocketTitleText}" />
-                                <TextBlock Text="Every capture and its private library index stays under this one folder." Style="{StaticResource PocketCaptionText}" TextWrapping="Wrap" />
-                                <Grid ColumnSpacing="10">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <TextBox Header="Capture folder" Text="{x:Bind ViewModel.CaptureDirectory, Mode=TwoWay}" />
-                                    <Button Grid.Column="1" VerticalAlignment="Bottom" Click="ChooseCaptureFolder_Click" Content="Choose folder" Style="{StaticResource PocketQuietButton}" />
+                        <StackPanel Spacing="10">
+                            <TextBlock Style="{StaticResource PocketLabelText}" Text="REACHING THESE WITHOUT THIS WINDOW" />
+                            <Border Style="{StaticResource PocketCard}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel
+                                        Padding="18,16"
+                                        Orientation="Horizontal"
+                                        Spacing="14">
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE765;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Command mode" />
+                                            <TextBlock
+                                                x:Name="ActivationShortcutHint"
+                                                Margin="0,2,0,0"
+                                                Style="{StaticResource PocketMetaText}"
+                                                Text="Over whatever is on screen" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Rectangle
+                                        Grid.Column="1"
+                                        Width="1"
+                                        Fill="{StaticResource PocketLine}" />
+                                    <StackPanel
+                                        Grid.Column="2"
+                                        Padding="18,16"
+                                        Orientation="Horizontal"
+                                        Spacing="14">
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE8B0;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Two mouse circles" />
+                                            <TextBlock
+                                                Margin="0,2,0,0"
+                                                Style="{StaticResource PocketMetaText}"
+                                                Text="Draw them anywhere on screen" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <Rectangle
+                                        Grid.Column="3"
+                                        Width="1"
+                                        Fill="{StaticResource PocketLine}" />
+                                    <StackPanel
+                                        Grid.Column="4"
+                                        Padding="18,16"
+                                        Orientation="Horizontal"
+                                        Spacing="14">
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <Path
+                                                Width="11"
+                                                Height="16"
+                                                Style="{StaticResource PocketCursorMark}" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="The cursor dot" />
+                                            <TextBlock
+                                                Margin="0,2,0,0"
+                                                Style="{StaticResource PocketMetaText}"
+                                                Text="Green when ready, red while recording" />
+                                        </StackPanel>
+                                    </StackPanel>
                                 </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Padding="20" Background="{StaticResource PocketSurface}" BorderBrush="{StaticResource PocketLine}" BorderThickness="1" CornerRadius="14">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="Activation" Style="{StaticResource PocketTitleText}" />
-                                <TextBox Header="Global shortcut" Description="Only a confirmed working shortcut is shown in the app." Text="{x:Bind ViewModel.ActivationShortcut, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Two quick mouse circles" IsOn="{x:Bind ViewModel.MouseGestureEnabled, Mode=TwoWay}" />
-                                <ComboBox x:Name="CompanionModeBox" Header="Cursor companion" SelectedValue="{x:Bind ViewModel.CursorCompanionMode, Mode=TwoWay}" SelectedValuePath="Tag">
-                                    <ComboBoxItem Content="Off" Tag="off" />
-                                    <ComboBoxItem Content="While moving" Tag="while-moving" />
-                                    <ComboBoxItem Content="Always visible" Tag="always" />
-                                </ComboBox>
-                                <ToggleSwitch Header="Start CursorPocket when I sign in" IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border Padding="20" Background="{StaticResource PocketSurface}" BorderBrush="{StaticResource PocketLine}" BorderThickness="1" CornerRadius="14">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="Video defaults" Style="{StaticResource PocketTitleText}" />
-                                <ToggleSwitch Header="Microphone on in preflight" IsOn="{x:Bind ViewModel.VideoMicrophoneEnabled, Mode=TwoWay}" />
-                                <ToggleSwitch Header="Camera on in preflight" IsOn="{x:Bind ViewModel.VideoCameraEnabled, Mode=TwoWay}" />
-                                <ComboBox x:Name="FpsBox" Header="Frame rate">
-                                    <ComboBoxItem Content="30 fps · balanced" Tag="30" />
-                                    <ComboBoxItem Content="60 fps · smoother, larger files" Tag="60" />
-                                </ComboBox>
-                                <ComboBox x:Name="CountdownBox" Header="Countdown">
-                                    <ComboBoxItem Content="No countdown" Tag="0" />
-                                    <ComboBoxItem Content="3 seconds" Tag="3" />
-                                    <ComboBoxItem Content="5 seconds" Tag="5" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Padding="20" Background="{StaticResource PocketSurface}" BorderBrush="{StaticResource PocketLine}" BorderThickness="1" CornerRadius="14">
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Privacy" Style="{StaticResource PocketTitleText}" />
-                                <TextBlock Text="No account, analytics, cloud upload, AI service, or background screen recording. Devices open only after you choose a recording action." Style="{StaticResource PocketCaptionText}" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <Button HorizontalAlignment="Left" Command="{x:Bind ViewModel.SaveSettingsCommand}" Content="Save settings" Style="{StaticResource PocketPrimaryButton}" />
+                            </Border>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
+
+                <!--  ============================ SETTINGS ============================  -->
+                <Grid x:Name="SettingsPanel" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ScrollViewer>
+                        <StackPanel
+                            MaxWidth="880"
+                            Padding="28,22,28,28"
+                            HorizontalAlignment="Left"
+                            Spacing="6">
+                            <TextBlock Style="{StaticResource PocketDisplayText}" Text="Settings" />
+                            <TextBlock Style="{StaticResource PocketCaptionText}" Text="Nothing here leaves this PC." />
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="STORAGE" />
+                            <Border Style="{StaticResource PocketCard}">
+                                <Grid Style="{StaticResource SettingsRow}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource PocketChipLarge}">
+                                        <FontIcon Glyph="&#xE8B7;" Style="{StaticResource PocketChipIcon}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Capture folder" />
+                                        <TextBlock
+                                            Margin="0,3,0,0"
+                                            Style="{StaticResource PocketNumericText}"
+                                            Text="{x:Bind ViewModel.CaptureDirectory, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <Button
+                                        Grid.Column="2"
+                                        Click="ChooseCaptureFolder_Click"
+                                        Content="Change"
+                                        Style="{StaticResource PocketQuietButton}" />
+                                </Grid>
+                            </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="ACTIVATION" />
+                            <Border Style="{StaticResource PocketCard}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource SettingsRow}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE765;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Global shortcut" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Only a shortcut confirmed working on this PC is shown."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBox
+                                            Grid.Column="2"
+                                            Width="200"
+                                            VerticalAlignment="Center"
+                                            FontFamily="Cascadia Mono"
+                                            Text="{x:Bind ViewModel.ActivationShortcut, Mode=TwoWay}" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE8B0;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Two quick mouse circles" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Draw two fast circles anywhere to open command mode."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.MouseGestureEnabled, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Two quick mouse circles" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE81E;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Cursor companion" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="A small dot beside the pointer. Green when ready, red while recording."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox
+                                            x:Name="CompanionModeBox"
+                                            Grid.Column="2"
+                                            Width="200"
+                                            VerticalAlignment="Center"
+                                            SelectedValue="{x:Bind ViewModel.CursorCompanionMode, Mode=TwoWay}"
+                                            SelectedValuePath="Tag"
+                                            AutomationProperties.Name="Cursor companion">
+                                            <ComboBoxItem Content="Off" Tag="off" />
+                                            <ComboBoxItem Content="While moving" Tag="while-moving" />
+                                            <ComboBoxItem Content="Always visible" Tag="always" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE7E8;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Start when I sign in" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.StartWithWindows, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Start when I sign in" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="RECORDING DEFAULTS" />
+                            <Border Style="{StaticResource PocketCard}">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource SettingsRow}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE720;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Microphone on in preflight" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.VideoMicrophoneEnabled, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Microphone on in preflight" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE714;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Camera on in preflight" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.VideoCameraEnabled, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Camera on in preflight" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE916;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Frame rate" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="60 fps is smoother and roughly doubles the file size."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox
+                                            x:Name="FpsBox"
+                                            Grid.Column="2"
+                                            Width="200"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="Frame rate">
+                                            <ComboBoxItem Content="30 fps · balanced" Tag="30" />
+                                            <ComboBoxItem Content="60 fps · smoother" Tag="60" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE916;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Countdown" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Time to get back to the window before recording starts."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox
+                                            x:Name="CountdownBox"
+                                            Grid.Column="2"
+                                            Width="200"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="Countdown">
+                                            <ComboBoxItem Content="No countdown" Tag="0" />
+                                            <ComboBoxItem Content="3 seconds" Tag="3" />
+                                            <ComboBoxItem Content="5 seconds" Tag="5" />
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="PRIVACY" />
+                            <Border Style="{StaticResource PocketCard}">
+                                <StackPanel Padding="16,14" Spacing="6">
+                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="No account, no analytics, no upload" />
+                                    <TextBlock
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="There is no cloud service and no AI service. Your microphone and camera open only after you choose a recording action, and close when it ends."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Border
+                        Grid.Row="1"
+                        Padding="28,12"
+                        Background="{StaticResource PocketSunken}"
+                        BorderBrush="{StaticResource PocketLine}"
+                        BorderThickness="0,1,0,0">
+                        <Grid>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PocketMetaText}"
+                                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                            <Button
+                                HorizontalAlignment="Right"
+                                Command="{x:Bind ViewModel.SaveSettingsCommand}"
+                                Content="Save settings"
+                                Style="{StaticResource PocketPrimaryButton}" />
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
         </NavigationView>
     </Grid>

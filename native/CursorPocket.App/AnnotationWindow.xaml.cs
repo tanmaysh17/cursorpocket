@@ -22,7 +22,7 @@ public sealed partial class AnnotationWindow : Window
     private readonly string _path;
     private readonly List<AnnotationOperation> _operations = [];
     private string _tool = "pen";
-    private Windows.UI.Color _color = Windows.UI.Color.FromArgb(255, 67, 224, 141);
+    private Windows.UI.Color _color = Windows.UI.Color.FromArgb(255, 69, 224, 140);
     private AnnotationOperation? _active;
     private Point _start;
     private bool _finished;

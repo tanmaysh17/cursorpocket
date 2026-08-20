@@ -30,9 +30,60 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     public string CaptureCountLabel => _allItems.Count switch
     {
         0 => "Your next capture will land here",
-        1 => "1 capture, stored locally",
-        _ => $"{_allItems.Count} captures, stored locally",
+        1 => "1 capture",
+        _ => $"{_allItems.Count} captures",
     };
+
+    /// <summary>Count and disk use on one mono line under the library heading.</summary>
+    public string LibrarySummary
+    {
+        get
+        {
+            if (_allItems.Count == 0)
+            {
+                return "Your next capture will land here";
+            }
+            var bytes = 0L;
+            foreach (var item in _allItems)
+            {
+                try
+                {
+                    var file = new FileInfo(item.AbsolutePath);
+                    if (file.Exists)
+                    {
+                        bytes += file.Length;
+                    }
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+                {
+                    // A capture that moved or vanished simply does not count toward the total.
+                }
+            }
+            return $"{CaptureCountLabel} · {CaptureItemViewModel.FormatBytes(bytes)}";
+        }
+    }
+
+    public int AllCount => _allItems.Count;
+    public int ScreenshotCount => CountOf(CaptureKind.Screenshot);
+    public int VideoCount => CountOf(CaptureKind.Video);
+    public int AudioCount => CountOf(CaptureKind.Audio);
+    public int TextCount => CountOf(CaptureKind.Text);
+    public int LinkCount => CountOf(CaptureKind.Link);
+
+    private int CountOf(CaptureKind kind) => _allItems.Count(item => item.Record.CaptureKind == kind);
+
+    private void RaiseCounts()
+    {
+        OnPropertyChanged(nameof(CaptureCountLabel));
+        OnPropertyChanged(nameof(LibrarySummary));
+        OnPropertyChanged(nameof(AllCount));
+        OnPropertyChanged(nameof(ScreenshotCount));
+        OnPropertyChanged(nameof(VideoCount));
+        OnPropertyChanged(nameof(AudioCount));
+        OnPropertyChanged(nameof(TextCount));
+        OnPropertyChanged(nameof(LinkCount));
+    }
+
     public string ActivationHint => ActivationShortcut == "Shortcut unavailable"
         ? "Choose a working activation shortcut in Settings, then make your first capture."
         : $"Press {ActivationShortcut}, then choose a capture. Audio, video, screenshots, text, and links all appear here.";
@@ -46,7 +97,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             _allItems.Clear();
             _allItems.AddRange(records.Select(record => new CaptureItemViewModel(record, services.Library.GetAbsolutePath(record))));
             ApplyFilter();
-            OnPropertyChanged(nameof(CaptureCountLabel));
+            RaiseCounts();
             StatusMessage = services.Hotkey.RegisteredShortcut is null
                 ? "Choose an available activation shortcut in Settings"
                 : $"Press {services.Hotkey.RegisteredShortcut} anywhere to capture";
@@ -69,7 +120,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
         _allItems.Insert(0, item);
         ApplyFilter();
         SelectedItem = item;
-        OnPropertyChanged(nameof(CaptureCountLabel));
+        RaiseCounts();
         StatusMessage = $"Saved {item.KindLabel.ToLowerInvariant()}";
         return Task.CompletedTask;
     }
@@ -111,7 +162,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
                 ? "Moved capture to the Recycle Bin"
                 : $"Moved {deleted} captures to the Recycle Bin"
             : $"Moved {deleted} to the Recycle Bin · {failed} could not be removed";
-        OnPropertyChanged(nameof(CaptureCountLabel));
+        RaiseCounts();
     }
 
     [RelayCommand]
