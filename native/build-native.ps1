@@ -3,6 +3,7 @@ param(
     [switch]$SkipRestore,
     [switch]$SkipTests,
     [switch]$SkipFfmpeg,
+    [switch]$SkipModels,
     [switch]$RequireInstaller
 )
 
@@ -37,6 +38,9 @@ function Remove-ArtifactPath([string]$path) {
 $dotnet = Resolve-Dotnet
 if (-not $SkipFfmpeg) {
     & (Join-Path $repoRoot "tools\fetch_ffmpeg.ps1")
+}
+if (-not $SkipModels) {
+    & (Join-Path $repoRoot "tools\fetch_models.ps1")
 }
 if (-not $SkipRestore) {
     & $dotnet restore $solution -p:RuntimeIdentifier=win-x64
@@ -73,7 +77,7 @@ $compiledAssets = Join-Path $targetDir "Assets"
 if (Test-Path -LiteralPath $compiledAssets) {
     Copy-Item -LiteralPath $compiledAssets -Destination $publishRoot -Recurse -Force
 }
-$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\CursorPocketLogo.png")
+$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\CursorPocketLogo.png", "Assets\Backgrounds\graphite.png", "Assets\Backgrounds\slate.png", "Assets\Backgrounds\moss.png")
 foreach ($resource in $requiredWinUiResources) {
     if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $resource))) {
         throw "Published WinUI resource is missing: $resource"
@@ -83,6 +87,18 @@ foreach ($resource in $requiredWinUiResources) {
 $ffmpegRoot = Join-Path $repoRoot "third_party\ffmpeg"
 Copy-Item -LiteralPath (Join-Path $ffmpegRoot "bin\ffmpeg.exe") -Destination (Join-Path $publishRoot "ffmpeg.exe") -Force
 Copy-Item -LiteralPath (Join-Path $ffmpegRoot "LICENSE.txt") -Destination (Join-Path $publishRoot "FFMPEG-LICENSE.txt") -Force
+
+# Segmentation model sidecar for camera background effects: same pinned-hash
+# pattern as FFmpeg. The app degrades gracefully without it, but a build must
+# never quietly ship without it.
+$modelsRoot = Join-Path $repoRoot "third_party\models"
+Copy-Item -LiteralPath (Join-Path $modelsRoot "selfie_segmenter.onnx") -Destination (Join-Path $publishRoot "selfie_segmenter.onnx") -Force
+Copy-Item -LiteralPath (Join-Path $modelsRoot "LICENSE-selfie_segmenter.txt") -Destination (Join-Path $publishRoot "SELFIE-SEGMENTER-LICENSE.txt") -Force
+foreach ($effectArtifact in @("selfie_segmenter.onnx", "onnxruntime.dll")) {
+    if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $effectArtifact))) {
+        throw "Published camera-effects artifact is missing: $effectArtifact"
+    }
+}
 Copy-Item -LiteralPath (Join-Path $repoRoot "THIRD_PARTY_NOTICES.md") -Destination (Join-Path $publishRoot "THIRD_PARTY_NOTICES.md") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination (Join-Path $publishRoot "README.md") -Force
 
@@ -93,7 +109,9 @@ $packageNotices = @(
     @{ Package = "microsoft.windowsappsdk"; Version = "2.4.0"; Files = @("license.txt", "NOTICE.txt") },
     @{ Package = "communitytoolkit.mvvm"; Version = "8.4.2"; Files = @("License.md", "ThirdPartyNotices.txt") },
     @{ Package = "naudio"; Version = "2.2.1"; Files = @("license.txt") },
-    @{ Package = "system.drawing.common"; Version = "8.0.20"; Files = @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT") }
+    @{ Package = "system.drawing.common"; Version = "8.0.20"; Files = @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT") },
+    @{ Package = "microsoft.ml.onnxruntime"; Version = "1.29.0"; Files = @("LICENSE", "ThirdPartyNotices.txt") },
+    @{ Package = "microsoft.ml.onnxruntime.managed"; Version = "1.29.0"; Files = @("LICENSE.txt") }
 )
 foreach ($packageNotice in $packageNotices) {
     foreach ($file in $packageNotice.Files) {

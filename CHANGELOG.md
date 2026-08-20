@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added camera effects to the self-view: background blur, background replacement (three bundled backgrounds or your own image), face touch-up, and brightness, warmth, and contrast. Everything runs on-device — the person mask comes from a hash-pinned local model, and no frame or derived data leaves the machine.
+- Added a squircle self-view shape — a 1:1 plump square — alongside the existing 16:9 rounded rectangle.
+- Recording preflight now previews the shape and every effect live in the framing slot, so the look is settled before recording rather than discovered afterwards.
+- Added microphone noise suppression and volume auto-levelling for both narration and standalone audio notes. Cleanup runs when the recording is finalized and the raw capture is only replaced on success, so a filter problem can never cost the take.
+- Every new effect defaults to off, and with all of them off the camera preview runs the untouched pre-effects path.
 - Added a live camera self-view during screen walkthroughs, so the webcam feed is visible on screen while recording instead of only in the saved file.
 - Moved camera ownership from FFmpeg to CursorPocket. The webcam is now recorded from the screen at the chosen corner and size, which is what makes a live self-view possible; DirectShow grants a single consumer exclusive use of the device.
 - Window-source recordings keep the on-screen self-view but cannot carry it into the saved file, and the preflight now says so before recording starts.

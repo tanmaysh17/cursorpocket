@@ -26,6 +26,89 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task RepairsOutOfRangeCameraEffectSettings()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "settings.json");
+        await File.WriteAllTextAsync(path, """
+            {"video_camera_shape":"octagon","video_camera_background":"hologram","video_camera_touch_up":9,"video_camera_brightness":5000,"video_camera_warmth":-5000,"video_camera_contrast":-101}
+            """);
+
+        var settings = await new SettingsStore(path).LoadAsync();
+
+        Assert.Equal("rounded", settings.VideoCameraShape);
+        Assert.Equal("none", settings.VideoCameraBackground);
+        Assert.Equal(2, settings.VideoCameraTouchUp);
+        Assert.Equal(100, settings.VideoCameraBrightness);
+        Assert.Equal(-100, settings.VideoCameraWarmth);
+        Assert.Equal(-100, settings.VideoCameraContrast);
+    }
+
+    /// <summary>
+    /// Selecting an image background with no image to show would run
+    /// segmentation on every frame and then composite nothing.
+    /// </summary>
+    [Fact]
+    public void AnImageBackgroundWithNoImageIsNotARealSelection()
+    {
+        var repaired = SettingsStore.Normalize(new AppSettings
+        {
+            VideoCameraBackground = "image",
+            VideoCameraBackgroundImage = "   ",
+        });
+
+        Assert.Equal("none", repaired.VideoCameraBackground);
+
+        var kept = SettingsStore.Normalize(new AppSettings
+        {
+            VideoCameraBackground = "image",
+            VideoCameraBackgroundImage = "asset:graphite",
+        });
+
+        Assert.Equal("image", kept.VideoCameraBackground);
+    }
+
+    [Fact]
+    public void CameraEffectsAndAudioCleanupAreOffByDefault()
+    {
+        var settings = SettingsStore.Normalize(new AppSettings());
+
+        Assert.Equal("rounded", settings.VideoCameraShape);
+        Assert.Equal("none", settings.VideoCameraBackground);
+        Assert.Equal(0, settings.VideoCameraTouchUp);
+        Assert.Equal(0, settings.VideoCameraBrightness);
+        Assert.False(settings.AudioNoiseSuppression);
+        Assert.False(settings.AudioAutoLevel);
+    }
+
+    [Fact]
+    public async Task KeepsValidCameraEffectChoices()
+    {
+        Directory.CreateDirectory(_root);
+        var path = Path.Combine(_root, "settings.json");
+        var store = new SettingsStore(path);
+        var expected = new AppSettings
+        {
+            VideoCameraShape = "squircle",
+            VideoCameraBackground = "blur",
+            VideoCameraTouchUp = 1,
+            VideoCameraBrightness = 40,
+            AudioNoiseSuppression = true,
+            AudioAutoLevel = true,
+        };
+
+        await store.SaveAsync(expected);
+        var actual = await store.LoadAsync();
+
+        Assert.Equal("squircle", actual.VideoCameraShape);
+        Assert.Equal("blur", actual.VideoCameraBackground);
+        Assert.Equal(1, actual.VideoCameraTouchUp);
+        Assert.Equal(40, actual.VideoCameraBrightness);
+        Assert.True(actual.AudioNoiseSuppression);
+        Assert.True(actual.AudioAutoLevel);
+    }
+
+    [Fact]
     public async Task SaveIsAtomicAndRoundTrips()
     {
         var path = Path.Combine(_root, "nested", "settings.json");

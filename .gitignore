@@ -7,6 +7,9 @@ dist/
 third_party/ffmpeg/bin/*.exe
 third_party/ffmpeg/cache/
 third_party/ffmpeg/LICENSE.txt
+# Fetched by tools/fetch_models.ps1, pinned by hash — never committed.
+third_party/models/*.onnx
+third_party/models/LICENSE-*.txt
 
 # .NET / Visual Studio
 **/[Bb]in/

@@ -67,6 +67,22 @@ public sealed class SettingsStore(string? settingsPath = null)
         var cameraWidth = value.VideoCameraWidth is 240 or 360 or 480
             ? value.VideoCameraWidth
             : 360;
+        var cameraShape = value.VideoCameraShape is "rounded" or "squircle"
+            ? value.VideoCameraShape
+            : "rounded";
+        var cameraBackground = value.VideoCameraBackground is "none" or "blur" or "image"
+            ? value.VideoCameraBackground
+            : "none";
+        // "image" with nothing to show would run segmentation every frame and
+        // then composite nothing, so it is not a real selection.
+        if (cameraBackground == "image" && string.IsNullOrWhiteSpace(value.VideoCameraBackgroundImage))
+        {
+            cameraBackground = "none";
+        }
+        var cameraTouchUp = Math.Clamp(value.VideoCameraTouchUp, 0, 2);
+        var cameraBrightness = ClampAdjustment(value.VideoCameraBrightness);
+        var cameraWarmth = ClampAdjustment(value.VideoCameraWarmth);
+        var cameraContrast = ClampAdjustment(value.VideoCameraContrast);
         var companionMode = !value.FollowCursor && value.CursorCompanionMode == "while-moving"
             ? "off"
             : value.CursorCompanionMode is "off" or "while-moving" or "always"
@@ -87,6 +103,12 @@ public sealed class SettingsStore(string? settingsPath = null)
             VideoCameraPosition = position,
             VideoSourceKind = source,
             VideoCameraWidth = cameraWidth,
+            VideoCameraShape = cameraShape,
+            VideoCameraBackground = cameraBackground,
+            VideoCameraTouchUp = cameraTouchUp,
+            VideoCameraBrightness = cameraBrightness,
+            VideoCameraWarmth = cameraWarmth,
+            VideoCameraContrast = cameraContrast,
             CursorCompanionMode = companionMode,
             CommandPanelAnchorX = anchorX,
             CommandPanelAnchorY = anchorY,
@@ -95,4 +117,6 @@ public sealed class SettingsStore(string? settingsPath = null)
 
     private static double ClampAnchor(double value, double fallback) =>
         double.IsFinite(value) ? Math.Clamp(value, 0, 1) : fallback;
+
+    private static int ClampAdjustment(int value) => Math.Clamp(value, -100, 100);
 }

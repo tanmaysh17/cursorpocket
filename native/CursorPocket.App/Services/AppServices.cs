@@ -14,7 +14,7 @@ public sealed class AppServices : IDisposable
         FfmpegPath = ffmpegPath;
         Library = new LibraryService(captureStore);
         Screenshots = new ScreenshotCaptureService(captureStore);
-        Recording = new RecordingService(captureStore, ffmpegPath);
+        Recording = new RecordingService(captureStore, ffmpegPath, () => (Settings.AudioNoiseSuppression, Settings.AudioAutoLevel));
         Context = new WindowContextService();
         Hotkey = new GlobalHotkeyService();
         EscapeHotkey = new ScopedEscapeHotkeyService();
@@ -74,7 +74,7 @@ public sealed class AppServices : IDisposable
             CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
             Library = new LibraryService(CaptureStore);
             Screenshots = new ScreenshotCaptureService(CaptureStore);
-            Recording = new RecordingService(CaptureStore, FfmpegPath);
+            Recording = new RecordingService(CaptureStore, FfmpegPath, () => (Settings.AudioNoiseSuppression, Settings.AudioAutoLevel));
             Previews = new PreviewService(CaptureStore, FfmpegPath);
         }
         SettingsChanged?.Invoke(this, normalized);

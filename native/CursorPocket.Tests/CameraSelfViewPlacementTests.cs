@@ -93,6 +93,68 @@ public sealed class CameraSelfViewPlacementTests
             () => CameraSelfViewPlacement.Compute(new CaptureBounds(10, 10, 11, 11), "top-left", 360));
     }
 
+    [Fact]
+    public void The_default_shape_keeps_the_existing_sixteen_by_nine_framing() =>
+        Assert.Equal(
+            CameraSelfViewPlacement.Compute(Display, "bottom-right", 360),
+            CameraSelfViewPlacement.Compute(Display, "bottom-right", 360, "rounded"));
+
+    [Theory]
+    [InlineData(240)]
+    [InlineData(360)]
+    [InlineData(480)]
+    public void The_squircle_is_square_so_the_plump_shape_is_not_stretched(int width)
+    {
+        var rect = CameraSelfViewPlacement.Compute(Display, "bottom-right", width, "squircle");
+
+        Assert.Equal(width, rect.Width);
+        Assert.Equal(width, rect.Height);
+    }
+
+    [Fact]
+    public void An_unknown_shape_falls_back_to_the_rounded_framing() =>
+        Assert.Equal(
+            CameraSelfViewPlacement.Compute(Display, "top-left", 360, "rounded"),
+            CameraSelfViewPlacement.Compute(Display, "top-left", 360, "hexagon"));
+
+    [Theory]
+    [InlineData("bottom-right")]
+    [InlineData("bottom-left")]
+    [InlineData("top-right")]
+    [InlineData("top-left")]
+    public void The_squircle_also_always_lands_inside_the_recorded_area(string position)
+    {
+        // The taller 1:1 shape has less room to spare than 16:9, so the inset
+        // clamping has to hold for it too or the webcam is cropped out of the file.
+        foreach (var area in new[]
+        {
+            Display,
+            new CaptureBounds(-1920, 200, 0, 1280),
+            new CaptureBounds(120, 90, 520, 330),
+            new CaptureBounds(0, 0, 300, 200),
+        })
+        {
+            foreach (var width in new[] { 240, 360, 480 })
+            {
+                var rect = CameraSelfViewPlacement.Compute(area, position, width, "squircle");
+
+                Assert.True(rect.Left >= area.Left, $"{position} {width} left {rect.Left} < {area.Left}");
+                Assert.True(rect.Top >= area.Top, $"{position} {width} top {rect.Top} < {area.Top}");
+                Assert.True(rect.Right <= area.Right, $"{position} {width} right {rect.Right} > {area.Right}");
+                Assert.True(rect.Bottom <= area.Bottom, $"{position} {width} bottom {rect.Bottom} > {area.Bottom}");
+            }
+        }
+    }
+
+    [Fact]
+    public void The_squircle_height_stays_even_for_h264()
+    {
+        foreach (var width in new[] { 241, 300, 361, 480, 639 })
+        {
+            Assert.Equal(0, CameraSelfViewPlacement.Compute(Display, "top-left", width, "squircle").Height % 2);
+        }
+    }
+
     [Theory]
     [InlineData(VideoSourceKind.Display, true)]
     [InlineData(VideoSourceKind.Region, true)]

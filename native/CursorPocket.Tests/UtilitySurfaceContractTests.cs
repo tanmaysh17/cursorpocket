@@ -218,6 +218,162 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void The_camera_effect_pipeline_only_replaces_the_plain_preview_when_effects_are_on()
+    {
+        var code = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+        var xaml = ReadFixture("CameraSelfViewWindow.xaml");
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+
+        // Both render paths exist; with no effects the untouched MediaPlayer
+        // path still runs, so an unconfigured user is on the pre-effects code.
+        Assert.Contains("x:Name=\"CameraEffectView\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MediaPlayerElement", xaml, StringComparison.Ordinal);
+        Assert.Contains("effects.HasAnyEffect", code, StringComparison.Ordinal);
+        Assert.Contains("MediaSource.CreateFromMediaFrameSource(source)", code, StringComparison.Ordinal);
+        // A frame reader that cannot start must fall back rather than fail.
+        Assert.Contains("MediaFrameReaderStartStatus.Success", renderer, StringComparison.Ordinal);
+        // Latest-frame-wins keeps a slow machine from accumulating latency.
+        Assert.Contains("MediaFrameReaderAcquisitionMode.Realtime", renderer, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.CompareExchange(ref _busy", renderer, StringComparison.Ordinal);
+        // The renderer holds the camera, so the self-view must release it.
+        Assert.Contains("_effectRenderer?.Dispose()", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Camera_effects_degrade_instead_of_breaking_a_recording()
+    {
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+        var segmenter = ReadFixture("SelfieSegmenter.cs.txt");
+
+        // A missing or broken model disables background effects rather than
+        // throwing into the recording path: both public entry points swallow.
+        // (The private constructor may throw — TryCreate is what catches it.)
+        Assert.Contains("public static SelfieSegmenter? TryCreate", segmenter, StringComparison.Ordinal);
+        Assert.Contains("return null", segmenter, StringComparison.Ordinal);
+        var tryGetMask = segmenter[segmenter.IndexOf("public bool TryGetMask", StringComparison.Ordinal)..];
+        Assert.Contains("catch (Exception)", tryGetMask, StringComparison.Ordinal);
+        Assert.Contains("_failed = true", tryGetMask, StringComparison.Ordinal);
+        // When frames cost too much, inference is stretched before anything visible drops.
+        Assert.Contains("InferenceInterval", renderer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_shaped_self_view_drops_its_window_region_while_it_is_dragged()
+    {
+        var code = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+        var placement = ReadFixture("WindowPlacement.cs.txt");
+
+        Assert.Contains("SquircleGeometry.ComputePolygon", code, StringComparison.Ordinal);
+        Assert.Contains("ClipToPolygonPixelRegion", placement, StringComparison.Ordinal);
+        Assert.Contains("CreatePolygonRgn", placement, StringComparison.Ordinal);
+        // This surface is both shaped and draggable, which a window region cannot be
+        // during the drag itself: it takes the window off DWM's fast path and the
+        // drag visibly lags. Both shapes go through one clip path so press/release
+        // has a single thing to drop and restore.
+        Assert.Contains("private void ApplyShapeClip()", code, StringComparison.Ordinal);
+        Assert.Contains("ClearWindowRegion", code, StringComparison.Ordinal);
+        Assert.Contains("SetWindowRgn(WinRT.Interop.WindowNative.GetWindowHandle(window), 0, true)", placement, StringComparison.Ordinal);
+        // Cleared on press, re-cut on release.
+        var pressed = Section(code, "Root_PointerPressed", "Root_PointerMoved");
+        Assert.Contains("ClearWindowRegion", pressed, StringComparison.Ordinal);
+        var released = Section(code, "Root_PointerReleased", "ApplyShapeClip()");
+        Assert.Contains("ReleasePointerCapture", released, StringComparison.Ordinal);
+        // Capture can be lost without a release, so that path restores it too.
+        var captureLost = Section(code, "Root_PointerCaptureLost", "private void ApplyShapeClip");
+        Assert.Contains("ApplyShapeClip()", captureLost, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_camera_is_fully_released_before_the_same_device_is_reopened()
+    {
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+        var selfView = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+
+        // Teardown has to await the frame reader stop, not fire and forget it —
+        // DirectShow allows one consumer, so returning early is what makes the
+        // next preview or self-view find the camera busy.
+        Assert.Contains("public async Task DisposeAsync", renderer, StringComparison.Ordinal);
+        Assert.Contains("await reader.StopAsync()", renderer, StringComparison.Ordinal);
+        // And it must outlast any frame still inside the pipeline, because
+        // releasing the ONNX session under a running inference is a native
+        // use-after-free rather than a catchable exception.
+        Assert.Contains("WaitForFrameWorkAsync", renderer, StringComparison.Ordinal);
+        Assert.Contains("_processing", renderer, StringComparison.Ordinal);
+        // Callers await it, and the renderer goes down before the MediaCapture.
+        Assert.Contains("await renderer.DisposeAsync()", preflight, StringComparison.Ordinal);
+        Assert.True(preflight.IndexOf("await renderer.DisposeAsync()", StringComparison.Ordinal) <
+            preflight.IndexOf("_mediaCapture?.Dispose()", StringComparison.Ordinal));
+        Assert.Contains("await renderer.DisposeAsync()", selfView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Preflight_never_opens_a_file_picker_while_seeding_its_controls()
+    {
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+
+        // Assigning SelectedIndex fires SelectionChanged synchronously, so a
+        // remembered custom background must not reopen the picker on load.
+        Assert.Contains("_seeding", preflight, StringComparison.Ordinal);
+        Assert.Contains("string.IsNullOrWhiteSpace(_customBackgroundPath)", preflight, StringComparison.Ordinal);
+        Assert.True(preflight.IndexOf("SeedBackgroundSelection(App.Services.Settings", StringComparison.Ordinal) <
+            preflight.IndexOf("_seeding = false", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Rapid_effect_changes_publish_the_latest_settings_not_the_fastest()
+    {
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+
+        // Loading a replacement image awaits a decode, so two quick changes can
+        // complete out of order and leave the preview disagreeing with the UI.
+        Assert.Contains("_settingsRevision", renderer, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Increment(ref _settingsRevision)", renderer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Audio_note_cleanup_never_leaves_a_file_the_library_would_adopt()
+    {
+        var recording = ReadFixture("RecordingService.cs.txt");
+        var cleanup = recording[recording.IndexOf("TryCleanupAudioNoteAsync(string wavPath", StringComparison.Ordinal)..];
+
+        // Orphan recovery adopts any .wav under audio/<date>, so the temp file
+        // has to live outside the capture categories.
+        Assert.Contains(".cursorpocket\", \"temp\"", cleanup, StringComparison.Ordinal);
+        Assert.DoesNotContain("wavPath + \".cleanup.wav\"", cleanup, StringComparison.Ordinal);
+        // A cancelled stop must not leave ffmpeg holding the file.
+        Assert.Contains("process.Kill(true)", cleanup, StringComparison.Ordinal);
+        // Same format in and out, so a short result means audio was lost.
+        Assert.Contains("originalLength * 0.9", cleanup, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Microphone_cleanup_runs_at_finalize_time_so_a_filter_can_never_lose_a_take()
+    {
+        var recording = ReadFixture("RecordingService.cs.txt");
+
+        // The raw capture is written first and only replaced on success.
+        Assert.Contains("AudioCleanupFilterBuilder.Build", recording, StringComparison.Ordinal);
+        Assert.Contains("TryCleanupAudioNoteAsync", recording, StringComparison.Ordinal);
+        Assert.True(recording.IndexOf("_waveIn.StopRecording()", StringComparison.Ordinal) <
+            recording.IndexOf("TryCleanupAudioNoteAsync(reservation.AbsolutePath", StringComparison.Ordinal));
+        // Video stays a stream copy: cleanup must never re-encode the picture.
+        Assert.Contains("\"-c:v\", \"copy\"", recording, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_effect_model_and_runtime_are_verified_by_the_packaging_script()
+    {
+        var build = ReadFixture("build-native.ps1.txt");
+
+        Assert.Contains("fetch_models.ps1", build, StringComparison.Ordinal);
+        Assert.Contains("selfie_segmenter.onnx", build, StringComparison.Ordinal);
+        Assert.Contains("onnxruntime.dll", build, StringComparison.Ordinal);
+        Assert.Contains("Published camera-effects artifact is missing", build, StringComparison.Ordinal);
+        Assert.Contains("Assets\\Backgrounds\\graphite.png", build, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Video_preflight_keeps_advanced_controls_scrollable_and_auto_reveals_them()
     {
         var xaml = ReadFixture("VideoPreflightWindow.xaml");
@@ -395,6 +551,19 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("Environment.GetCommandLineArgs()", code, StringComparison.Ordinal);
         Assert.Contains("DispatcherQueuePriority.Low", code, StringComparison.Ordinal);
         Assert.True(code.Split("Window.AppWindow.Hide()", StringSplitOptions.None).Length >= 3);
+    }
+
+    /// <summary>
+    /// The slice of a source fixture between two markers, so an assertion can say
+    /// "inside this method" instead of "somewhere in the file".
+    /// </summary>
+    private static string Section(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"'{startMarker}' was not found.");
+        var end = source.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
+        Assert.True(end >= 0, $"'{endMarker}' was not found after '{startMarker}'.");
+        return source[start..end];
     }
 
     private static string ReadFixture(string name) =>

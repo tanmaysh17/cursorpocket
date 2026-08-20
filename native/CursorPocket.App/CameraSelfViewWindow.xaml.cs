@@ -24,10 +24,15 @@ public sealed partial class CameraSelfViewWindow : Window
 {
     private MediaCapture? _mediaCapture;
     private MediaPlayer? _cameraPlayer;
+    private CameraEffectRenderer? _effectRenderer;
     private CaptureBounds _captureArea = new(0, 0, 1920, 1080);
     private (int Left, int Top) _dragOrigin;
     private (int X, int Y) _dragStart;
     private bool _dragging;
+    /// <summary>Remembered so the shape can be re-cut after a drag; see <see cref="ApplyShapeClip"/>.</summary>
+    private string _cameraShape = "rounded";
+    private int _clipWidth;
+    private int _clipHeight;
     private bool _closed;
 
     private CameraSelfViewWindow()
@@ -52,6 +57,15 @@ public sealed partial class CameraSelfViewWindow : Window
         _dragStart = WindowPlacement.PointerPosition();
         _dragging = Root.CapturePointer(eventArgs.Pointer);
         eventArgs.Handled = _dragging;
+        if (_dragging)
+        {
+            // A window region takes the window off DWM's fast path, so dragging a
+            // clipped surface visibly lags. Drop the clip for the duration of the
+            // drag and cut it again on release: the shape is what appears in the
+            // recording at rest, and the square corners only show while the user is
+            // actively holding the window.
+            WindowPlacement.ClearWindowRegion(this);
+        }
     }
 
     private void Root_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs)
@@ -85,9 +99,40 @@ public sealed partial class CameraSelfViewWindow : Window
         _dragging = false;
         eventArgs.Handled = true;
         Root.ReleasePointerCapture(eventArgs.Pointer);
+        ApplyShapeClip();
     }
 
-    private void Root_PointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _dragging = false;
+    private void Root_PointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+        // Capture can be lost without a release — the clip still has to come back.
+        _dragging = false;
+        ApplyShapeClip();
+    }
+
+    /// <summary>
+    /// Cuts the self-view to its configured shape. The squircle is a superellipse
+    /// polygon; everything else is the rounded rectangle. Safe to call repeatedly,
+    /// which is what lets the clip be dropped for a drag and restored after.
+    /// </summary>
+    private void ApplyShapeClip()
+    {
+        if (_clipWidth < 2 || _clipHeight < 2)
+        {
+            return;
+        }
+        if (_cameraShape == "squircle")
+        {
+            WindowPlacement.ClipToPolygonPixelRegion(this, SquircleGeometry.ComputePolygon(_clipWidth, _clipHeight));
+        }
+        else
+        {
+            WindowPlacement.ClipToRoundedPixelRegion(this, _clipWidth, _clipHeight, 12);
+        }
+    }
 
     /// <summary>
     /// Shows the self-view inside the area being recorded, or returns null when the
@@ -101,13 +146,16 @@ public sealed partial class CameraSelfViewWindow : Window
             return null;
         }
         var bounds = ResolveCaptureArea(options, sourceWindow);
-        var placement = CameraSelfViewPlacement.Compute(bounds, options.CameraPosition, options.CameraWidth);
+        var placement = CameraSelfViewPlacement.Compute(bounds, options.CameraPosition, options.CameraWidth, options.CameraShape);
         var window = new CameraSelfViewWindow();
         window._captureArea = bounds;
+        window._cameraShape = options.CameraShape;
+        window._clipWidth = placement.Width;
+        window._clipHeight = placement.Height;
         window.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(placement.Left, placement.Top, placement.Width, placement.Height));
-        WindowPlacement.ClipToRoundedPixelRegion(window, placement.Width, placement.Height, 12);
+        window.ApplyShapeClip();
         window.AppWindow.Show(false);
-        if (!await window.StartCameraAsync(options.CameraName))
+        if (!await window.StartCameraAsync(options.CameraName, options.ToCameraEffectSettings()))
         {
             window.Close();
             return null;
@@ -117,13 +165,25 @@ public sealed partial class CameraSelfViewWindow : Window
         return window;
     }
 
-    public void Dismiss()
+    public void Dismiss() => _ = DismissAsync();
+
+    /// <summary>
+    /// Releases the camera and closes. Awaiting this matters: the next preflight
+    /// preview opens the same device, and DirectShow allows a single consumer.
+    /// </summary>
+    public async Task DismissAsync()
     {
         if (_closed)
         {
             return;
         }
         _closed = true;
+        var renderer = _effectRenderer;
+        _effectRenderer = null;
+        if (renderer is not null)
+        {
+            await renderer.DisposeAsync();
+        }
         ReleaseCamera();
         Close();
     }
@@ -148,7 +208,7 @@ public sealed partial class CameraSelfViewWindow : Window
         return new CaptureBounds(monitor.Left, monitor.Top, monitor.Right, monitor.Bottom);
     }
 
-    private async Task<bool> StartCameraAsync(string cameraName)
+    private async Task<bool> StartCameraAsync(string cameraName, CursorPocket.Core.Media.CameraEffectSettings effects)
     {
         try
         {
@@ -172,9 +232,22 @@ public sealed partial class CameraSelfViewWindow : Window
                 ReleaseCamera();
                 return false;
             }
-            _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
-            _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
-            CameraPreview.SetMediaPlayer(_cameraPlayer);
+            if (effects.HasAnyEffect)
+            {
+                _effectRenderer = await CameraEffectRenderer.StartAsync(_mediaCapture, source, effects, CameraEffectView, DispatcherQueue);
+            }
+            if (_effectRenderer is not null)
+            {
+                CameraEffectView.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                // No effects requested, or the frame reader could not start:
+                // the plain preview is exactly the pre-effects pipeline.
+                _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
+                _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
+                CameraPreview.SetMediaPlayer(_cameraPlayer);
+            }
             CameraStatus.Visibility = Visibility.Collapsed;
             return true;
         }
@@ -189,6 +262,8 @@ public sealed partial class CameraSelfViewWindow : Window
 
     private void ReleaseCamera()
     {
+        _effectRenderer?.Dispose();
+        _effectRenderer = null;
         CameraPreview.SetMediaPlayer(null);
         _cameraPlayer?.Dispose();
         _cameraPlayer = null;

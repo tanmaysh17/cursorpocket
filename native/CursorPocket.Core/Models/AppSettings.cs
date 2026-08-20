@@ -49,6 +49,33 @@ public sealed record AppSettings
     [JsonPropertyName("video_camera_width")]
     public int VideoCameraWidth { get; init; } = 360;
 
+    [JsonPropertyName("video_camera_shape")]
+    public string VideoCameraShape { get; init; } = "rounded";
+
+    [JsonPropertyName("video_camera_background")]
+    public string VideoCameraBackground { get; init; } = "none";
+
+    [JsonPropertyName("video_camera_background_image")]
+    public string VideoCameraBackgroundImage { get; init; } = string.Empty;
+
+    [JsonPropertyName("video_camera_touch_up")]
+    public int VideoCameraTouchUp { get; init; }
+
+    [JsonPropertyName("video_camera_brightness")]
+    public int VideoCameraBrightness { get; init; }
+
+    [JsonPropertyName("video_camera_warmth")]
+    public int VideoCameraWarmth { get; init; }
+
+    [JsonPropertyName("video_camera_contrast")]
+    public int VideoCameraContrast { get; init; }
+
+    [JsonPropertyName("audio_noise_suppression")]
+    public bool AudioNoiseSuppression { get; init; }
+
+    [JsonPropertyName("audio_auto_level")]
+    public bool AudioAutoLevel { get; init; }
+
     [JsonPropertyName("video_fps")]
     public int VideoFramesPerSecond { get; init; } = 30;
 

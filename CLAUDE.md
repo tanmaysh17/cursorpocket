@@ -9,7 +9,7 @@ CursorPocket is a local-first Windows capture utility (screenshots, screen video
 - `native/` — the **shipping app**: .NET 8 / WinUI 3, x64, self-contained, unpackaged. All product work happens here.
 - `cursorpocket/` + `main.py` — the **previous Python implementation, kept only as a behavioral parity reference**. It still runs in CI (unit tests + `--self-test`) but is not shipped in artifacts. Do not add a Python bridge to the native release; do not port new features into it.
 
-`tools/` (FFmpeg fetch, media verifier, icon generation) is shared by both.
+`tools/` (FFmpeg fetch, segmentation-model fetch, background generation, media verifier, icon generation) is shared by both.
 
 ## Commands
 
@@ -33,7 +33,7 @@ Packaging (portable ZIP always, installer if Inno Setup 6 is present) into `arti
 powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 ```
 
-`build-native.ps1` accepts `-SkipRestore -SkipTests -SkipFfmpeg -RequireInstaller` (CI uses all four).
+`build-native.ps1` accepts `-SkipRestore -SkipTests -SkipFfmpeg -SkipModels -RequireInstaller` (CI uses all five). `-SkipModels` skips the segmentation-model fetch used by camera background effects.
 
 Python reference checks:
 
@@ -46,6 +46,12 @@ FFmpeg media pipeline verification (encodes screen-only, narrated, webcam, combi
 
 ```powershell
 py -m tools.verify_video_media --ffmpeg .\third_party\ffmpeg\bin\ffmpeg.exe
+```
+
+Segmentation model verification — asserts the tensor layout, the 0..1 RGB input, and that **high means person**. The unit tests run against a fake `IPersonMaskModel`, so nothing else catches a model whose mask is inverted, which blurs the person instead of the background. Run it after changing the pinned model (needs `onnxruntime` and `numpy`, dev-only):
+
+```powershell
+py -m tools.verify_segmentation_model
 ```
 
 `CONTRIBUTING.md` lists the full pre-submit gate. UI changes additionally require a visual pass on the *installed* build at the active display scale — XAML inspection is not sufficient (see `DESIGN.md` acceptance gate).
@@ -69,6 +75,10 @@ py -m tools.verify_video_media --ffmpeg .\third_party\ffmpeg\bin\ffmpeg.exe
 **Which screen gets recorded.** Two index spaces must never be confused: `EnumDisplayMonitors` ordering, and the DXGI output ordering that FFmpeg's `ddagrab` `output_idx` uses. Passing the former as the latter silently records a different monitor. `DisplayOutputLocator` resolves a monitor's `\\.\DISPLAYn` device name to a DXGI output index on the default adapter; `RecordingOptions.DisplayOutputIndex` carries only that. When it is null — monitor on another adapter, or DXGI unavailable — `FfmpegCommandBuilder` grabs `Bounds` with `gdigrab` instead, which is slower but always the right pixels. The target is resolved by `WindowPlacement.DisplayTargetUnderPointer()` **when command mode opens**, never when Start is pressed: by then the pointer is over the preflight window, which Windows may have placed on another display.
 
 **Camera ownership.** The camera is deliberately *not* an FFmpeg input. DirectShow grants a single consumer exclusive use of the device, so an FFmpeg `dshow` camera input made a live self-view impossible. Instead `CameraSelfViewWindow` holds the camera for the whole recording and the webcam reaches the file by being on screen inside the captured rectangle — which is also what lets the user watch their own feed. `CameraSelfViewPlacement` (Core) guarantees the window lands inside that rectangle; anything outside it is absent from the file. Consequences: window-source recordings (`gdigrab hwnd=`) cannot carry the self-view into the file, and the camera must be released the moment recording stops or the next preflight preview finds it busy.
+
+**Camera effects.** Because the webcam reaches the file by being on screen, effects are applied by *rendering* them into the self-view — there is no FFmpeg video filter involved. `CameraEffectRenderer` (App) reads frames with a `MediaFrameReader` (`Bgra8`, `AcquisitionMode.Realtime`), hands the packed buffer to `CameraEffectPipeline` (Core), and presents the result through a `SoftwareBitmapSource` on an `Image`. All pixel math lives in `CursorPocket.Core/Media` on `Span<byte>` (LUT, box blur, resize, touch-up, mask composite) and is unit-tested with a fake `IPersonMaskModel`. The person mask comes from `SelfieSegmenter` (App), an ONNX Runtime session over a hash-pinned MediaPipe Selfie Segmenter fetched by `tools/fetch_models.ps1`. Deliberate choices worth keeping: **no Win2D** (v1.4 targets WinAppSDK 1.8, unsupported against our 2.4.0, and CPU is ample at ≤480 px); the plain `MediaPlayerElement` path is kept verbatim and still used whenever no effect is enabled, so the no-effects case carries zero new risk; `FrameArrived` is gated by an interlocked busy flag released only after the frame reaches the screen, giving latest-frame-wins instead of growing latency; and without a mask the background is left *untouched* rather than blurred, because blurring everything would erase the user. The renderer is shared by the self-view and the preflight preview so both show the same thing.
+
+**Microphone cleanup.** `AudioCleanupFilterBuilder` (Core) builds an `-af` chain from stock avfilters (`highpass`, `afftdn`, `loudnorm`). It is applied by the *finalize* passes, not the live capture: `MuxVideoMicrophoneAsync` for narration (where video is already `-c:v copy`) and `TryCleanupAudioNoteAsync` for audio notes. Both write the raw capture first and only replace it when FFmpeg succeeds — audio notes must keep saving with no FFmpeg present at all. `FfmpegCommandBuilder`'s `dshow` mic branch remains dead at runtime (`RecordingService` strips it and muxes NAudio's WAV afterwards), so do not add audio filters there.
 
 **Storage compatibility contract.** Settings live at `%LOCALAPPDATA%\CursorPocket\settings.json`; captures default to `Documents\CursorPocket Captures\<date>\{screenshots,audio,videos,text,links}` with a `captures.jsonl` index. The native app must keep reading and writing the existing layout and must never move or rewrite existing captures. `SettingsStore.Normalize` is the single place that clamps/repairs persisted values.
 
@@ -107,7 +117,11 @@ These were each fixed after a real regression (`AGENTS.md`, `DESIGN.md`, `HANDOF
 - Command mode is the one transient surface using a `SystemBackdrop` (`DesktopAcrylicBackdrop`) for a live blurred desktop. That does not violate the opaque-root rule: the system paints the whole window, so there is no unpainted WinUI gutter.
 - CursorPocket's own capture surfaces must be brought up with `WindowPlacement.ForceForeground`, not `Window.Activate()`. A transient surface has just hidden itself, so the source app already owns the foreground and its foreground lock refuses the change — that is what left the annotation window minimized. Source windows still go through `WindowContextService.RestoreFocus`, which never restores a healthy window.
 - `DoubleCircleGestureDetector` is permissive about gesture size and speed and strict only about shape (angular travel, directionality, radius consistency). Loosen size/speed if asked; do not loosen the shape checks, which are what stop ordinary mouse movement from opening command mode. The thresholds have been tuned in both directions already — a much looser pass fired during normal work — so change them by moving one knob at a time and re-checking on a real session.
-- Never apply a `SetWindowRgn` clip to a surface the user can drag. A window region takes the window off DWM's fast path and dragging visibly lags; `ConfigureUtilityWindow` already asks DWM for rounded corners.
+- Never leave a `SetWindowRgn` clip on a surface *while* the user drags it. A window region takes the window off DWM's fast path and dragging visibly lags; `ConfigureUtilityWindow` already asks DWM for rounded corners. The camera self-view is both shaped and draggable, so it drops its region on pointer-press and re-cuts it on release (`ApplyShapeClip` / `WindowPlacement.ClearWindowRegion`) — square corners show only while the user is actively holding the window. Restore the clip from `PointerCaptureLost` too, since capture can be lost without a release.
 - Deletion goes to the Recycle Bin, never a hard delete.
+- Every camera effect and audio cleanup option defaults to off, and with all camera effects off the self-view runs the original `MediaPlayer` path. Do not "simplify" by routing the no-effects case through the frame reader.
+- Camera effects degrade, never fail: a missing or broken model disables background blur/replacement while colour and touch-up keep working, and a slow machine stretches inference across frames before anything visible drops. A failed effect must never take down a recording.
+- Audio cleanup runs at finalize time against a raw capture already on disk. Never filter the live capture — that would put a filter failure between the user and their take.
+- The squircle self-view is cut with `CreatePolygonRgn`, the rounded one with `CreateRoundRectRgn`, both through the single `ApplyShapeClip` path so the drag handlers have one thing to restore. Shape also drives aspect: squircle records 1:1, rounded 16:9 (`CameraSelfViewPlacement.Compute`).
 
 Because the HUD and receipt use capture exclusion, Windows Graphics Capture–based automation screenshots show the source content instead of those surfaces. Verify them by accessibility inspection plus direct visual inspection on an unlocked desktop.

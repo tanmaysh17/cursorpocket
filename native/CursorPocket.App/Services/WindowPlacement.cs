@@ -266,6 +266,37 @@ internal static class WindowPlacement
         }
     }
 
+    /// <summary>
+    /// Clips a surface to an arbitrary polygon (the squircle self-view). Same
+    /// contract as <see cref="ClipToRoundedPixelRegion"/>: physical pixels, and
+    /// only ever applied to click-through windows the user cannot drag.
+    /// </summary>
+    /// <summary>
+    /// Removes any window region, putting the surface back on DWM's fast path.
+    /// Dragging a region-clipped window visibly lags, so a draggable surface drops
+    /// its clip for the duration of the drag and re-cuts it on release.
+    /// </summary>
+    public static void ClearWindowRegion(Window window) =>
+        NativeMethods.SetWindowRgn(WinRT.Interop.WindowNative.GetWindowHandle(window), 0, true);
+
+    public static void ClipToPolygonPixelRegion(Window window, IReadOnlyList<(int X, int Y)> points)
+    {
+        var nativePoints = new NativeMethods.Point[points.Count];
+        for (var index = 0; index < points.Count; index++)
+        {
+            nativePoints[index] = new NativeMethods.Point { X = points[index].X, Y = points[index].Y };
+        }
+        var region = NativeMethods.CreatePolygonRgn(nativePoints, nativePoints.Length, NativeMethods.Winding);
+        if (region == 0)
+        {
+            return;
+        }
+        if (NativeMethods.SetWindowRgn(WinRT.Interop.WindowNative.GetWindowHandle(window), region, true) == 0)
+        {
+            NativeMethods.DeleteObject(region);
+        }
+    }
+
     public static double ScaleFor(Window window)
     {
         var dpi = NativeMethods.GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(window));
