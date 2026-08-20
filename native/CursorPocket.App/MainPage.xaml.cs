@@ -44,7 +44,10 @@ public sealed partial class MainPage : Page
         FpsBox.SelectionChanged += VideoDefaults_SelectionChanged;
         CountdownBox.SelectionChanged += VideoDefaults_SelectionChanged;
         UpdateLibraryVisibility();
+        SyncDeleteAffordance();
         await UpdateDetailAsync();
+        // Fire and forget: the list is already usable, thumbnails fill in behind it.
+        _ = LoadThumbnailsAsync();
     }
 
     private void VideoDefaults_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
@@ -77,7 +80,9 @@ public sealed partial class MainPage : Page
         {
             await ViewModel.CaptureAddedAsync(eventArgs.Record);
             UpdateLibraryVisibility();
+            SyncDeleteAffordance();
             await UpdateDetailAsync();
+            await LoadThumbnailsAsync();
         });
     }
 
@@ -95,7 +100,77 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs) => await UpdateDetailAsync();
+    private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    {
+        SyncDeleteAffordance();
+        await UpdateDetailAsync();
+    }
+
+    /// <summary>
+    /// Delete acts on the whole selection, so the button has to say how many captures
+    /// are about to move to the Recycle Bin.
+    /// </summary>
+    private void SyncDeleteAffordance()
+    {
+        var count = CaptureList.SelectedItems.Count;
+        DeleteButton.IsEnabled = count > 0;
+        DeleteCountText.Text = count.ToString();
+        DeleteCountText.Visibility = count > 1 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void DeleteSelected_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var selected = CaptureList.SelectedItems.OfType<CaptureItemViewModel>().ToList();
+        if (selected.Count == 0)
+        {
+            return;
+        }
+        // Deletion goes to the Recycle Bin, so this stays recoverable without a prompt.
+        await ViewModel.DeleteAsync(selected);
+        SyncDeleteAffordance();
+        await UpdateDetailAsync();
+    }
+
+    /// <summary>
+    /// Hides the list so the preview gets the whole window. The Library window itself
+    /// is resizable and remembers its size, so this is about the split, not the window.
+    /// </summary>
+    private void MaximizePreview_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        var maximized = ListColumn.Width.Value > 0;
+        ListColumn.Width = maximized ? new GridLength(0) : new GridLength(4, GridUnitType.Star);
+        ListColumn.MinWidth = maximized ? 0 : 240;
+        MaximizePreviewIcon.Glyph = maximized ? "" : "";
+        ToolTipService.SetToolTip(MaximizePreviewButton, maximized ? "Show the capture list" : "Fill the window with the preview");
+    }
+
+    /// <summary>
+    /// Fills in the real screenshot, video frame, or waveform for each row. Runs after
+    /// the list is already on screen and one at a time, so a folder full of large
+    /// recordings never delays the Library appearing.
+    /// </summary>
+    private async Task LoadThumbnailsAsync()
+    {
+        foreach (var item in ViewModel.Items.ToList())
+        {
+            if (item.Thumbnail is not null)
+            {
+                continue;
+            }
+            try
+            {
+                var preview = await App.Services.Previews.GetPreviewAsync(item.Record);
+                if (preview is not null)
+                {
+                    item.Thumbnail = new BitmapImage(new Uri(preview)) { DecodePixelWidth = 104 };
+                }
+            }
+            catch (Exception)
+            {
+                // A capture whose preview cannot be produced keeps its kind icon.
+            }
+        }
+    }
 
     private async Task UpdateDetailAsync()
     {

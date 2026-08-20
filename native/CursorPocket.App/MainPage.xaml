@@ -80,8 +80,8 @@
 
                     <Grid Grid.Row="2" ColumnSpacing="18">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="5*" />
-                            <ColumnDefinition Width="4*" MinWidth="300" />
+                            <ColumnDefinition x:Name="ListColumn" Width="4*" MinWidth="240" />
+                            <ColumnDefinition Width="6*" MinWidth="360" />
                         </Grid.ColumnDefinitions>
 
                         <Border Background="{StaticResource PocketSurface}" CornerRadius="16" BorderBrush="{StaticResource PocketLine}" BorderThickness="1">
@@ -92,23 +92,30 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedItem, Mode=TwoWay}"
                                     SelectionChanged="CaptureList_SelectionChanged"
                                     IsItemClickEnabled="False"
-                                    Padding="8">
+                                    SelectionMode="Extended"
+                                    Padding="6">
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="vm:CaptureItemViewModel">
-                                            <Grid MinHeight="70" Padding="10,8" ColumnSpacing="12">
+                                            <Grid MinHeight="46" Padding="6,4" ColumnSpacing="10">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="44" />
+                                                    <ColumnDefinition Width="52" />
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-                                                <Border Width="42" Height="42" Background="{StaticResource PocketGreenSoft}" CornerRadius="12">
-                                                    <FontIcon Glyph="{x:Bind IconGlyph}" Foreground="{StaticResource PocketGreen}" FontSize="18" />
+                                                <!-- The capture itself wherever one can be rendered. The kind
+                                                     icon sits underneath as the fallback: it shows while the
+                                                     thumbnail loads, and stays for text and links. -->
+                                                <Border Width="52" Height="34" Background="#66070D0B" CornerRadius="7">
+                                                    <Grid>
+                                                        <FontIcon Glyph="{x:Bind IconGlyph}" Foreground="{StaticResource PocketGreen}" FontSize="14" />
+                                                        <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="UniformToFill" />
+                                                    </Grid>
                                                 </Border>
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
-                                                    <TextBlock Text="{x:Bind Preview}" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketBodyText}" />
-                                                    <TextBlock Text="{x:Bind KindLabel}" Style="{StaticResource PocketCaptionText}" />
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                    <TextBlock Text="{x:Bind Preview}" FontSize="13" TextTrimming="CharacterEllipsis" Style="{StaticResource PocketBodyText}" />
+                                                    <TextBlock Text="{x:Bind MetaLabel}" FontSize="11" Style="{StaticResource PocketCaptionText}" />
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CreatedLabel}" Style="{StaticResource PocketCaptionText}" />
+                                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="{x:Bind CreatedLabel}" FontSize="11" Style="{StaticResource PocketCaptionText}" />
                                             </Grid>
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
@@ -133,14 +140,46 @@
                                     <RowDefinition Height="*" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <StackPanel Spacing="4">
-                                    <TextBlock x:Name="DetailKind" Text="Capture preview" Style="{StaticResource PocketCaptionText}" />
-                                    <TextBlock x:Name="DetailTitle" Text="Choose something from your library" TextWrapping="Wrap" Style="{StaticResource PocketTitleText}" />
-                                </StackPanel>
-                                <Grid Grid.Row="1" Margin="0,12" MinHeight="120">
-                                    <Border Background="#990A0F12" CornerRadius="12" />
-                                    <Image x:Name="DetailImage" Margin="8" Stretch="Uniform" Visibility="Collapsed" />
-                                    <MediaPlayerElement x:Name="DetailPlayer" AreTransportControlsEnabled="True" AutoPlay="False" Visibility="Collapsed" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="4">
+                                        <TextBlock x:Name="DetailKind" Text="Capture preview" Style="{StaticResource PocketCaptionText}" />
+                                        <TextBlock x:Name="DetailTitle" Text="Choose something from your library" TextWrapping="Wrap" Style="{StaticResource PocketTitleText}" />
+                                    </StackPanel>
+                                    <Button x:Name="MaximizePreviewButton" Grid.Column="1" VerticalAlignment="Top" Click="MaximizePreview_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Fill the window with the preview" AutomationProperties.Name="Fill the window with the preview">
+                                        <FontIcon x:Name="MaximizePreviewIcon" Glyph="&#xE740;" FontSize="14" />
+                                    </Button>
+                                </Grid>
+                                <Grid Grid.Row="1" Margin="0,12" MinHeight="320">
+                                    <Border Background="#CC05080A" CornerRadius="12" />
+                                    <Image x:Name="DetailImage" Margin="6" Stretch="Uniform" Visibility="Collapsed" />
+                                    <MediaPlayerElement x:Name="DetailPlayer" AreTransportControlsEnabled="True" AutoPlay="False" Visibility="Collapsed">
+                                        <MediaPlayerElement.TransportControls>
+                                            <MediaTransportControls
+                                                IsSeekBarVisible="True"
+                                                IsSeekEnabled="True"
+                                                IsPlaybackRateButtonVisible="True"
+                                                IsPlaybackRateEnabled="True"
+                                                IsVolumeButtonVisible="True"
+                                                IsVolumeEnabled="True"
+                                                IsSkipForwardButtonVisible="True"
+                                                IsSkipForwardEnabled="True"
+                                                IsSkipBackwardButtonVisible="True"
+                                                IsSkipBackwardEnabled="True"
+                                                IsFastForwardButtonVisible="True"
+                                                IsFastForwardEnabled="True"
+                                                IsFastRewindButtonVisible="True"
+                                                IsFastRewindEnabled="True"
+                                                IsZoomButtonVisible="True"
+                                                IsZoomEnabled="True"
+                                                IsRepeatButtonVisible="True"
+                                                IsRepeatEnabled="True"
+                                                IsCompact="False" />
+                                        </MediaPlayerElement.TransportControls>
+                                    </MediaPlayerElement>
                                     <StackPanel x:Name="DetailTextPanel" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                                         <FontIcon x:Name="DetailIcon" Glyph="&#xE7C3;" Foreground="{StaticResource PocketGreen}" FontSize="32" />
                                         <TextBlock x:Name="DetailText" MaxWidth="310" Text="Screenshots, waveforms, and video posters appear here." TextAlignment="Center" TextWrapping="Wrap" Style="{StaticResource PocketBodyText}" />
@@ -152,8 +191,11 @@
                                     <Button Click="CopyPath_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Copy file path">
                                         <FontIcon Glyph="&#xE8C8;" />
                                     </Button>
-                                    <Button HorizontalAlignment="Right" Command="{x:Bind ViewModel.DeleteSelectedCommand}" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Move to Recycle Bin">
-                                        <FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" />
+                                    <Button x:Name="DeleteButton" HorizontalAlignment="Right" Click="DeleteSelected_Click" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Move to Recycle Bin" AutomationProperties.Name="Move selected captures to the Recycle Bin">
+                                        <StackPanel Orientation="Horizontal" Spacing="7">
+                                            <FontIcon Glyph="&#xE74D;" Foreground="{StaticResource PocketRed}" />
+                                            <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" Foreground="{StaticResource PocketRed}" />
+                                        </StackPanel>
                                     </Button>
                                 </StackPanel>
                             </Grid>

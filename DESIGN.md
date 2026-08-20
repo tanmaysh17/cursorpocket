@@ -83,16 +83,19 @@ Green is not used as generic decoration inside dense surfaces. Red is never used
 
 - Excluded from the captured media and tucked against the top edge, centred, using DPI-aware sizing.
 - **Small by default, complete on approach.** Collapsed it is a 178 × 30 dip pill: live mark, timer, and level meter, nothing else. It opens to the full surface—mode, device, **Stop & save**, **Discard**—as the pointer *approaches*, not when it lands, and draws back up when the pointer leaves. Recording is not a mode the user is asked to look at; it is a mode they occasionally reach for.
-- It moves like a drawer: an eased travel of roughly 190 ms in both directions, with the contents cross-fading and sliding down as it opens. Snapping between two sizes read as abrupt. Window geometry cannot be animated by the composition engine, so `DrawerAnimation` steps it per frame; keyboard focus holds it open, tracked explicitly because `FocusManager` reports stale focus on an inactive window.
+- It moves like a drawer: **one fixed-size window that slides vertically**, mostly above the top edge when closed, over an eased ~190 ms travel with the contents cross-fading. Nothing resizes and no window region is recomputed per frame — both drop the window off DWM's fast path, which is what made an earlier resize-based version stutter. Rounded corners come from DWM instead. Keyboard focus holds it open, tracked explicitly because `FocusManager` reports stale focus on an inactive window.
+- Text is sized to fit the drawer. Type large enough to overflow the panel is worse for legibility than smaller type that fits.
 - `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
 - Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
 - No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
 - Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
-- The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
+- The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Stems grow from a mid-line in both directions with a bright centre, so the form has a spine and reads as a waveform rather than a bar chart; quiet samples fade back instead of vanishing. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
 
 ### Receipt and Library
 
+- The Library gives the preview the majority of the width, and the preview can take the whole window when the list is collapsed. Video and audio use the full transport controls — seek, volume, playback rate, skip, fast forward and rewind, zoom, repeat, full window.
+- Rows are compact strips carrying the capture's own thumbnail — the screenshot, a video frame, or its waveform — with the kind icon only as a fallback. Each row states kind and file size. Selection is extended, and delete moves every selected capture to the Recycle Bin, saying how many.
 - Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover. Because hovering pauses the countdown indefinitely, it also carries an explicit dismiss control.
 - Receipts use the correct media preview and explicit Open/Reveal/Library actions. A screenshot is also copied to the clipboard the moment it is taken, and again after annotation so the clipboard holds the marked-up image; the receipt says so.
 - Library is a standard resizable Mica window with date grouping and All/Screenshots/Video/Audio/Text/Links filters.

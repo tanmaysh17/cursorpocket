@@ -9,11 +9,12 @@ namespace CursorPocket_App;
 
 public sealed partial class RecordingHudWindow : Window
 {
-    private const int CollapsedWidth = 178;
-    private const int CollapsedHeight = 30;
-    private const int ExpandedWidth = 452;
-    private const int ExpandedHeight = 92;
-    private const int TopMargin = 0;
+    // One fixed window size for both states. Closed, it is pushed up so only the
+    // bottom strip is on screen; open, it sits flush at the top. Only the position
+    // changes, never the size.
+    private const int PanelWidth = 300;
+    private const int PanelHeight = 96;
+    private const int StripHeight = 32;
 
     private readonly Func<bool, Task> _stop;
     private readonly IDisposable _escapeLease;
@@ -22,9 +23,16 @@ public sealed partial class RecordingHudWindow : Window
     private readonly List<Rectangle> _expandedBars = [];
     private readonly bool _hasAudio;
     // Polls the pointer so the drawer opens as it approaches rather than only once it
-    // lands on the pill, and steps the geometry, which composition cannot animate.
+    // lands on the strip, and steps the slide, which composition cannot drive for a
+    // top-level window.
     private readonly DispatcherTimer _drawer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly System.Diagnostics.Stopwatch _frameClock = System.Diagnostics.Stopwatch.StartNew();
+    private int _panelLeft;
+    private int _pixelWidth;
+    private int _pixelHeight;
+    private int _closedTop;
+    private int _openTop;
+    private int _appliedTop = int.MinValue;
     private double _progress;
     private double _target;
     private bool _focusWithin;
@@ -88,16 +96,15 @@ public sealed partial class RecordingHudWindow : Window
         {
             return;
         }
-        var green = (Brush)Application.Current.Resources["PocketGreen"];
         for (var index = 0; index < AudioLevelHistory.Length; index++)
         {
             if (index >= AudioLevelHistory.Length - CollapsedBarCount)
             {
-                var small = NewBar(green, 2.5);
+                var small = NewBar(2);
                 _collapsedBars.Add(small);
                 CollapsedMeter.Children.Add(small);
             }
-            var bar = NewBar(green, 3);
+            var bar = NewBar(3);
             _expandedBars.Add(bar);
             ExpandedMeter.Children.Add(bar);
         }
@@ -105,15 +112,32 @@ public sealed partial class RecordingHudWindow : Window
     }
 
     private const int CollapsedBarCount = 10;
+    private const double ExpandedMeterHeight = 24;
+    private const double CollapsedMeterHeight = 14;
 
-    private static Rectangle NewBar(Brush fill, double width) => new()
+    /// <summary>
+    /// One stem of the waveform. Centred vertically so each sample grows away from a
+    /// mid-line in both directions, which reads as a waveform rather than as a bar
+    /// chart, and brightest at that centre so the form has a visible spine.
+    /// </summary>
+    private static Rectangle NewBar(double width) => new()
     {
         Width = width,
-        Height = 2,
+        Height = AudioLevelHistory.MinimumBarHeight,
         RadiusX = width / 2,
         RadiusY = width / 2,
-        Fill = fill,
-        VerticalAlignment = VerticalAlignment.Bottom,
+        VerticalAlignment = VerticalAlignment.Center,
+        Fill = new LinearGradientBrush
+        {
+            StartPoint = new Windows.Foundation.Point(0.5, 0),
+            EndPoint = new Windows.Foundation.Point(0.5, 1),
+            GradientStops =
+            {
+                new GradientStop { Offset = 0, Color = Windows.UI.Color.FromArgb(0x8A, 0x43, 0xE0, 0x8D) },
+                new GradientStop { Offset = 0.5, Color = Windows.UI.Color.FromArgb(0xFF, 0x7C, 0xF5, 0xB4) },
+                new GradientStop { Offset = 1, Color = Windows.UI.Color.FromArgb(0x8A, 0x43, 0xE0, 0x8D) },
+            },
+        },
     };
 
     private void RenderMeters()
@@ -124,12 +148,20 @@ public sealed partial class RecordingHudWindow : Window
         }
         for (var index = 0; index < _expandedBars.Count; index++)
         {
-            _expandedBars[index].Height = AudioLevelHistory.BarHeight(_levels[index], 24);
+            Apply(_expandedBars[index], _levels[index], ExpandedMeterHeight);
         }
         var offset = AudioLevelHistory.Length - _collapsedBars.Count;
         for (var index = 0; index < _collapsedBars.Count; index++)
         {
-            _collapsedBars[index].Height = AudioLevelHistory.BarHeight(_levels[offset + index], 14);
+            Apply(_collapsedBars[index], _levels[offset + index], CollapsedMeterHeight);
+        }
+
+        static void Apply(Rectangle bar, double level, double maximum)
+        {
+            bar.Height = AudioLevelHistory.BarHeight(level, maximum);
+            // Quiet samples sit back rather than disappearing, so the trailing history
+            // reads as a fading tail instead of a row of stubs.
+            bar.Opacity = 0.4 + (0.6 * Math.Clamp(level, 0, 1));
         }
     }
 
@@ -145,14 +177,16 @@ public sealed partial class RecordingHudWindow : Window
         _frameClock.Restart();
 
         // Open while the pointer is near, or while focus is inside the drawer so a
-        // keyboard user does not have it close under them.
-        var bounds = WindowPlacement.BoundsOf(this);
+        // keyboard user does not have it close under them. Proximity is measured
+        // against the on-screen strip, not the window, most of which is above the
+        // top edge while closed.
         var (pointerX, pointerY) = WindowPlacement.PointerPosition();
-        var rect = new CaptureBounds(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
+        var visibleTop = _appliedTop + (_pixelHeight - (_openTop - _closedTop) - StripPixels());
+        var visible = new CaptureBounds(_panelLeft, Math.Max(0, visibleTop), _panelLeft + _pixelWidth, _appliedTop + _pixelHeight);
         // Focus is tracked explicitly rather than queried: FocusManager reports the
         // last focused element even when the window is inactive, which would pin the
         // drawer open for the rest of the recording.
-        _target = DrawerAnimation.IsPointerNear(rect, pointerX, pointerY) || _focusWithin ? 1 : 0;
+        _target = DrawerAnimation.IsPointerNear(visible, pointerX, pointerY) || _focusWithin ? 1 : 0;
 
         var next = DrawerAnimation.Advance(_progress, _target, elapsed);
         if (Math.Abs(next - _progress) < 0.0001)
@@ -163,27 +197,48 @@ public sealed partial class RecordingHudWindow : Window
         ApplyProgress();
     }
 
+    /// <summary>
+    /// Slides the window between closed and open. Only <c>SetWindowPos</c> runs per
+    /// frame — no resize, and no window region, both of which drop the window off
+    /// DWM's fast path and made the travel stutter.
+    /// </summary>
     private void ApplyProgress()
     {
         var eased = DrawerAnimation.Ease(_progress);
-        var width = DrawerAnimation.Lerp(CollapsedWidth, ExpandedWidth, eased);
-        var height = DrawerAnimation.Lerp(CollapsedHeight, ExpandedHeight, eased);
-        WindowPlacement.PlaceTopCenter(this, width, height, TopMargin);
-        WindowPlacement.ClipToRoundedRegion(this, width, height, DrawerAnimation.Lerp(CollapsedHeight / 2, 16, eased));
+        var top = DrawerAnimation.Lerp(_closedTop, _openTop, eased);
+        if (top != _appliedTop)
+        {
+            _appliedTop = top;
+            WindowPlacement.MoveTo(this, _panelLeft, top);
+        }
 
-        // The contents cross-fade and the drawer's face slides down with it, so the
-        // surface reads as being pulled open rather than swapped.
-        CollapsedView.Opacity = 1 - eased;
-        ExpandedView.Opacity = eased;
-        ExpandedSlide.Y = (eased - 1) * 14;
-        CollapsedView.Visibility = eased < 0.98 ? Visibility.Visible : Visibility.Collapsed;
-        ExpandedView.Visibility = eased > 0.02 ? Visibility.Visible : Visibility.Collapsed;
+        // The strip dissolves into the full panel as the drawer arrives, so the two
+        // states read as one surface opening rather than a swap.
+        CollapsedView.Opacity = Math.Clamp(1 - (eased * 1.6), 0, 1);
+        ExpandedView.Opacity = Math.Clamp((eased - 0.25) / 0.75, 0, 1);
+        ExpandedSlide.Y = (eased - 1) * 10;
+        CollapsedView.Visibility = eased < 0.62 ? Visibility.Visible : Visibility.Collapsed;
+        ExpandedView.Visibility = eased > 0.25 ? Visibility.Visible : Visibility.Collapsed;
         // Only accept clicks once the actions are actually readable.
         ExpandedView.IsHitTestVisible = eased > 0.6;
-        RenderMeters();
     }
 
-    private void ApplySize() => ApplyProgress();
+    private int StripPixels() => WindowPlacement.ToPixels(this, StripHeight);
+
+    private void ApplySize()
+    {
+        // Resolved once: the work area, scale, and the two rest positions. Recomputing
+        // these per frame was part of what made the slide expensive.
+        var work = WindowPlacement.MonitorUnderPointer(true);
+        _pixelWidth = WindowPlacement.ToPixels(this, PanelWidth);
+        _pixelHeight = WindowPlacement.ToPixels(this, PanelHeight);
+        _panelLeft = work.Left + ((work.Right - work.Left - _pixelWidth) / 2);
+        _openTop = work.Top;
+        _closedTop = work.Top - (_pixelHeight - StripPixels());
+        WindowPlacement.ResizeInDips(this, PanelWidth, PanelHeight);
+        _appliedTop = int.MinValue;
+        ApplyProgress();
+    }
 
     private void Recording_ElapsedChanged(object? sender, TimeSpan elapsed) => DispatcherQueue.TryEnqueue(() =>
     {

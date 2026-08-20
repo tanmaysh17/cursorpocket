@@ -206,8 +206,11 @@ public sealed class UtilitySurfaceContractTests
         var xaml = ReadFixture("RecordingHudWindow.xaml");
 
         Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"22\"", xaml, StringComparison.Ordinal);
+        // Sized to fit the drawer. The previous 17/22 pt text overflowed the panel and
+        // was cut off, which is worse for legibility than smaller text that fits.
+        Assert.Contains("FontSize=\"15\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"12\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontSize=\"22\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Stop &amp; save\"", xaml, StringComparison.Ordinal);
         Assert.Contains("BorderThickness=\"0\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
@@ -225,10 +228,15 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("PointerExited=\"Root_PointerExited\"", xaml, StringComparison.Ordinal);
         // Keyboard users must be able to reach the actions without a pointer.
         Assert.Contains("GotFocus=\"Root_GotFocus\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("CollapsedWidth = 178", code, StringComparison.Ordinal);
-        Assert.Contains("CollapsedHeight = 30", code, StringComparison.Ordinal);
-        Assert.Contains("TopMargin = 0", code, StringComparison.Ordinal);
-        Assert.Contains("ClipToRoundedRegion", code, StringComparison.Ordinal);
+        Assert.Contains("StripHeight = 32", code, StringComparison.Ordinal);
+        // The window is one fixed size that slides; resizing it or recomputing a window
+        // region per frame is what made the travel stutter.
+        Assert.Contains("WindowPlacement.MoveTo(this, _panelLeft, top)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClipToRoundedRegion", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PlaceTopCenter", code, StringComparison.Ordinal);
+        // Opens on approach, not on contact.
+        Assert.Contains("DrawerAnimation.IsPointerNear", code, StringComparison.Ordinal);
+        Assert.Contains("DrawerAnimation.Advance", code, StringComparison.Ordinal);
         // Escape still stops and saves, so a collapsed HUD never traps a recording.
         Assert.Contains("EscapeHotkey.Capture", code, StringComparison.Ordinal);
         // The level meter is a rolling waveform, not one bar sliding left and right.
@@ -255,7 +263,11 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("SwpFrameChanged", placement, StringComparison.Ordinal);
         Assert.Contains("DwmNcRenderingDisabled", placement, StringComparison.Ordinal);
         Assert.Contains("SetWindowRgn", placement, StringComparison.Ordinal);
-        Assert.Contains("ClipToRoundedRegion", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        // The HUD deliberately takes its rounded corners from DWM instead of a window
+        // region: it slides every frame, and a region clip drops the window off DWM's
+        // fast path. ConfigureUtilityWindow is what asks for the rounding.
+        Assert.Contains("WindowPlacement.ConfigureUtilityWindow(this)", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("DwmwaWindowCornerPreference", placement, StringComparison.Ordinal);
     }
 
     [Fact]
