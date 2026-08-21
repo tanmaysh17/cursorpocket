@@ -94,8 +94,13 @@
 
   <!-- Publish Properties -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <!--
+      Unconditional on purpose. ReadyToRun needs its crossgen2 runtime pack restored,
+      and restore is invoked without an explicit Configuration (see the CI workflow),
+      so a Configuration-conditioned value evaluates as Debug at restore time, skips
+      the pack, and then fails the Release publish with NETSDK1094.
+    -->
+    <PublishReadyToRun>True</PublishReadyToRun>
     <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
     <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
   </PropertyGroup>
