@@ -418,86 +418,82 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <Border Grid.Column="1" Style="{StaticResource PocketCard}">
-                <Grid Padding="16">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock Style="{StaticResource PocketLabelText}" Text="WHAT GETS RECORDED" />
-                    <Grid Grid.Row="1" Margin="0,12">
-                        <Border
-                            Background="#FF0F171C"
-                            BorderBrush="{StaticResource PocketLineStrong}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource PocketWellCorner}" />
+            <!--  The whole panel is the camera. This is where the effects are judged,
+                  so the feed gets the entire area rather than sitting as a thumbnail
+                  inside a diagram of the screen. The format facts stay, over a scrim
+                  along the bottom, so nothing has to move into a dialog.  -->
+            <Border
+                Grid.Column="1"
+                Background="#FF0F171C"
+                BorderBrush="{StaticResource PocketLineStrong}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource PocketCardCorner}">
+                <Grid x:Name="FramingWell" CornerRadius="{StaticResource PocketCardCorner}">
+                    <MediaPlayerElement
+                        x:Name="CameraPreview"
+                        AreTransportControlsEnabled="False"
+                        AutoPlay="True"
+                        Stretch="UniformToFill"
+                        Visibility="Collapsed" />
+                    <!--  The effects preview: the same pipeline the recording self-view
+                          runs, so this shows exactly what lands in the file.  -->
+                    <Image
+                        x:Name="CameraSlotEffectView"
+                        Stretch="UniformToFill"
+                        Visibility="Collapsed" />
+                    <!--  Kept so the shape and position controls still have somewhere to
+                          report themselves once the feed covers the panel.  -->
+                    <Border
+                        x:Name="CameraSlot"
+                        Margin="12"
+                        Padding="8,4"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#99000000"
+                        CornerRadius="6"
+                        Visibility="Collapsed">
                         <TextBlock
                             x:Name="FramingLabel"
-                            Margin="14"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
                             Style="{StaticResource PocketTagText}"
                             Text="FULL DISPLAY" />
-                        <Border
-                            x:Name="CameraSlot"
-                            Width="132"
-                            Height="88"
-                            Margin="18"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Bottom"
-                            BorderBrush="{StaticResource PocketLineStrong}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource PocketControlCorner}">
-                            <Grid>
-                                <MediaPlayerElement
-                                    x:Name="CameraPreview"
-                                    AreTransportControlsEnabled="False"
-                                    AutoPlay="True"
-                                    Stretch="UniformToFill"
-                                    Visibility="Collapsed" />
-                                <!--  The effects preview: the same pipeline the recording self-view
-                                      runs, so the slot shows exactly what lands in the file.  -->
-                                <Image
-                                    x:Name="CameraSlotEffectView"
-                                    Stretch="UniformToFill"
-                                    Visibility="Collapsed" />
+                    </Border>
+                    <TextBlock
+                        x:Name="CameraSlotLabel"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PocketMetaText}"
+                        Text="camera off" />
+                    <Border
+                        VerticalAlignment="Bottom"
+                        Background="#B3070D0B"
+                        CornerRadius="0,0,11,11">
+                        <StackPanel
+                            Margin="12,9"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Border Style="{StaticResource PocketTagBorder}">
+                                <TextBlock Style="{StaticResource PocketTagText}" Text="MP4 · H.264" />
+                            </Border>
+                            <Border Style="{StaticResource PocketTagBorder}">
                                 <TextBlock
-                                    x:Name="CameraSlotLabel"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource PocketMetaText}"
-                                    Text="camera off" />
-                            </Grid>
-                        </Border>
-                    </Grid>
-                    <!--  Format facts belong on the surface, not inside a settings dialog.  -->
-                    <StackPanel
-                        Grid.Row="2"
-                        Orientation="Horizontal"
-                        Spacing="8">
-                        <Border Style="{StaticResource PocketTagBorder}">
-                            <TextBlock Style="{StaticResource PocketTagText}" Text="MP4 · H.264" />
-                        </Border>
-                        <Border Style="{StaticResource PocketTagBorder}">
-                            <TextBlock
-                                x:Name="FrameRateTag"
-                                Style="{StaticResource PocketTagText}"
-                                Text="30 FPS" />
-                        </Border>
-                        <Border Style="{StaticResource PocketTagBorder}">
-                            <TextBlock
-                                x:Name="MicrophoneTag"
-                                Style="{StaticResource PocketTagText}"
-                                Text="MIC ON" />
-                        </Border>
-                        <Border Style="{StaticResource PocketTagBorder}">
-                            <TextBlock
-                                x:Name="CountdownTag"
-                                Style="{StaticResource PocketTagText}"
-                                Text="3 S" />
-                        </Border>
-                    </StackPanel>
+                                    x:Name="FrameRateTag"
+                                    Style="{StaticResource PocketTagText}"
+                                    Text="30 FPS" />
+                            </Border>
+                            <Border Style="{StaticResource PocketTagBorder}">
+                                <TextBlock
+                                    x:Name="MicrophoneTag"
+                                    Style="{StaticResource PocketTagText}"
+                                    Text="MIC ON" />
+                            </Border>
+                            <Border Style="{StaticResource PocketTagBorder}">
+                                <TextBlock
+                                    x:Name="CountdownTag"
+                                    Style="{StaticResource PocketTagText}"
+                                    Text="3 S" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
         </Grid>

@@ -34,6 +34,14 @@ public sealed partial class VideoPreflightWindow : Window
     /// because the user previously chose a custom image.
     /// </summary>
     private bool _seeding = true;
+    /// <summary>
+    /// Serializes camera start and stop. Both are async and several UI events can
+    /// trigger them at once — notably setting CameraBox.SelectedItem, which fires
+    /// SelectionChanged synchronously while LoadDevicesAsync is still running. Two
+    /// interleaved starts used to leave the first renderer orphaned, and an orphaned
+    /// frame reader keeps the camera light on even after its MediaCapture is gone.
+    /// </summary>
+    private readonly SemaphoreSlim _cameraGate = new(1, 1);
     private bool _closing;
 
     public VideoPreflightWindow(long sourceWindow, CaptureBounds displayBounds, int? displayOutputIndex)
@@ -92,7 +100,11 @@ public sealed partial class VideoPreflightWindow : Window
             MicrophoneBox.ItemsSource = devices.Audio;
             CameraBox.ItemsSource = devices.Video;
             MicrophoneBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(devices.Audio, App.Services.Settings.VideoMicrophoneName);
+            // Seeding fires SelectionChanged synchronously, which would start the
+            // preview here and race the explicit start below.
+            _seeding = true;
             CameraBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(devices.Video, App.Services.Settings.VideoCameraName);
+            _seeding = false;
             MicrophoneToggle.IsEnabled = devices.Audio.Count > 0;
             CameraToggle.IsEnabled = devices.Video.Count > 0;
             ReadinessTitle.Text = "Ready when you are";
@@ -166,7 +178,33 @@ public sealed partial class VideoPreflightWindow : Window
 
     private async Task StartCameraPreviewAsync()
     {
-        await StopCameraPreviewAsync();
+        await _cameraGate.WaitAsync();
+        try
+        {
+            await StartCameraPreviewCoreAsync();
+        }
+        finally
+        {
+            _cameraGate.Release();
+        }
+    }
+
+    private async Task StopCameraPreviewAsync()
+    {
+        await _cameraGate.WaitAsync();
+        try
+        {
+            await StopCameraPreviewCoreAsync();
+        }
+        finally
+        {
+            _cameraGate.Release();
+        }
+    }
+
+    private async Task StartCameraPreviewCoreAsync()
+    {
+        await StopCameraPreviewCoreAsync();
         if (!CameraToggle.IsOn || CameraBox.SelectedItem is not MediaDeviceDescriptor selected)
         {
             ShowCameraSlot(false, CameraToggle.IsOn ? "no camera" : "camera off");
@@ -195,7 +233,20 @@ public sealed partial class VideoPreflightWindow : Window
             }
             // The preview always goes through the effect renderer so the slot
             // shows exactly the frames the recording self-view will render.
-            _previewRenderer = await CameraEffectRenderer.StartAsync(_mediaCapture, source, ReadEffectSettings(), CameraSlotEffectView, DispatcherQueue);
+            var started = await CameraEffectRenderer.StartAsync(
+                _mediaCapture,
+                source,
+                ReadEffectSettings(),
+                CameraSlotEffectView,
+                DispatcherQueue,
+                PreviewAspect());
+            // Belt and braces against the race above: if anything did slip through
+            // and leave a renderer behind, it goes down rather than being stranded.
+            if (_previewRenderer is not null)
+            {
+                await _previewRenderer.DisposeAsync().ConfigureAwait(true);
+            }
+            _previewRenderer = started;
             if (_previewRenderer is null)
             {
                 _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
@@ -204,6 +255,7 @@ public sealed partial class VideoPreflightWindow : Window
             }
             ShowCameraSlot(true, string.Empty);
             UpdateEffectAssetsNotice();
+            ReportPreviewHealth();
         }
         catch (Exception error)
         {
@@ -220,9 +272,22 @@ public sealed partial class VideoPreflightWindow : Window
         CameraSlotLabel.Text = label;
     }
 
-    /// <summary>Keep the facts under the preview honest about what the file will contain.</summary>
+    /// <summary>
+    /// Keep the facts under the preview honest about what the file will contain.
+    /// <para>
+    /// Returns early until the whole tree exists. <c>SourceBox</c> carries both
+    /// <c>SelectedIndex="0"</c> and a <c>SelectionChanged</c> handler in XAML, so the
+    /// handler fires while <c>InitializeComponent</c> is still parsing — at which
+    /// point the tags in the right-hand column, further down the document, are still
+    /// null. The constructor calls this again once seeding is done.
+    /// </para>
+    /// </summary>
     private void UpdateSummaryTags()
     {
+        if (FrameRateTag is null || MicrophoneTag is null || CountdownTag is null || FramingLabel is null)
+        {
+            return;
+        }
         FrameRateTag.Text = (FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "60" ? "60 FPS" : "30 FPS";
         MicrophoneTag.Text = MicrophoneToggle.IsOn ? "MIC ON" : "MIC OFF";
         var countdown = (CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "3";
@@ -235,7 +300,7 @@ public sealed partial class VideoPreflightWindow : Window
         };
     }
 
-    private async Task StopCameraPreviewAsync()
+    private async Task StopCameraPreviewCoreAsync()
     {
         var renderer = _previewRenderer;
         _previewRenderer = null;
@@ -243,14 +308,49 @@ public sealed partial class VideoPreflightWindow : Window
         CameraPreview.SetMediaPlayer(null);
         _cameraPlayer?.Dispose();
         _cameraPlayer = null;
+        var capture = _mediaCapture;
+        _mediaCapture = null;
         if (renderer is not null)
         {
-            // Must complete before the MediaCapture below is released, and
-            // before the recording self-view opens the same device.
-            await renderer.DisposeAsync();
+            // Must complete before the MediaCapture below is released, and before
+            // the recording self-view opens the same device.
+            //
+            // ConfigureAwait(false) is load-bearing: this runs from the window's
+            // Closed handler, and a continuation posted back to a closing window's
+            // dispatcher may never be drained — which left the MediaCapture below
+            // undisposed and the camera light on until the process exited.
+            await renderer.DisposeAsync().ConfigureAwait(false);
         }
-        _mediaCapture?.Dispose();
-        _mediaCapture = null;
+        capture?.Dispose();
+    }
+
+    /// <summary>
+    /// Says something truthful when the preview stays blank. A dark slot is
+    /// otherwise indistinguishable from a camera that simply produced nothing, and
+    /// the renderer swallows per-frame problems by design so a recording survives
+    /// them — which means the reason has to be pulled out and shown here.
+    /// </summary>
+    private async void ReportPreviewHealth()
+    {
+        var renderer = _previewRenderer;
+        if (renderer is null)
+        {
+            return;
+        }
+        // Long enough for a camera to warm up and hand over its first frames.
+        await Task.Delay(2000);
+        if (_closing || !ReferenceEquals(renderer, _previewRenderer))
+        {
+            return;
+        }
+        if (renderer.FramesPresented > 0)
+        {
+            CameraStatus.Text = $"Live · {renderer.FramesPresented} frames shown";
+            return;
+        }
+        var diagnosis = renderer.Diagnosis ?? "no frames reached the preview";
+        CameraStatus.Text = $"Camera opened but nothing is showing · {diagnosis}";
+        ShowCameraSlot(false, "no signal");
     }
 
     /// <summary>The effect configuration currently described by the controls.</summary>
@@ -331,16 +431,48 @@ public sealed partial class VideoPreflightWindow : Window
             : Visibility.Collapsed;
     }
 
-    /// <summary>The squircle records 1:1; keep the framing preview honest about that.</summary>
+    private void FramingWell_SizeChanged(object sender, SizeChangedEventArgs eventArgs)
+    {
+        UpdateCameraSlotShape();
+        _previewRenderer?.SetTargetAspect(PreviewAspect());
+    }
+
+    /// <summary>
+    /// Aspect the preview crops to. The feed fills the panel, so this follows the
+    /// panel rather than the recorded shape — which means the preview shows a little
+    /// more than the file will. The auto-framing needs some aspect to work from, and
+    /// showing extra context is better than cropping tighter than the recording.
+    /// </summary>
+    private double PreviewAspect() =>
+        FramingWell is { ActualWidth: > 40, ActualHeight: > 40 }
+            ? FramingWell.ActualWidth / FramingWell.ActualHeight
+            : 0;
+
+    /// <summary>
+    /// Reports the recorded shape and framing as a caption over the feed. The feed
+    /// itself fills the panel, so the shape is no longer previewed here — the
+    /// recording still uses it, and the Shape control names it.
+    /// </summary>
     private void UpdateCameraSlotShape()
     {
-        if (CameraSlot is null)
+        if (CameraSlot is null || FramingLabel is null)
         {
             return;
         }
-        var squircle = (CameraShapeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "squircle";
-        CameraSlot.Width = squircle ? 88 : 132;
-        CameraSlot.CornerRadius = new CornerRadius(squircle ? 26 : 8);
+        var shape = (CameraShapeBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "squircle"
+            ? "SQUIRCLE 1:1"
+            : "ROUNDED 16:9";
+        var source = ((SourceBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString()) switch
+        {
+            "region" => "SELECTED REGION",
+            "window" => "PREVIOUS WINDOW",
+            _ => "FULL DISPLAY",
+        };
+        var position = (CameraPositionBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToUpperInvariant() ?? string.Empty;
+        FramingLabel.Text = string.IsNullOrEmpty(position)
+            ? $"{source} · {shape}"
+            : $"{source} · {shape} · {position}";
+        CameraSlot.Visibility = CameraToggle?.IsOn == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async void CameraEffect_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
@@ -543,7 +675,14 @@ public sealed partial class VideoPreflightWindow : Window
 
     private async void CameraBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
-        if (CameraToggle.IsOn) await StartCameraPreviewAsync();
+        if (_seeding)
+        {
+            return;
+        }
+        if (CameraToggle.IsOn)
+        {
+            await StartCameraPreviewAsync();
+        }
     }
 
     private async void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
@@ -554,7 +693,28 @@ public sealed partial class VideoPreflightWindow : Window
 
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
     private void Cancel() { _closing = true; CleanupDevices(); Close(); }
-    private void CleanupDevices() { StopMicrophoneMeter(); _ = StopCameraPreviewAsync(); }
+    /// <summary>
+    /// Releases both devices as the window goes away. The camera is torn down twice
+    /// on purpose: the orderly async path first, then a direct dispose of the
+    /// MediaCapture, because this is reached from <c>Closed</c> and an async
+    /// continuation is not guaranteed to run once the window is gone. Holding a
+    /// camera open after its window closed is the one outcome worth being blunt
+    /// about — the capture light stays on and the next preview finds the device busy.
+    /// </summary>
+    private void CleanupDevices()
+    {
+        StopMicrophoneMeter();
+        var capture = _mediaCapture;
+        _ = StopCameraPreviewAsync();
+        try
+        {
+            capture?.Dispose();
+        }
+        catch (Exception)
+        {
+            // Already being disposed by the async path; nothing further to do.
+        }
+    }
 
     private static string GetDiskSpaceStatus()
     {

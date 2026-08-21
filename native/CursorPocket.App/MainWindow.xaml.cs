@@ -460,6 +460,14 @@ public sealed partial class MainWindow : Window
                 App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
             }
         };
+        // Raised from a timer thread, so it has to marshal like the others.
+        _mouseActivity.ChordHold += (_, _) =>
+        {
+            if (App.Services.Settings.MouseChordEnabled)
+            {
+                App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
+            }
+        };
     }
 
     private void InitializeTray()
