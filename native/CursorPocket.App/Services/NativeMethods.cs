@@ -16,6 +16,14 @@ internal static class NativeMethods
     internal const uint WmClose = 0x0010;
     internal const uint WmDestroy = 0x0002;
     internal const uint WmLButtonUp = 0x0202;
+    internal const int WmLButtonDown = 0x0201;
+    internal const int WmRButtonDown = 0x0204;
+    internal const int WmRButtonUp = 0x0205;
+    /// <summary>LLMHF_INJECTED — set on events we synthesized ourselves, so the hook can ignore them.</summary>
+    internal const uint LowLevelMouseInjected = 0x00000001;
+    internal const uint InputMouse = 0;
+    internal const uint MouseEventFLeftUp = 0x0004;
+    internal const uint MouseEventFRightUp = 0x0010;
     internal const uint WmNcHitTest = 0x0084;
     internal const int WhMouseLl = 14;
     internal const int WmMouseMove = 0x0200;
@@ -132,6 +140,30 @@ internal static class NativeMethods
         public nint Background;
         public string? MenuName;
         public string ClassName;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public nint ExtraInfo;
+    }
+
+    /// <summary>
+    /// <c>INPUT</c> for mouse events only. The union is sized for the largest
+    /// member, so the padding after <see cref="Mouse"/> is deliberate.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Input
+    {
+        public uint Type;
+        public MouseInput Mouse;
+        private readonly uint _unionPadding1;
+        private readonly uint _unionPadding2;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -337,4 +369,7 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern nint CallNextHookEx(nint hook, int code, nuint wParam, nint lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint SendInput(uint count, [In] Input[] inputs, int size);
 }

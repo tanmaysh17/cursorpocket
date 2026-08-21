@@ -891,6 +891,31 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE962;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Hold both mouse buttons" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Press left and right together for about a second to open command mode. The click is kept from the window underneath, so no context menu appears."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.MouseChordEnabled, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Hold both mouse buttons" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
                                             <FontIcon Glyph="&#xE81E;" Style="{StaticResource PocketChipIcon}" />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">

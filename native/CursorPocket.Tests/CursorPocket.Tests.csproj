@@ -51,6 +51,7 @@
     <None Include="..\CursorPocket.App\ReceiptWindow.xaml.cs" Link="Fixtures\ReceiptWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\RecordingService.cs" Link="Fixtures\RecordingService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\WindowPlacement.cs" Link="Fixtures\WindowPlacement.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\MouseActivityService.cs" Link="Fixtures\MouseActivityService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\DisplayOutputLocator.cs" Link="Fixtures\DisplayOutputLocator.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CameraSelfViewWindow.xaml" Link="Fixtures\CameraSelfViewWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CameraSelfViewWindow.xaml.cs" Link="Fixtures\CameraSelfViewWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />

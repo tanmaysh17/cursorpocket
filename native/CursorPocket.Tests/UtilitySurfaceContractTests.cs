@@ -385,6 +385,29 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void The_both_button_chord_is_hidden_from_the_window_underneath()
+    {
+        var code = ReadFixture("MouseActivityService.cs.txt");
+
+        // The first button passes through, so ordinary clicks and drags are
+        // untouched. Only the second one -- already a deliberate thing to do -- is
+        // swallowed, by returning non-zero instead of chaining the hook.
+        Assert.Contains("return 1;", code, StringComparison.Ordinal);
+        Assert.Contains("_swallowingChord", code, StringComparison.Ordinal);
+        // The button that did reach the app has to be released for it, or the app
+        // sits in a drag or capture state after command mode opens.
+        Assert.Contains("ReleaseHeldButtonsForApplication", code, StringComparison.Ordinal);
+        Assert.Contains("MouseEventFLeftUp", code, StringComparison.Ordinal);
+        Assert.Contains("MouseEventFRightUp", code, StringComparison.Ordinal);
+        // Our own synthesized release must not be read back as user input.
+        Assert.Contains("LowLevelMouseInjected", code, StringComparison.Ordinal);
+        // A perfectly still hold emits no further mouse messages, so the hold can
+        // only be noticed by a timer -- the hook alone would never fire it.
+        Assert.Contains("System.Threading.Timer", code, StringComparison.Ordinal);
+        Assert.Contains("ShouldActivate", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Preflight_handlers_that_can_fire_mid_parse_check_the_tree_exists_first()
     {
         var xaml = ReadFixture("VideoPreflightWindow.xaml");
