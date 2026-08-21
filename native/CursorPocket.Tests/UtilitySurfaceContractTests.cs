@@ -284,6 +284,53 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Starting_the_preview_can_never_orphan_a_renderer()
+    {
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+
+        // Several UI events start the preview, and LoadDevicesAsync seeds
+        // CameraBox.SelectedItem, which fires SelectionChanged synchronously. Two
+        // interleaved starts used to overwrite _previewRenderer and strand the
+        // first one — and an orphaned frame reader holds the camera open, which is
+        // what kept the capture light on with nothing on screen.
+        Assert.Contains("SemaphoreSlim", preflight, StringComparison.Ordinal);
+        Assert.Contains("_cameraGate.WaitAsync()", preflight, StringComparison.Ordinal);
+        Assert.Contains("_cameraGate.Release()", preflight, StringComparison.Ordinal);
+        // The seed does not trigger a start of its own.
+        var selectionChanged = Section(preflight, "private async void CameraBox_SelectionChanged", "}");
+        Assert.Contains("_seeding", selectionChanged, StringComparison.Ordinal);
+        // And the assignment disposes anything already there rather than dropping it.
+        var start = Section(preflight, "private async Task StartCameraPreviewCoreAsync", "ShowCameraSlot(true");
+        Assert.Contains("_previewRenderer = started;", start, StringComparison.Ordinal);
+        Assert.True(
+            start.IndexOf("await _previewRenderer.DisposeAsync()", StringComparison.Ordinal) <
+            start.IndexOf("_previewRenderer = started;", StringComparison.Ordinal),
+            "The previous renderer has to go down before the new one takes its place.");
+    }
+
+    [Fact]
+    public void Releasing_the_camera_never_depends_on_a_closing_windows_dispatcher()
+    {
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+        var preflight = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+        var selfView = ReadFixture("CameraSelfViewWindow.xaml.cs.txt");
+
+        // Both surfaces tear the camera down from their Closed handler. A
+        // continuation posted back to a closing window's dispatcher may never be
+        // drained, which strands the MediaCapture and leaves the capture light on.
+        Assert.Contains("ConfigureAwait(false)", renderer, StringComparison.Ordinal);
+        Assert.Contains("await renderer.DisposeAsync().ConfigureAwait(false)", preflight, StringComparison.Ordinal);
+        // And the device dispose does not sit behind that await unguarded: the
+        // Closed path disposes the capture directly as well.
+        var cleanup = Section(preflight, "private void CleanupDevices()", "private static string GetDiskSpaceStatus");
+        Assert.Contains("capture?.Dispose()", cleanup, StringComparison.Ordinal);
+        // The self-view disposes its capture synchronously, after the async
+        // renderer teardown is kicked off rather than awaited.
+        var release = Section(selfView, "private void ReleaseCamera()", "_mediaCapture = null;");
+        Assert.Contains("_mediaCapture?.Dispose()", release, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_camera_is_fully_released_before_the_same_device_is_reopened()
     {
         var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
@@ -301,10 +348,72 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("WaitForFrameWorkAsync", renderer, StringComparison.Ordinal);
         Assert.Contains("_processing", renderer, StringComparison.Ordinal);
         // Callers await it, and the renderer goes down before the MediaCapture.
+        // The capture is held in a local across that await so the field cannot be
+        // reassigned underneath it, hence the ordering check is against that local.
         Assert.Contains("await renderer.DisposeAsync()", preflight, StringComparison.Ordinal);
         Assert.True(preflight.IndexOf("await renderer.DisposeAsync()", StringComparison.Ordinal) <
-            preflight.IndexOf("_mediaCapture?.Dispose()", StringComparison.Ordinal));
+            preflight.IndexOf("capture?.Dispose()", StringComparison.Ordinal));
         Assert.Contains("await renderer.DisposeAsync()", selfView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Camera_frames_are_copied_with_the_projected_buffer_api_and_failures_are_recorded()
+    {
+        var renderer = ReadFixture("CameraEffectRenderer.cs.txt");
+
+        // LockBuffer plus a hand-declared IMemoryBufferByteAccess does not work under
+        // CsWinRT: the reference arrives as a projected WinRT.IInspectable and the
+        // cast throws on every frame. Verified against a real camera — it produced a
+        // permanently blank preview with the capture light on.
+        // Matched as code, not as prose: the comment above the fix names both of the
+        // old APIs on purpose, so a bare word search would flag its own explanation.
+        Assert.DoesNotContain("[ComImport]", renderer, StringComparison.Ordinal);
+        Assert.DoesNotContain("(IMemoryBufferByteAccess)", renderer, StringComparison.Ordinal);
+        Assert.DoesNotContain(".LockBuffer(", renderer, StringComparison.Ordinal);
+        Assert.Contains(".CopyToBuffer(", renderer, StringComparison.Ordinal);
+        Assert.Contains(".CopyFromBuffer(", renderer, StringComparison.Ordinal);
+        Assert.Contains(".AsBuffer(", renderer, StringComparison.Ordinal);
+
+        // The frame loop swallows per-frame exceptions on purpose, so it has to
+        // record them. Without this, a step that fails every single frame is
+        // indistinguishable from a camera that produced nothing.
+        Assert.Contains("catch (Exception error)", renderer, StringComparison.Ordinal);
+        Assert.Contains("_skipReason", renderer, StringComparison.Ordinal);
+        Assert.Contains("Diagnosis", renderer, StringComparison.Ordinal);
+        // No requested subtype: forcing Bgra8 starves cameras that only offer NV12.
+        Assert.DoesNotContain("MediaEncodingSubtypes.Bgra8", renderer, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Preflight_handlers_that_can_fire_mid_parse_check_the_tree_exists_first()
+    {
+        var xaml = ReadFixture("VideoPreflightWindow.xaml");
+        var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
+
+        // SourceBox carries a value *and* a handler in XAML, so the handler runs
+        // while InitializeComponent is still parsing. Anything it touches further
+        // down the document is still null at that point -- an unguarded write is a
+        // NullReferenceException that takes the whole preflight window down.
+        var sourceBox = Section(xaml, "x:Name=\"SourceBox\"", "</ComboBox>");
+        Assert.Contains("SelectedIndex=", sourceBox, StringComparison.Ordinal);
+        Assert.Contains("SelectionChanged=", sourceBox, StringComparison.Ordinal);
+        Assert.True(
+            xaml.IndexOf("x:Name=\"SourceBox\"", StringComparison.Ordinal) <
+            xaml.IndexOf("x:Name=\"FrameRateTag\"", StringComparison.Ordinal),
+            "FrameRateTag is expected to come after SourceBox, which is what makes the guard necessary.");
+
+        var summaryTags = Section(code, "private void UpdateSummaryTags()", "FrameRateTag.Text");
+        Assert.Contains("is null", summaryTags, StringComparison.Ordinal);
+        Assert.Contains("return;", summaryTags, StringComparison.Ordinal);
+        // The same exposure applies to every seed-time handler on this surface.
+        foreach (var guarded in new[] { "UpdateCameraSourceNotice", "UpdateCameraSlotShape", "UpdateEffectValueReadouts" })
+        {
+            var body = Section(code, $"private void {guarded}()", "}");
+            Assert.Contains("is null", body, StringComparison.Ordinal);
+        }
+        // And the effect push bails before reading any control.
+        var push = Section(code, "private async Task PushEffectSettingsAsync()", "await _previewRenderer");
+        Assert.Contains("_previewRenderer is null", push, StringComparison.Ordinal);
     }
 
     [Fact]

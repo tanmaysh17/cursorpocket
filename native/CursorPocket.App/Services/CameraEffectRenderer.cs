@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Media;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
@@ -27,6 +27,13 @@ public sealed class CameraEffectRenderer : IDisposable
 {
     private const int TargetProcessingWidth = 640;
 
+    /// <summary>
+    /// Frame subtypes that arrive as a readable CPU bitmap. Matched case-insensitively
+    /// because <c>MediaFrameFormat.Subtype</c> casing varies by driver.
+    /// </summary>
+    private static readonly HashSet<string> UncompressedSubtypes =
+        new(StringComparer.OrdinalIgnoreCase) { "NV12", "YUY2", "ARGB32", "RGB32", "BGRA8", "RGB24", "YV12", "IYUV", "L8" };
+
     private volatile CameraEffectPipeline _pipeline;
     private SelfieSegmenter? _segmenter;
     private readonly Image _target;
@@ -37,6 +44,14 @@ public sealed class CameraEffectRenderer : IDisposable
     private SoftwareBitmap? _output;
     private byte[] _packed = [];
     private byte[] _halved = [];
+    private byte[] _cropped = [];
+    /// <summary>
+    /// Aspect (width / height) of the surface this renders into, so the frame can be
+    /// cropped around the person instead of down the middle. Zero means no cropping.
+    /// </summary>
+    // Written from the UI thread on resize, read on the frame thread; double
+    // cannot be volatile, so both sides go through Volatile/Interlocked.
+    private double _targetAspect;
     private int _busy;
     /// <summary>
     /// Held only while the frame thread is inside the CPU work — reading the
@@ -46,13 +61,17 @@ public sealed class CameraEffectRenderer : IDisposable
     /// block the very thread that has to run the release and self-deadlock.
     /// </summary>
     private int _processing;
+    private int _framesArrived;
+    private int _framesPresented;
+    private volatile string? _skipReason;
     private int _frameIndex;
     private int _settingsRevision;
     private double _averageMilliseconds;
     private volatile bool _disposed;
 
-    private CameraEffectRenderer(CameraEffectSettings settings, SelfieSegmenter? segmenter, Image target, DispatcherQueue dispatcher)
+    private CameraEffectRenderer(CameraEffectSettings settings, SelfieSegmenter? segmenter, Image target, DispatcherQueue dispatcher, double targetAspect)
     {
+        _targetAspect = targetAspect;
         _segmenter = segmenter;
         _pipeline = new CameraEffectPipeline(settings, segmenter);
         _target = target;
@@ -61,6 +80,27 @@ public sealed class CameraEffectRenderer : IDisposable
 
     /// <summary>Whether blur/replacement can run (model present and loadable).</summary>
     public bool SegmentationAvailable => _pipeline.SegmentationAvailable;
+
+    /// <summary>
+    /// Updates the aspect the frame is cropped to, for when the surface is resized.
+    /// </summary>
+    public void SetTargetAspect(double targetAspect) =>
+        Volatile.Write(ref _targetAspect, double.IsFinite(targetAspect) && targetAspect > 0 ? targetAspect : 0);
+
+    /// <summary>Frames the reader has handed over since start.</summary>
+    public int FramesArrived => Volatile.Read(ref _framesArrived);
+
+    /// <summary>Frames that actually reached the screen.</summary>
+    public int FramesPresented => Volatile.Read(ref _framesPresented);
+
+    /// <summary>
+    /// Why the last frame did not reach the screen, or null once one has. A blank
+    /// preview is otherwise indistinguishable from a dead camera, so callers use
+    /// this to say something truthful instead of showing nothing.
+    /// </summary>
+    public string? Diagnosis => FramesPresented > 0
+        ? null
+        : _skipReason ?? (FramesArrived == 0 ? "the camera has not delivered a frame" : null);
 
     /// <summary>
     /// Swaps in a fresh pipeline mid-preview so the preflight controls update
@@ -98,14 +138,15 @@ public sealed class CameraEffectRenderer : IDisposable
         MediaFrameSource frameSource,
         CameraEffectSettings settings,
         Image target,
-        DispatcherQueue dispatcher)
+        DispatcherQueue dispatcher,
+        double targetAspect = 0)
     {
         SelfieSegmenter? segmenter = null;
         if (settings.NeedsSegmentation || settings.TouchUpLevel > 0)
         {
             segmenter = SelfieSegmenter.TryCreate(SelfieSegmenter.ResolveModelPath());
         }
-        var renderer = new CameraEffectRenderer(settings, segmenter, target, dispatcher);
+        var renderer = new CameraEffectRenderer(settings, segmenter, target, dispatcher, targetAspect);
         try
         {
             if (settings.BackgroundMode == CameraEffectSettings.BackgroundImage)
@@ -113,7 +154,12 @@ public sealed class CameraEffectRenderer : IDisposable
                 await LoadBackgroundImageAsync(renderer._pipeline, settings.BackgroundImagePath);
             }
             await SelectProcessingFormatAsync(frameSource);
-            var reader = await capture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
+            // Deliberately no requested subtype. Asking for Bgra8 here makes the
+            // reader start successfully on cameras that only produce NV12, YUY2, or
+            // MJPG and then deliver nothing at all — a preview that is blank forever
+            // with no error. Take whatever the camera natively offers and convert in
+            // software, which the frame loop already does.
+            var reader = await capture.CreateFrameReaderAsync(frameSource);
             reader.AcquisitionMode = MediaFrameReaderAcquisitionMode.Realtime;
             reader.FrameArrived += renderer.Reader_FrameArrived;
             renderer._reader = reader;
@@ -144,6 +190,10 @@ public sealed class CameraEffectRenderer : IDisposable
             var best = frameSource.SupportedFormats
                 .Where(format => format.VideoFormat is not null && FrameRateOf(format) >= 15)
                 .Where(format => format.VideoFormat.Width >= 320)
+                // Uncompressed only. A compressed format (MJPG, H264) is delivered
+                // without a CPU bitmap, which the frame loop cannot read — the same
+                // blank-preview failure as forcing a subtype the camera lacks.
+                .Where(format => UncompressedSubtypes.Contains(format.Subtype))
                 .OrderBy(format => format.VideoFormat.Width < TargetProcessingWidth ? 1 : 0)
                 .ThenBy(format => format.VideoFormat.Width)
                 .ThenByDescending(FrameRateOf)
@@ -176,10 +226,18 @@ public sealed class CameraEffectRenderer : IDisposable
             {
                 return;
             }
+            Interlocked.Increment(ref _framesArrived);
             using var frame = sender.TryAcquireLatestFrame();
             var bitmap = frame?.VideoMediaFrame?.SoftwareBitmap;
             if (bitmap is null)
             {
+                // Never silent: a preview that stays blank has to be able to say why
+                // rather than looking like a dead camera.
+                _skipReason = frame is null
+                    ? "no frame available from the reader"
+                    : frame.VideoMediaFrame is null
+                        ? "frame carried no video"
+                        : "frame was GPU-backed with no CPU bitmap";
                 return;
             }
             var started = Environment.TickCount64;
@@ -206,6 +264,23 @@ public sealed class CameraEffectRenderer : IDisposable
             _frameIndex++;
             _pipeline.Process(packed.AsSpan(0, width * height * 4), width, height, runInference: _frameIndex % InferenceInterval() == 0);
 
+            // Crop to the surface's aspect around the tracked person. Doing it here
+            // rather than leaving it to the Image's UniformToFill is the whole point:
+            // XAML can only centre the crop on the frame, not on whoever is in it.
+            var targetAspect = Volatile.Read(ref _targetAspect);
+            if (targetAspect > 0)
+            {
+                var crop = CursorPocket.Core.Media.AutoFrameCrop.Compute(width, height, targetAspect, _pipeline.FocusX);
+                if (crop.Width != width || crop.Height != height)
+                {
+                    EnsurePacked(ref _cropped, crop.Width, crop.Height);
+                    CursorPocket.Core.Media.AutoFrameCrop.CopyCrop(packed, width, crop, _cropped);
+                    packed = _cropped;
+                    width = crop.Width;
+                    height = crop.Height;
+                }
+            }
+
             var output = _output;
             if (output is null || output.PixelWidth != width || output.PixelHeight != height)
             {
@@ -229,11 +304,15 @@ public sealed class CameraEffectRenderer : IDisposable
                     if (!_disposed && current is not null)
                     {
                         await _source.SetBitmapAsync(current);
+                        Interlocked.Increment(ref _framesPresented);
+                        _skipReason = null;
                     }
                 }
-                catch (Exception)
+                catch (Exception error)
                 {
-                    // A torn-down source mid-shutdown is not worth a crash.
+                    // A torn-down source mid-shutdown is not worth a crash, but a
+                    // preview that never appears has to leave a reason behind.
+                    _skipReason = $"presenting the frame failed: {error.Message}";
                 }
                 finally
                 {
@@ -241,9 +320,13 @@ public sealed class CameraEffectRenderer : IDisposable
                 }
             });
         }
-        catch (Exception)
+        catch (Exception error)
         {
             // Never let a bad frame take down the preview; the next one retries.
+            // But record why: a step that throws on *every* frame is otherwise
+            // completely silent, and looks exactly like a dead camera. That is how
+            // an InvalidCastException in the pixel copy went unnoticed.
+            _skipReason = $"{error.GetType().Name} while processing the frame: {error.Message}";
         }
         finally
         {
@@ -333,7 +416,7 @@ public sealed class CameraEffectRenderer : IDisposable
             reader.FrameArrived -= Reader_FrameArrived;
             try
             {
-                await reader.StopAsync();
+                await reader.StopAsync().AsTask().ConfigureAwait(false);
             }
             catch (Exception)
             {
@@ -344,19 +427,30 @@ public sealed class CameraEffectRenderer : IDisposable
         // A frame dispatched just before the unsubscribe may still be inside the
         // pipeline — including native ONNX inference. Releasing the session or
         // the output bitmap under it is a use-after-free, so wait it out.
-        await WaitForFrameWorkAsync();
+        await WaitForFrameWorkAsync().ConfigureAwait(false);
         _output?.Dispose();
         _output = null;
         _segmenter?.Dispose();
         _segmenter = null;
-        _target.Source = null;
+        // Touching the Image needs the UI thread, and by now the window may be
+        // closing. Best effort only: releasing the camera must not depend on it.
+        _dispatcher.TryEnqueue(() =>
+        {
+            try
+            {
+                _target.Source = null;
+            }
+            catch (Exception)
+            {
+            }
+        });
     }
 
     private async Task WaitForFrameWorkAsync()
     {
         for (var attempt = 0; attempt < 100 && Volatile.Read(ref _processing) != 0; attempt++)
         {
-            await Task.Delay(5);
+            await Task.Delay(5).ConfigureAwait(false);
         }
     }
 
@@ -374,45 +468,36 @@ public sealed class CameraEffectRenderer : IDisposable
 /// </summary>
 internal static class SoftwareBitmapPixels
 {
-    [ComImport]
-    [Guid("5B0D3235-4DBA-4D44-865E-8F1D0E4FD04D")]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    private unsafe interface IMemoryBufferByteAccess
-    {
-        void GetBuffer(out byte* buffer, out uint capacity);
-    }
+    /// <summary>
+    /// Copies a BGRA8 bitmap out to a packed array.
+    /// <para>
+    /// Uses <c>CopyToBuffer</c> rather than <c>LockBuffer</c> plus a hand-declared
+    /// <c>IMemoryBufferByteAccess</c>. That older pattern does not work here: under
+    /// CsWinRT the buffer reference arrives as a projected <c>WinRT.IInspectable</c>
+    /// and casting it to a hand-declared COM-imported interface throws
+    /// <see cref="InvalidCastException"/> on every frame. Because the frame loop
+    /// deliberately swallows per-frame failures, that produced a preview that was
+    /// blank forever while the camera light stayed on.
+    /// </para>
+    /// <para>
+    /// The buffer is tightly packed — no stride padding — so the pipeline can treat
+    /// it as width * 4 bytes per row throughout.
+    /// </para>
+    /// </summary>
+    public static void Read(SoftwareBitmap bitmap, byte[] destination, int width, int height) =>
+        bitmap.CopyToBuffer(destination.AsBuffer(0, width * height * 4));
 
-    public static unsafe void Read(SoftwareBitmap bitmap, byte[] destination, int width, int height)
+    /// <summary>Copies a packed BGRA8 array back into a bitmap.</summary>
+    public static void Write(SoftwareBitmap bitmap, byte[] source, int width, int height)
     {
-        using var buffer = bitmap.LockBuffer(BitmapBufferAccessMode.Read);
-        using var reference = buffer.CreateReference();
-        ((IMemoryBufferByteAccess)reference).GetBuffer(out var data, out _);
-        var plane = buffer.GetPlaneDescription(0);
-        for (var row = 0; row < height; row++)
+        // The destination is Premultiplied and some cameras leave the fourth BGRA
+        // byte undefined. A zero there renders the whole preview transparent, and an
+        // invisible self-view means no webcam in the recording.
+        var length = width * height * 4;
+        for (var offset = 3; offset < length; offset += 4)
         {
-            new ReadOnlySpan<byte>(data + plane.StartIndex + row * plane.Stride, width * 4)
-                .CopyTo(destination.AsSpan(row * width * 4));
+            source[offset] = 255;
         }
-    }
-
-    public static unsafe void Write(SoftwareBitmap bitmap, byte[] source, int width, int height)
-    {
-        using var buffer = bitmap.LockBuffer(BitmapBufferAccessMode.Write);
-        using var reference = buffer.CreateReference();
-        ((IMemoryBufferByteAccess)reference).GetBuffer(out var data, out _);
-        var plane = buffer.GetPlaneDescription(0);
-        for (var row = 0; row < height; row++)
-        {
-            var destination = new Span<byte>(data + plane.StartIndex + row * plane.Stride, width * 4);
-            source.AsSpan(row * width * 4, width * 4).CopyTo(destination);
-            // The destination is Premultiplied and some cameras leave the fourth
-            // BGRA byte undefined. Passing a zero through would render the whole
-            // preview transparent — and an invisible self-view means no webcam
-            // in the recording.
-            for (var offset = 3; offset < destination.Length; offset += 4)
-            {
-                destination[offset] = 255;
-            }
-        }
+        bitmap.CopyFromBuffer(source.AsBuffer(0, length));
     }
 }
