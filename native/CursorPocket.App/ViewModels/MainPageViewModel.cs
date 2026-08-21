@@ -20,6 +20,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private string _captureDirectory = services.Settings.CaptureDirectory;
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
+    [ObservableProperty] private bool _mouseChordEnabled = services.Settings.MouseChordEnabled;
     [ObservableProperty] private string _cursorCompanionMode = services.Settings.CursorCompanionMode;
     [ObservableProperty] private string _activationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
     [ObservableProperty] private bool _videoMicrophoneEnabled = services.Settings.VideoMicrophoneEnabled;
@@ -201,6 +202,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             CaptureDirectory = CaptureDirectory,
             StartWithWindows = StartWithWindows,
             MouseGestureEnabled = MouseGestureEnabled,
+            MouseChordEnabled = MouseChordEnabled,
             CursorCompanionMode = CursorCompanionMode,
             ActivationShortcut = ActivationShortcut,
             VideoMicrophoneEnabled = VideoMicrophoneEnabled,

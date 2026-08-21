@@ -17,8 +17,6 @@
     <EnableMsixTooling>false</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Confined to SoftwareBitmapPixels: stride-aware BGRA copies for the camera effect pipeline. -->
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <AssemblyName>CursorPocket</AssemblyName>
     <Product>CursorPocket</Product>

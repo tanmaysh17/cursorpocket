@@ -180,12 +180,50 @@ public sealed partial class CameraSelfViewWindow : Window
         _closed = true;
         var renderer = _effectRenderer;
         _effectRenderer = null;
+        // Taken before the await so the device handle cannot be stranded: whatever
+        // happens to the continuation, this local is disposed below. The camera must
+        // be free the moment the recording ends, not whenever the process exits.
+        var capture = _mediaCapture;
+        _mediaCapture = null;
         if (renderer is not null)
         {
-            await renderer.DisposeAsync();
+            await renderer.DisposeAsync().ConfigureAwait(false);
         }
-        ReleaseCamera();
-        Close();
+        try
+        {
+            capture?.Dispose();
+        }
+        catch (Exception)
+        {
+            // Racing an in-flight reader stop; the handle is going away regardless.
+        }
+        // Everything below touches XAML, so it has to be back on the UI thread —
+        // ConfigureAwait(false) above means we may not be.
+        if (DispatcherQueue is null || DispatcherQueue.HasThreadAccess)
+        {
+            FinishClose();
+        }
+        else
+        {
+            DispatcherQueue.TryEnqueue(FinishClose);
+        }
+    }
+
+    private void FinishClose()
+    {
+        try
+        {
+            _effectRenderer?.Dispose();
+            _effectRenderer = null;
+            CameraPreview.SetMediaPlayer(null);
+            _cameraPlayer?.Dispose();
+            _cameraPlayer = null;
+            Close();
+        }
+        catch (Exception)
+        {
+            // The window is going away; the camera is already released above.
+        }
     }
 
     private static CaptureBounds ResolveCaptureArea(RecordingOptions options, long sourceWindow)
@@ -234,11 +272,23 @@ public sealed partial class CameraSelfViewWindow : Window
             }
             if (effects.HasAnyEffect)
             {
-                _effectRenderer = await CameraEffectRenderer.StartAsync(_mediaCapture, source, effects, CameraEffectView, DispatcherQueue);
+                _effectRenderer = await CameraEffectRenderer.StartAsync(
+                    _mediaCapture,
+                    source,
+                    effects,
+                    CameraEffectView,
+                    DispatcherQueue,
+                    // The shape decides the aspect, so the crop follows the person
+                    // instead of slicing the sides off a 4:3 camera down the middle.
+                    _clipHeight > 0 ? _clipWidth / (double)_clipHeight : 0);
             }
             if (_effectRenderer is not null)
             {
                 CameraEffectView.Visibility = Visibility.Visible;
+                // Exactly one path is ever on screen. An idle MediaPlayerElement
+                // still paints, so leaving it visible puts a black rectangle behind
+                // the effects image for no reason.
+                CameraPreview.Visibility = Visibility.Collapsed;
             }
             else
             {
@@ -260,14 +310,34 @@ public sealed partial class CameraSelfViewWindow : Window
         }
     }
 
+    /// <summary>
+    /// Frees the camera. The MediaCapture is disposed synchronously and last, on
+    /// purpose: the renderer teardown it follows is asynchronous, and this runs from
+    /// <c>Closed</c> where a continuation may never be drained. Disposing the
+    /// capture here is what actually turns the camera light off.
+    /// </summary>
     private void ReleaseCamera()
     {
-        _effectRenderer?.Dispose();
-        _effectRenderer = null;
-        CameraPreview.SetMediaPlayer(null);
-        _cameraPlayer?.Dispose();
-        _cameraPlayer = null;
-        _mediaCapture?.Dispose();
+        try
+        {
+            _effectRenderer?.Dispose();
+            _effectRenderer = null;
+            CameraPreview.SetMediaPlayer(null);
+            _cameraPlayer?.Dispose();
+            _cameraPlayer = null;
+        }
+        catch (Exception)
+        {
+            // Whatever else fails, the device below still has to be released.
+        }
+        try
+        {
+            _mediaCapture?.Dispose();
+        }
+        catch (Exception)
+        {
+            // Racing an in-flight reader stop; the handle is going away regardless.
+        }
         _mediaCapture = null;
     }
 }

@@ -19,6 +19,10 @@ public sealed record AppSettings
     [JsonPropertyName("mouse_gesture_enabled")]
     public bool MouseGestureEnabled { get; init; } = true;
 
+    /// <summary>Hold both mouse buttons together to open command mode.</summary>
+    [JsonPropertyName("mouse_chord_enabled")]
+    public bool MouseChordEnabled { get; init; } = true;
+
     [JsonPropertyName("onboarding_seen")]
     public bool OnboardingSeen { get; init; }
 

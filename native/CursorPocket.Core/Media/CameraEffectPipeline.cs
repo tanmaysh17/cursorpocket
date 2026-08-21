@@ -27,6 +27,7 @@ public sealed class CameraEffectPipeline
     private byte[]? _backgroundImageSource;
     private int _backgroundImageSourceWidth;
     private int _backgroundImageSourceHeight;
+    private double _focusX = 0.5;
 
     public CameraEffectPipeline(CameraEffectSettings settings, IPersonMaskModel? model)
     {
@@ -82,6 +83,7 @@ public sealed class CameraEffectPipeline
             {
                 _maskPostprocessor.Resolve(_alpha, width, height);
                 hasMask = true;
+                UpdateFocus(width, height);
             }
         }
 
@@ -107,7 +109,11 @@ public sealed class CameraEffectPipeline
         }
         if (_settings.BackgroundMode == CameraEffectSettings.BackgroundBlur)
         {
-            BuildSoftened(pixels, width, height, downscaleFactor: 4, blurRadius: 2, iterations: 3, _background);
+            // Tuned down from 4x/radius 2/3 passes, which read as frosted glass and
+            // erased the room rather than de-emphasising it. Halving the downscale
+            // is what does most of the work: the blur radius is applied to a buffer
+            // twice as wide, so its reach in full-resolution terms drops with it.
+            BuildSoftened(pixels, width, height, downscaleFactor: 2, blurRadius: 2, iterations: 2, _background);
             MaskCompositor.Composite(pixels, _background, _alpha, width, height);
         }
         else if (_settings.BackgroundMode == CameraEffectSettings.BackgroundImage && _backgroundImageSource is not null)
@@ -120,6 +126,25 @@ public sealed class CameraEffectPipeline
                 height);
             MaskCompositor.Composite(pixels, _backgroundImage, _alpha, width, height);
         }
+    }
+
+    /// <summary>
+    /// Where to centre the crop when the self-view's shape is a different aspect
+    /// than the camera: the smoothed horizontal centre of the person, or 0.5 when
+    /// there is no mask to go on. Fed to <see cref="AutoFrameCrop.Compute"/>.
+    /// </summary>
+    public double FocusX => _focusX;
+
+    private void UpdateFocus(int width, int height)
+    {
+        var centroid = AutoFrameCrop.HorizontalCentroid(_alpha, width, height);
+        if (centroid is null)
+        {
+            return;
+        }
+        // Heavily smoothed: the crop window moving is far more noticeable than the
+        // mask wobbling, so it should drift rather than track.
+        _focusX = _focusX * 0.92 + centroid.Value * 0.08;
     }
 
     private void BuildSoftened(ReadOnlySpan<byte> pixels, int width, int height, int downscaleFactor, int blurRadius, int iterations, byte[] destination)
