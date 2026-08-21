@@ -13,7 +13,9 @@ namespace CursorPocket_App;
 public sealed partial class MainPage : Page
 {
     public MainPageViewModel ViewModel { get; } = new(App.Services);
+    private CancellationTokenSource? _detailLoad;
     private bool _loaded;
+    private bool _libraryLoaded;
 
     public MainPage()
     {
@@ -38,7 +40,6 @@ public sealed partial class MainPage : Page
         }
         _loaded = true;
         App.Services.CaptureCompleted += CaptureStore_CaptureCompleted;
-        await ViewModel.InitializeAsync();
         CompanionModeBox.SelectedIndex = ViewModel.CursorCompanionMode switch { "off" => 0, "always" => 2, _ => 1 };
         FpsBox.SelectedIndex = ViewModel.VideoFramesPerSecond == 60 ? 1 : 0;
         CountdownBox.SelectedIndex = ViewModel.VideoCountdownSeconds switch { 0 => 0, 5 => 2, _ => 1 };
@@ -46,6 +47,23 @@ public sealed partial class MainPage : Page
         CountdownBox.SelectionChanged += VideoDefaults_SelectionChanged;
         ApplyFilterSelection(ViewModel.SelectedFilter);
         ShowActivationShortcut();
+        // A tray-only launch has nothing on screen, so reading the manifest and
+        // materializing every row can wait until the window is actually revealed.
+        if (!App.StartedInBackground)
+        {
+            await EnsureLibraryLoadedAsync();
+        }
+    }
+
+    /// <summary>Reads the library once, on the first reveal that needs it.</summary>
+    public async Task EnsureLibraryLoadedAsync()
+    {
+        if (_libraryLoaded)
+        {
+            return;
+        }
+        _libraryLoaded = true;
+        await ViewModel.InitializeAsync();
         UpdateLibraryVisibility();
         SyncDeleteAffordance();
         await UpdateDetailAsync();
@@ -97,6 +115,12 @@ public sealed partial class MainPage : Page
     {
         App.DispatcherQueue.TryEnqueue(async () =>
         {
+            if (!_libraryLoaded)
+            {
+                // Nothing is displayed yet; the first reveal will read this capture
+                // from the manifest along with the rest.
+                return;
+            }
             await ViewModel.CaptureAddedAsync(eventArgs.Record);
             UpdateLibraryVisibility();
             SyncDeleteAffordance();
@@ -216,10 +240,19 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private async void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
+    private void CaptureList_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
+        // The delete affordance is cheap and must track the selection immediately.
         SyncDeleteAffordance();
-        await UpdateDetailAsync();
+        // Loading the detail is not cheap: arrow-keying down the list would open a
+        // media pipeline and generate a waveform for every row passed through.
+        // The superseded source is cancelled but deliberately not disposed — the
+        // preview path still registers callbacks on its token, which would throw
+        // ObjectDisposedException against a disposed source.
+        _detailLoad?.Cancel();
+        var pending = new CancellationTokenSource();
+        _detailLoad = pending;
+        _ = DebounceDetailAsync(pending.Token);
     }
 
     /// <summary>
@@ -304,7 +337,20 @@ public sealed partial class MainPage : Page
     private void CaptureList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs eventArgs)
         => ViewModel.OpenSelectedCommand.Execute(null);
 
-    private async Task UpdateDetailAsync()
+    private async Task DebounceDetailAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(120, cancellationToken);
+            await UpdateDetailAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer selection is already loading.
+        }
+    }
+
+    private async Task UpdateDetailAsync(CancellationToken cancellationToken = default)
     {
         DetailPlayer.Source = null;
         DetailPlayer.Visibility = Visibility.Collapsed;
@@ -351,7 +397,8 @@ public sealed partial class MainPage : Page
         if (item.Record.CaptureKind == CaptureKind.Audio)
         {
             DetailTextPanel.Visibility = Visibility.Collapsed;
-            var waveform = await App.Services.Previews.GetPreviewAsync(item.Record);
+            var waveform = await App.Services.Previews.GetPreviewAsync(item.Record, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (waveform is not null)
             {
                 DetailImage.Source = new BitmapImage(new Uri(waveform));
@@ -364,7 +411,8 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        var preview = await App.Services.Previews.GetPreviewAsync(item.Record);
+        var preview = await App.Services.Previews.GetPreviewAsync(item.Record, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (preview is not null)
         {
             DetailTextPanel.Visibility = Visibility.Collapsed;
@@ -377,7 +425,7 @@ public sealed partial class MainPage : Page
         {
             try
             {
-                DetailText.Text = await File.ReadAllTextAsync(item.AbsolutePath);
+                DetailText.Text = await File.ReadAllTextAsync(item.AbsolutePath, cancellationToken);
             }
             catch (IOException)
             {

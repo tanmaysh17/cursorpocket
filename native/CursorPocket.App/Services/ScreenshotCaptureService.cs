@@ -49,12 +49,17 @@ public sealed class ScreenshotCaptureService(CaptureStore store) : ICaptureServi
             throw new ArgumentException("Screenshot selection is empty.", nameof(bounds));
         }
         var reservation = store.Reserve(CaptureKind.Screenshot, ".png");
-        using (var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb))
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-            bitmap.Save(reservation.AbsolutePath, ImageFormat.Png);
-        }
+        // The screen grab and the PNG encode are both expensive at 4K. Doing them
+        // inline froze the UI thread for the whole encode after every screenshot key.
+        await Task.Run(
+            () =>
+            {
+                using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+                using var graphics = Graphics.FromImage(bitmap);
+                graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+                bitmap.Save(reservation.AbsolutePath, ImageFormat.Png);
+            },
+            cancellationToken);
         return await store.RegisterExistingAsync(
             CaptureKind.Screenshot,
             reservation.AbsolutePath,

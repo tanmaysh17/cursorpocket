@@ -6,6 +6,16 @@ namespace CursorPocket_App.Services;
 
 internal static class DesktopSnapshot
 {
+    /// <summary>
+    /// Grabs the desktop under the command overlay.
+    /// <para>
+    /// The frame never touches the filesystem. Staging it through the temp folder
+    /// meant writing and then re-reading roughly 33 MB at 4K on the hotkey path,
+    /// plus a temp-directory scan on every activation, which was the largest
+    /// remaining cost of opening command mode. BMP still avoids synchronous PNG
+    /// compression while handing the decoder an exact, lossless desktop frame.
+    /// </para>
+    /// </summary>
     public static BitmapImage Capture(NativeMethods.Rect bounds)
     {
         var width = bounds.Right - bounds.Left;
@@ -15,65 +25,43 @@ internal static class DesktopSnapshot
             throw new ArgumentOutOfRangeException(nameof(bounds), "Desktop snapshot bounds must have a visible area.");
         }
 
-        var cacheDirectory = Path.Combine(Path.GetTempPath(), "CursorPocket", "desktop-snapshots");
-        Directory.CreateDirectory(cacheDirectory);
-        DeleteExpiredSnapshots(cacheDirectory);
-        // BMP avoids synchronous PNG compression on the hotkey path. At 4K this
-        // removes the largest source of command-mode launch latency while the
-        // decoder still receives an exact, lossless desktop frame.
-        var snapshotPath = Path.Combine(cacheDirectory, $"{Guid.NewGuid():N}.bmp");
-
+        var frame = new MemoryStream(EstimateCapacity(width, height));
         using (var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb))
         using (var graphics = Graphics.FromImage(bitmap))
         {
             graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-            bitmap.Save(snapshotPath, ImageFormat.Bmp);
+            bitmap.Save(frame, ImageFormat.Bmp);
         }
+        frame.Position = 0;
 
         var source = new BitmapImage();
-        source.ImageOpened += (_, _) => DeleteSnapshot(snapshotPath);
-        source.ImageFailed += (_, _) => DeleteSnapshot(snapshotPath);
-        source.UriSource = new Uri(snapshotPath, UriKind.Absolute);
+        _ = DecodeAsync(source, frame);
         return source;
     }
 
-    private static void DeleteExpiredSnapshots(string directory)
+    private static int EstimateCapacity(int width, int height)
     {
-        try
-        {
-            foreach (var path in Directory.EnumerateFiles(directory, "*.*"))
-            {
-                if ((path.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".bmp", StringComparison.OrdinalIgnoreCase)) &&
-                    File.GetLastWriteTimeUtc(path) < DateTime.UtcNow.AddHours(-1))
-                {
-                    File.Delete(path);
-                }
-            }
-        }
-        catch (IOException)
-        {
-            // A concurrent overlay may still be decoding its own snapshot.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // The overlay can still use its new file even if cleanup is unavailable.
-        }
+        // 32bpp rows plus the BMP header, clamped so an implausible virtual-screen
+        // size cannot ask for a negative or absurd initial buffer.
+        var bytes = (long)width * height * 4 + 1024;
+        return (int)Math.Clamp(bytes, 4096, int.MaxValue);
     }
 
-    private static void DeleteSnapshot(string path)
+    private static async Task DecodeAsync(BitmapImage image, MemoryStream frame)
     {
         try
         {
-            File.Delete(path);
+            using var randomAccess = frame.AsRandomAccessStream();
+            await image.SetSourceAsync(randomAccess);
         }
-        catch (IOException)
+        catch (Exception)
         {
-            // The decoder can release the file shortly after the event; the next
-            // overlay launch removes this short-lived cache file.
+            // The backdrop is decorative. Command mode stays usable over the plain
+            // graphite surface if the decoder rejects this frame.
         }
-        catch (UnauthorizedAccessException)
+        finally
         {
-            // Leave cleanup to the next launch rather than breaking capture mode.
+            await frame.DisposeAsync();
         }
     }
 }

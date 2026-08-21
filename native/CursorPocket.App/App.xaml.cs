@@ -7,9 +7,10 @@ public partial class App : Microsoft.UI.Xaml.Application
 {
     private Mutex? _singleInstanceMutex;
     private EventWaitHandle? _activationEvent;
-    private CancellationTokenSource? _activationListener;
+    private RegisteredWaitHandle? _activationRegistration;
 
     public static Window Window { get; private set; } = null!;
+    public static bool StartedInBackground { get; private set; }
     public static AppServices Services { get; private set; } = null!;
     public static Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue { get; private set; } = null!;
     public static nint WindowHandle => WinRT.Interop.WindowNative.GetWindowHandle(Window);
@@ -39,14 +40,17 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             Services = await AppServices.CreateAsync();
+            // Resolved before the window exists so the Library knows not to build
+            // itself for a tray-only launch, rather than racing the deferred hide.
+            StartedInBackground = args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase)
+                || Environment.GetCommandLineArgs().Any(argument =>
+                    argument.Equals("--background", StringComparison.OrdinalIgnoreCase));
             Window = new MainWindow();
             Services.Hotkey.Invoked += (_, _) => DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowCommandPalette());
             StartActivationListener();
             Window.Activate();
-            var backgroundLaunch = args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase)
-                || Environment.GetCommandLineArgs().Any(argument =>
-                    argument.Equals("--background", StringComparison.OrdinalIgnoreCase));
-            if (backgroundLaunch)
+            Services.StartOrphanRecovery();
+            if (StartedInBackground)
             {
                 Window.AppWindow.Hide();
                 // WinUI posts its first-show work after Activate returns. Hide once
@@ -84,22 +88,24 @@ public partial class App : Microsoft.UI.Xaml.Application
 
     private void StartActivationListener()
     {
-        _activationListener = new CancellationTokenSource();
-        _ = Task.Run(() =>
+        if (_activationEvent is null)
         {
-            while (!_activationListener.IsCancellationRequested)
-            {
-                if (_activationEvent?.WaitOne(500) == true)
-                {
-                    DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowLibrary());
-                }
-            }
-        }, _activationListener.Token);
+            return;
+        }
+        // A named event needs no polling. The previous 500 ms wait loop woke this
+        // process twice a second for its entire lifetime.
+        _activationRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _activationEvent,
+            (_, _) => DispatcherQueue.TryEnqueue(() => (Window as MainWindow)?.ShowLibrary()),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
     }
 
     public void Shutdown()
     {
-        _activationListener?.Cancel();
+        _activationRegistration?.Unregister(null);
+        _activationRegistration = null;
         _activationEvent?.Dispose();
         Services?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();

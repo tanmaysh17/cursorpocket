@@ -598,6 +598,10 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("Task.Delay(130", main, StringComparison.Ordinal);
         Assert.DoesNotContain("Task.Delay(350", recording, StringComparison.Ordinal);
         Assert.Contains("ImageFormat.Bmp", snapshot, StringComparison.Ordinal);
+        // The desktop frame is handed to the decoder in memory. Staging it through
+        // the temp folder wrote and re-read tens of megabytes on the hotkey path.
+        Assert.DoesNotContain("Path.GetTempPath()", snapshot, StringComparison.Ordinal);
+        Assert.DoesNotContain("UriSource", snapshot, StringComparison.Ordinal);
         Assert.Contains("Starting…", hud, StringComparison.Ordinal);
         Assert.True(main.IndexOf("RecordingHudWindow.ShowForVideo", StringComparison.Ordinal) <
             main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
@@ -650,7 +654,7 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("Startup.SetEnabled(settings.StartWithWindows)", ReadFixture("AppServices.cs.txt"), StringComparison.Ordinal);
         var mainPage = ReadFixture("MainPage.xaml.cs.txt");
         Assert.Contains("CaptureKind.Audio", mainPage, StringComparison.Ordinal);
-        Assert.Contains("GetPreviewAsync(item.Record)", mainPage, StringComparison.Ordinal);
+        Assert.Contains("GetPreviewAsync(item.Record", mainPage, StringComparison.Ordinal);
         Assert.Contains("DetailPlayer.Height = 92", mainPage, StringComparison.Ordinal);
     }
 
@@ -696,6 +700,72 @@ public sealed class UtilitySurfaceContractTests
         var end = source.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
         Assert.True(end >= 0, $"'{endMarker}' was not found after '{startMarker}'.");
         return source[start..end];
+    }
+
+    [Fact]
+    public void Pointer_tracking_stays_off_the_ui_thread_and_allocation_free()
+    {
+        var mouse = ReadFixture("MouseActivityService.cs.txt");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+
+        // The low-level hook fires on the thread that installed it, so it must own a
+        // thread and pump messages rather than borrowing the XAML dispatcher.
+        Assert.Contains("SetWindowsHookEx", mouse, StringComparison.Ordinal);
+        Assert.Contains("GetMessage", mouse, StringComparison.Ordinal);
+        Assert.Contains("CursorPocket.MouseHook", mouse, StringComparison.Ordinal);
+        Assert.DoesNotContain("Marshal.PtrToStructure<", mouse, StringComparison.Ordinal);
+        // Gesture work is skipped outright when the user turned the gesture off.
+        Assert.Contains("_gestureEnabled", mouse, StringComparison.Ordinal);
+        Assert.Contains("GestureEnabled = App.Services.Settings.MouseGestureEnabled", main, StringComparison.Ordinal);
+        // One coalesced dispatcher item, not one closure per mouse event.
+        Assert.Contains("TryConsumeLatestPosition", main, StringComparison.Ordinal);
+        // The coalesced signal latches, so the hook must go live only after the
+        // handlers are attached.
+        Assert.True(
+            main.IndexOf("_mouseActivity.Moved +=", StringComparison.Ordinal) <
+            main.IndexOf("_mouseActivity.Start();", StringComparison.Ordinal),
+            "The pointer hook must start after Moved is subscribed.");
+    }
+
+    [Fact]
+    public void Cursor_companion_caches_its_pulse_and_idles_when_hidden()
+    {
+        var code = ReadFixture("NativeCompanionWindow.cs.txt");
+
+        Assert.Contains("_readyFrames", code, StringComparison.Ordinal);
+        Assert.Contains("_recordingFrames", code, StringComparison.Ordinal);
+        // Nothing visible means nothing to animate.
+        Assert.Contains("_pulseTimer.Stop()", code, StringComparison.Ordinal);
+        // The frames and the shared memory DC are GDI handles and must be released.
+        Assert.Contains("ReleaseFrames", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Screenshots_encode_off_the_ui_thread()
+    {
+        var code = ReadFixture("ScreenshotCaptureService.cs.txt");
+
+        Assert.Contains("Task.Run", code, StringComparison.Ordinal);
+        Assert.True(
+            code.IndexOf("Task.Run", StringComparison.Ordinal) <
+            code.IndexOf("ImageFormat.Png", StringComparison.Ordinal),
+            "The PNG encode must happen inside the background work item.");
+    }
+
+    [Fact]
+    public void Launch_does_not_wait_on_the_capture_folder_or_poll_for_activation()
+    {
+        var services = ReadFixture("AppServices.cs.txt");
+        var app = ReadFixture("App.xaml.cs.txt");
+
+        // Orphan recovery walks the capture folder; it must not gate the first window.
+        Assert.Contains("StartOrphanRecovery", services, StringComparison.Ordinal);
+        Assert.DoesNotContain("await captureStore.RecoverOrphanedMediaAsync", services, StringComparison.Ordinal);
+        Assert.Contains("RegisterWaitForSingleObject", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("WaitOne(500)", app, StringComparison.Ordinal);
+        // A tray-only launch must not build the Library.
+        Assert.Contains("StartedInBackground", app, StringComparison.Ordinal);
+        Assert.Contains("EnsureLibraryLoadedAsync", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
     }
 
     private static string ReadFixture(string name) =>

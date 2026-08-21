@@ -26,6 +26,8 @@ public sealed partial class CommandPaletteWindow : Window
     private bool _dragging;
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
+    private bool _paletteLoaded;
+    private long _lastTimeoutReset;
 
     public CommandPaletteWindow()
     {
@@ -52,6 +54,10 @@ public sealed partial class CommandPaletteWindow : Window
             ? "Press one key · Esc closes"
             : $"A uses {App.Services.Settings.VideoMicrophoneName} · Esc closes";
         if (initialMode == "screenshot") ShowScreenshotCommands(); else ShowPrimaryCommands();
+        if (_paletteLoaded)
+        {
+            PulseStoryboard.Begin();
+        }
         _commandKeys.SetEnabled(true);
         AppWindow.Show(false);
         Activate();
@@ -305,11 +311,15 @@ public sealed partial class CommandPaletteWindow : Window
     {
         _timeout.Stop();
         _timeout.Start();
+        _lastTimeoutReset = Environment.TickCount64;
     }
 
     private void HidePalette()
     {
         _timeout.Stop();
+        // The palette window stays alive between activations, so a Forever
+        // storyboard left running would keep animating an invisible surface.
+        PulseStoryboard.Stop();
         _commandKeys.SetEnabled(false);
         AppWindow.Hide();
         if (_restoreSourceOnClose)
@@ -323,15 +333,22 @@ public sealed partial class CommandPaletteWindow : Window
     {
         if (!_dragging)
         {
-            ResetTimeout();
+            // Restarting a DispatcherTimer on every pointer move is pure overhead
+            // when the window it guards closes after thirty seconds.
+            if (Environment.TickCount64 - _lastTimeoutReset >= 1000)
+            {
+                ResetTimeout();
+            }
             return;
         }
         eventArgs.Handled = true;
         var (pointerX, pointerY) = WindowPlacement.PointerPosition();
         Root_PointerMovedWhileDragging(pointerX, pointerY);
     }
+
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
+        _paletteLoaded = true;
         PulseStoryboard.Begin();
         FocusCommandSurface();
     }
