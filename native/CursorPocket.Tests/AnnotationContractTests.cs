@@ -20,25 +20,107 @@ public sealed class AnnotationContractTests
         Assert.Contains("<Grid.KeyboardAccelerators>", xaml, StringComparison.Ordinal);
         Assert.Contains("Key=\"Enter\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Key=\"Z\" Modifiers=\"Control\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Key=\"Y\" Modifiers=\"Control\"", xaml, StringComparison.Ordinal);
 
-        // ...but the inline text tool commits on Enter and owns its own undo, so every
-        // accelerator stands down while a text box has focus.
-        Assert.Contains("is TextBox", code, StringComparison.Ordinal);
-
-        // Escape also arrives globally: the window can lose activation while still shown.
+        // Escape alone stays a global scoped lease: the window can lose activation while
+        // still shown, and the drawing surface cannot hold focus to catch it.
         Assert.Contains("EscapeHotkey.Capture", code, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Escape_keeps_the_original_and_never_writes_a_file()
+    public void Something_focusable_holds_focus_so_accelerators_can_route()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Accelerators only route while an element inside the window holds focus. A
+        // Canvas cannot take focus — Focus() on it returns false and says nothing — and
+        // a Grid cannot stand in for it either, because IsTabStop belongs to Control and
+        // a Grid is a Panel. Verified on the installed build: with nothing focused, not
+        // one key worked until a toolbar button had been clicked.
+        Assert.Contains("x:Name=\"CanvasHost\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("IsTabStop=\"True\"", xaml, StringComparison.Ordinal);
+        // No focus ring: this host exists to receive keys, not to look selected.
+        Assert.Contains("UseSystemFocusVisuals=\"False\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("DrawingSurface.Focus(", code, StringComparison.Ordinal);
+
+        // Focus must land on Loaded. Activated fires before the content tree exists, so
+        // focusing there silently does nothing.
+        Assert.Contains("CanvasHost.Loaded", code, StringComparison.Ordinal);
+        Assert.Contains("CanvasHost.Focus(FocusState.Programmatic)", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Focus_lookups_survive_a_window_that_has_no_XamlRoot_yet()
     {
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
-        var cancel = Slice(code, "private void Cancel()", "private static Windows.UI.Color ParseColor");
+        // FocusManager.GetFocusedElement throws ArgumentException rather than returning
+        // null when XamlRoot is not ready, and the first Activated fires before it is.
+        // That crashed the editor on open, on the installed build.
+        var guards = Occurrences(code, "Content?.XamlRoot is null");
+        var lookups = Occurrences(code, "FocusManager.GetFocusedElement(");
+        Assert.Equal(lookups, guards);
+    }
+
+    [Fact]
+    public void Bare_letter_keys_are_page_accelerators_rather_than_global_hotkeys()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Command mode registers bare keys globally because it owns the user's attention
+        // and cannot take focus. This surface can take focus, so accelerators are
+        // strictly better: they cannot leak a keystroke into another application, and
+        // they cannot fail to register because something else already holds the key.
+        foreach (var key in new[] { "V", "A", "L", "P", "H", "R", "E", "T" })
+        {
+            Assert.Contains($"Key=\"{key}\" Invoked=\"ToolAccelerator_Invoked\"", xaml, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("PaletteHotkeyService", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("RegisterHotKey", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_accelerator_stands_down_while_a_text_box_has_focus()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Bare letters would otherwise swallow typing in the inline text editor. With
+        // this many accelerators, repeating the check per handler is how one gets
+        // missed, so they all route through one guard.
+        Assert.Contains("private bool ToolKeysActive() =>", code, StringComparison.Ordinal);
+        Assert.Contains("is not TextBox", code, StringComparison.Ordinal);
+
+        // Every Invoked handler must consult it. Counted rather than spot-checked,
+        // because the failure mode is one handler quietly missing the guard.
+        var handlers = Occurrences(code, "_Invoked(KeyboardAccelerator sender");
+        var guards = Occurrences(code, "if (!ToolKeysActive())");
+        Assert.True(
+            guards >= handlers - 1,
+            $"{handlers} accelerator handlers but only {guards} guards — one is unguarded.");
+    }
+
+    [Fact]
+    public void Escape_returns_to_select_first_and_then_keeps_the_original()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        var escape = Slice(code, "private void HandleEscape()", "private void Cancel()");
+        // Two stage: an armed creation tool returns to Select, and Escape from Select
+        // closes. The last press always keeps the original, so nothing is ever lost —
+        // it can just take two presses. A dead-feeling first press is the risk, so the
+        // status strip has to say what the next press will do.
+        Assert.Contains("AnnotationTool.Select", escape, StringComparison.Ordinal);
+        Assert.Contains("Esc again to keep the original", escape, StringComparison.Ordinal);
+        Assert.Contains("Cancel();", escape, StringComparison.Ordinal);
+
+        var cancel = Slice(code, "private void Cancel()", "// ------");
         Assert.Contains("Cancelled?.Invoke", cancel, StringComparison.Ordinal);
         // Cancelling is the one path that must not touch the saved capture.
         Assert.DoesNotContain("File.Move", cancel, StringComparison.Ordinal);
-        Assert.DoesNotContain("Save", cancel, StringComparison.Ordinal);
+        Assert.DoesNotContain("Flatten", cancel, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,10 +131,108 @@ public sealed class AnnotationContractTests
         // The stage is sized to the source bitmap, so a canvas coordinate IS an image
         // pixel. Nudging by one pixel, the native-pixel readout, and a faithful export
         // all rest on this identity; nothing may scale pointer input on the way in.
-        Assert.Contains("Stage.Width = source.Width", code, StringComparison.Ordinal);
-        Assert.Contains("Stage.Height = source.Height", code, StringComparison.Ordinal);
-        Assert.Contains("DrawingSurface.Width = source.Width", code, StringComparison.Ordinal);
-        Assert.Contains("DrawingSurface.Height = source.Height", code, StringComparison.Ordinal);
+        Assert.Contains("Stage.Width = _sourceWidth", code, StringComparison.Ordinal);
+        Assert.Contains("Stage.Height = _sourceHeight", code, StringComparison.Ordinal);
+        Assert.Contains("DrawingSurface.Width = _sourceWidth", code, StringComparison.Ordinal);
+        Assert.Contains("DrawingSurface.Height = _sourceHeight", code, StringComparison.Ordinal);
+        // Pointer input is read straight from the drawing surface, never rescaled.
+        Assert.Contains("GetCurrentPoint(DrawingSurface).Position", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_preview_and_the_export_share_one_geometry_source()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var export = ReadFixture("AnnotationExport.cs.txt");
+
+        // Both sides derive every shape from Core. This is the structural fix for a
+        // preview and an export that had already drifted three ways.
+        Assert.Contains("AnnotationGeometry.ArrowOutline", code, StringComparison.Ordinal);
+        Assert.Contains("AnnotationGeometry.ArrowOutline", export, StringComparison.Ordinal);
+
+        // The arrow head is a filled polygon on both sides. A line cap would reintroduce
+        // the original bug: cap styles differ per renderer and scale with pen width in
+        // renderer-specific ways.
+        Assert.DoesNotContain("ArrowAnchor", export, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdjustableArrowCap", export, StringComparison.Ordinal);
+        Assert.DoesNotContain("PenLineCap.Triangle", code, StringComparison.Ordinal);
+
+        // Grid fitting snaps glyph advances to the pixel grid, making the same string a
+        // different width at a different scale.
+        // Qualified, so the comment explaining why grid fitting is wrong does not itself
+        // trip the assertion.
+        Assert.Contains("TextRenderingHint = TextRenderingHint.AntiAlias;", export, StringComparison.Ordinal);
+        Assert.DoesNotContain("TextRenderingHint.AntiAliasGridFit", export, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_filled_shape_is_filled_in_the_saved_file_too()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var export = ReadFixture("AnnotationExport.cs.txt");
+
+        // The old surface previewed a faint fill behind every rectangle and wrote none
+        // of it. Fill is now a property of the mark and both renderers honour it at the
+        // same alpha.
+        Assert.Contains("FillAlpha", export, StringComparison.Ordinal);
+        Assert.Contains("FillRectangle", export, StringComparison.Ordinal);
+        Assert.Contains("box.Filled", code, StringComparison.Ordinal);
+        Assert.Contains("box.Filled", export, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_source_is_decoded_once_and_never_read_back_from_the_file()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Saving moves a temporary file over the capture. The old surface had the same
+        // path open twice — as the Image source and again at save time — while doing it.
+        Assert.Contains("File.ReadAllBytes", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("new BitmapImage(new Uri", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("File.OpenRead", code, StringComparison.Ordinal);
+        // A malformed image makes GDI+ throw a bare OutOfMemoryException, which reads as
+        // a resource problem and gets misdiagnosed.
+        Assert.Contains("could not be opened as an image", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void No_state_colour_is_offered_as_ink()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+
+        // The first four swatches were the Ready and Recording tokens. This surface now
+        // spends green on the active tool, so a green mark would be indistinguishable
+        // from CursorPocket's own state. The swatches are built from AnnotationPalette,
+        // which excludes every state colour.
+        Assert.DoesNotContain("45E08C", xaml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("FF5F6B", xaml, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void The_toolbar_degrades_its_teaching_and_never_its_capability()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        var apply = Slice(code, "private void ApplyToolbarWidth", "// ------");
+        // At full width every tool shows its key. As the window narrows the keys go, then
+        // a label shortens — but no tool is hidden, there is no overflow menu, and the
+        // toolbar never scrolls.
+        Assert.Contains("Visibility.Collapsed", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsEnabled = false", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("Children.Remove", apply, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Mark_sizes_come_from_the_image_rather_than_a_constant()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // 32 px text is most of a small region capture and nearly invisible on a 4K
+        // shot. Every weight and size is derived from the image being annotated.
+        Assert.Contains("AnnotationMetrics.StrokeWidth", code, StringComparison.Ordinal);
+        Assert.Contains("AnnotationMetrics.TextSize", code, StringComparison.Ordinal);
+        Assert.Contains("AnnotationMetrics.HighlightWidth", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("FontSize = 32", code, StringComparison.Ordinal);
     }
 
     [Fact]

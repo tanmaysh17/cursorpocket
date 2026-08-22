@@ -239,6 +239,9 @@ public sealed partial class MainWindow : Window
             // rather than only after the annotation surface is dismissed.
             var copied = await CopyImageToClipboardAsync(path);
             var editor = new AnnotationWindow(record, path);
+            // Ctrl+C in the editor puts the marked-up image on the clipboard without
+            // closing, so the user can paste a work-in-progress and keep drawing.
+            editor.CopyRequested += async (_, _) => await CopyImageToClipboardAsync(path);
             editor.Saved += async (_, _) =>
             {
                 // Re-copy so the clipboard holds the marked-up image, not the original.

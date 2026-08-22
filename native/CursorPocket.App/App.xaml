@@ -310,6 +310,8 @@
                 <Setter Property="Width" Value="24" />
                 <Setter Property="Height" Value="24" />
                 <Setter Property="Stretch" Value="None" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="StrokeThickness" Value="2" />
                 <Setter Property="StrokeLineJoin" Value="Round" />
                 <Setter Property="StrokeStartLineCap" Value="Round" />
@@ -329,9 +331,31 @@
                 <Setter Property="Width" Value="24" />
                 <Setter Property="Height" Value="24" />
                 <Setter Property="Stretch" Value="None" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="Fill" Value="{StaticResource PocketInkDim}" />
             </Style>
 
+
+            <!--  The engraved key on a tool button. A bare mono letter, not a KeyCap
+                  chip: a chip inside a button double-nests interactive-looking elements,
+                  which is the trap command mode had to walk the visual tree to work
+                  around. An engraved letter is quieter and more instrument-like.  -->
+            <Style x:Key="ToolKeyText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="IsTextScaleFactorEnabled" Value="False" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,7,0" />
+            </Style>
+            <Style x:Key="ToolbarDivider" TargetType="Rectangle">
+                <Setter Property="Width" Value="1" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Margin" Value="8,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Fill" Value="{StaticResource PocketLine}" />
+            </Style>
 
             <!--  Icon geometry is written inline as Path.Data at each use site, not held
                   here as PathGeometry resources. WinUI only parses the abbreviated
