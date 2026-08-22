@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
+using CursorPocket.Core.Media;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
@@ -36,6 +38,11 @@ public sealed partial class AnnotationWindow : Window
 
     private const double TightToolbarWidth = 900;
 
+    /// <summary>Corner-radius step and ceiling for a box, in source pixels.</summary>
+    private const double CornerRadiusStep = 2;
+
+    private const double MaximumCornerRadius = 24;
+
     private readonly CaptureRecord _record;
     private readonly string _path;
     private readonly AnnotationHistory _history = new();
@@ -61,6 +68,29 @@ public sealed partial class AnnotationWindow : Window
     private bool _boxFilled;
     private bool _ellipseFilled;
     private bool _finished;
+
+    /// <summary>
+    /// Solid first, deliberately. Pixelation and blur both derive their output from the
+    /// pixels underneath, so for short text they are only partially destructive.
+    /// </summary>
+    private RedactStyle _redactStyle = RedactStyle.Solid;
+
+    private FocusMode _focusMode = FocusMode.Dim;
+    private FocusShape _focusShape = FocusShape.Rectangle;
+    private double _boxCornerRadius;
+    private double _loupeMagnification = 2;
+
+    /// <summary>The eyedropper's last sample, offered as a seventh ink once taken.</summary>
+    private AnnotationInk? _customInk;
+
+    private Button? _customSwatch;
+
+    /// <summary>
+    /// What to go back to after the eyedropper takes its one sample. Sampling is a
+    /// detour, not a mode: nobody wants to press I and then remember what they were
+    /// holding.
+    /// </summary>
+    private AnnotationTool _toolBeforeEyedrop = AnnotationTool.Arrow;
 
     // The gesture in flight. Strokes append to their visual as the pointer moves;
     // everything else rebuilds its visual from the mark, so what is on screen mid-drag
@@ -199,7 +229,10 @@ public sealed partial class AnnotationWindow : Window
 
     private void CollectToolButtons()
     {
-        _toolButtons.AddRange([SelectTool, ArrowTool, LineTool, PenTool, HighlightTool, BoxTool, EllipseTool, TextTool]);
+        _toolButtons.AddRange([
+            SelectTool, ArrowTool, LineTool, PenTool, HighlightTool, BoxTool, EllipseTool,
+            TextTool, StepTool, RedactTool, FocusTool, EyedropTool,
+        ]);
     }
 
     private void BuildSwatches()
@@ -240,6 +273,67 @@ public sealed partial class AnnotationWindow : Window
             _swatchButtons.Add(button);
             SwatchStrip.Children.Add(button);
         }
+
+        BuildCustomSwatch();
+    }
+
+    /// <summary>
+    /// The seventh swatch: whatever the eyedropper last sampled. Until something has been
+    /// sampled it shows a colour wheel, so the slot reads as "pick a colour" rather than
+    /// as an empty hole.
+    /// </summary>
+    private void BuildCustomSwatch()
+    {
+        var button = new Button
+        {
+            Style = (Style)Application.Current.Resources["PocketSwatchButton"],
+        };
+        ToolTipService.SetToolTip(button, "Sampled colour · 7 · press I to sample");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, "Sampled ink");
+
+        var stack = new StackPanel { Spacing = 1 };
+        var disc = new Microsoft.UI.Xaml.Shapes.Ellipse
+        {
+            Width = 16,
+            Height = 16,
+            Margin = new Thickness(0, 3, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Fill = WheelBrush(),
+        };
+        stack.Children.Add(disc);
+        stack.Children.Add(new TextBlock
+        {
+            Text = "7",
+            FontFamily = new FontFamily("Cascadia Mono"),
+            FontSize = 10,
+            IsTextScaleFactorEnabled = false,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Foreground = (Brush)Application.Current.Resources["PocketMuted"],
+        });
+
+        button.Content = stack;
+        button.Click += Swatch_Click;
+        _customSwatch = button;
+        _swatchButtons.Add(button);
+        SwatchStrip.Children.Add(button);
+    }
+
+    /// <summary>
+    /// The colour wheel, generated in Core and handed over as an image. WinUI ships no
+    /// conic or sweep gradient brush, and a fan of wedge-shaped Paths bands visibly at
+    /// this size.
+    /// </summary>
+    private static Brush WheelBrush()
+    {
+        const int size = 32;
+        var pixels = ConicWheel.Render(size);
+        var bitmap = new WriteableBitmap(size, size);
+        using (var stream = bitmap.PixelBuffer.AsStream())
+        {
+            stream.Write(pixels, 0, pixels.Length);
+        }
+
+        return new ImageBrush { ImageSource = bitmap, Stretch = Stretch.Fill };
     }
 
     private void ApplyToolState()
@@ -266,7 +360,9 @@ public sealed partial class AnnotationWindow : Window
 
         foreach (var button in _swatchButtons)
         {
-            var active = ReferenceEquals(button.Tag, _ink);
+            var active = ReferenceEquals(button, _customSwatch)
+                ? _customInk is not null && ReferenceEquals(_ink, _customInk)
+                : ReferenceEquals(button.Tag, _ink);
             // Deliberately not green: green already means the active tool here, and two
             // competing selection greens in one toolbar would make neither readable.
             button.BorderBrush = active ? (Brush)Application.Current.Resources["PocketInk"] : clear;
@@ -279,6 +375,18 @@ public sealed partial class AnnotationWindow : Window
 
         BoxFillGlyph.Visibility = _boxFilled ? Visibility.Visible : Visibility.Collapsed;
         EllipseFillGlyph.Visibility = _ellipseFilled ? Visibility.Visible : Visibility.Collapsed;
+
+        // Each variant shows its own glyph, so the toolbar states the mode without the
+        // user having to read the status strip to find out what D will do.
+        RedactSolidGlyph.Visibility = Show(_redactStyle == RedactStyle.Solid);
+        RedactPixelateGlyph.Visibility = Show(_redactStyle == RedactStyle.Pixelate);
+        RedactBlurGlyph.Visibility = Show(_redactStyle == RedactStyle.Blur);
+        FocusDimGlyph.Visibility = Show(_focusMode == FocusMode.Dim);
+        FocusLoupeGlyph.Visibility = Show(_focusMode == FocusMode.Loupe);
+
+        // The digit says which number is about to be placed, not a generic glyph.
+        StepNumberText.Text = MarkerNumbering.Next(_history.Visible).ToString();
+
         SizeStepText.Text = _size switch
         {
             AnnotationSizeStep.Small => "S",
@@ -287,6 +395,8 @@ public sealed partial class AnnotationWindow : Window
         };
 
         StatusToolText.Text = DescribeTool();
+
+        static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>
@@ -347,6 +457,18 @@ public sealed partial class AnnotationWindow : Window
         AnnotationTool.Box => _boxFilled ? "BOX · FILLED · R again for hollow" : "BOX · HOLLOW · R again for filled",
         AnnotationTool.Ellipse => _ellipseFilled ? "ELLIPSE · FILLED · E again for hollow" : "ELLIPSE · HOLLOW · E again for filled",
         AnnotationTool.Text => "TEXT · type, then Enter",
+        AnnotationTool.Step => $"STEP {MarkerNumbering.Next(_history.Visible)} · click to place",
+        AnnotationTool.Redact => _redactStyle switch
+        {
+            // Solid says "nothing recoverable" outright, because the other two are not.
+            RedactStyle.Solid => "REDACT · SOLID · nothing recoverable · D for pixelate",
+            RedactStyle.Pixelate => "REDACT · PIXELATE · partly recoverable · D for blur",
+            _ => "REDACT · BLUR · partly recoverable · D for solid",
+        },
+        AnnotationTool.Focus => _focusMode == FocusMode.Dim
+            ? "FOCUS · DIM OUTSIDE · S for loupe"
+            : $"FOCUS · LOUPE {_loupeMagnification:0.#}× {_focusShape.ToString().ToUpperInvariant()} · S to cycle",
+        AnnotationTool.Eyedrop => "EYEDROPPER · click the screenshot to take its colour",
         _ => _tool.ToString().ToUpperInvariant(),
     };
 
@@ -409,11 +531,42 @@ public sealed partial class AnnotationWindow : Window
                 case AnnotationTool.Ellipse:
                     _ellipseFilled = !_ellipseFilled;
                     break;
+                case AnnotationTool.Redact:
+                    _redactStyle = _redactStyle switch
+                    {
+                        RedactStyle.Solid => RedactStyle.Pixelate,
+                        RedactStyle.Pixelate => RedactStyle.Blur,
+                        _ => RedactStyle.Solid,
+                    };
+                    break;
+                case AnnotationTool.Focus:
+                    CycleFocus();
+                    break;
             }
+        }
+        else if (tool == AnnotationTool.Eyedrop)
+        {
+            // Remember what to come back to before the detour starts.
+            _toolBeforeEyedrop = _tool == AnnotationTool.Eyedrop ? AnnotationTool.Arrow : _tool;
         }
 
         _tool = tool;
         ApplyToolState();
+    }
+
+    /// <summary>
+    /// Dim, then the loupe in each of its three outlines — the same four-step cycle the
+    /// reference tool uses, reached by pressing S again rather than by a submenu.
+    /// </summary>
+    private void CycleFocus()
+    {
+        (_focusMode, _focusShape) = (_focusMode, _focusShape) switch
+        {
+            (FocusMode.Dim, _) => (FocusMode.Loupe, FocusShape.Ellipse),
+            (FocusMode.Loupe, FocusShape.Ellipse) => (FocusMode.Loupe, FocusShape.Rectangle),
+            (FocusMode.Loupe, FocusShape.Rectangle) => (FocusMode.Loupe, FocusShape.Rounded),
+            _ => (FocusMode.Dim, FocusShape.Rectangle),
+        };
     }
 
     private void Swatch_Click(object sender, RoutedEventArgs eventArgs)
@@ -425,14 +578,18 @@ public sealed partial class AnnotationWindow : Window
         }
     }
 
-    private void Size_Click(object sender, RoutedEventArgs eventArgs) => StepSize(1);
+    private void Size_Click(object sender, RoutedEventArgs eventArgs) => StepSize(1, cycle: true);
 
-    private void StepSize(int direction)
+    /// <summary>
+    /// Steps the mark size. The toolbar button cycles, because a single button has no
+    /// direction of its own; the bracket keys and the wheel do not, because a key that
+    /// wrapped from largest back to smallest would feel broken.
+    /// </summary>
+    private void StepSize(int direction, bool cycle)
     {
         var next = AnnotationMetrics.Step(_size, direction);
-        if (next == _size && direction > 0)
+        if (cycle && next == _size && direction > 0)
         {
-            // Cycle round from the toolbar button, which has no direction of its own.
             next = AnnotationSizeStep.Small;
         }
 
@@ -478,6 +635,27 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
+        if (_tool == AnnotationTool.Step)
+        {
+            // A marker is placed, not dragged: one click, one number.
+            Commit(new MarkerMark
+            {
+                Id = _history.AllocateId(),
+                Colour = _ink.Colour,
+                StrokeWidth = CurrentStrokeWidth,
+                Center = ToAnn(_press),
+                Number = MarkerNumbering.Next(_history.Visible),
+                Radius = MarkerNumbering.RadiusFor(_sourceWidth, _sourceHeight, _size),
+            });
+            return;
+        }
+
+        if (_tool == AnnotationTool.Eyedrop)
+        {
+            SampleColour(_press);
+            return;
+        }
+
         if (_tool == AnnotationTool.Select)
         {
             // Nothing to select yet: marks are not yet individually addressable. The
@@ -491,9 +669,14 @@ public sealed partial class AnnotationWindow : Window
         if (_tool is AnnotationTool.Pen or AnnotationTool.Highlight)
         {
             _strokePoints = [ToAnn(_press)];
+            var highlighting = _tool == AnnotationTool.Highlight;
             _strokeVisual = new Polyline
             {
-                Stroke = new SolidColorBrush(ToWinUi(StrokeColour())),
+                // Opaque brush plus element opacity, matching the committed visual: a
+                // translucent brush would make the stroke darken itself as it crossed
+                // over, and then jump when the commit replaced it with the correct one.
+                Stroke = new SolidColorBrush(ToWinUi(StrokeColour().WithAlpha(255))),
+                Opacity = highlighting ? AnnotationPalette.HighlightAlpha / 255d : 1,
                 StrokeThickness = CurrentStrokeWidth,
                 StrokeLineJoin = PenLineJoin.Round,
                 StrokeStartLineCap = PenLineCap.Round,
@@ -560,6 +743,71 @@ public sealed partial class AnnotationWindow : Window
     }
 
     /// <summary>
+    /// The wheel changes the active tool's size. Holding Alt changes the secondary knob
+    /// instead — a box's corner radius, or the loupe's magnification.
+    /// </summary>
+    private void DrawingSurface_PointerWheelChanged(object sender, PointerRoutedEventArgs eventArgs)
+    {
+        var delta = eventArgs.GetCurrentPoint(DrawingSurface).Properties.MouseWheelDelta;
+        if (delta == 0)
+        {
+            return;
+        }
+
+        eventArgs.Handled = true;
+        var direction = Math.Sign(delta);
+
+        if (!IsDown(VirtualKey.Menu))
+        {
+            StepSize(direction, cycle: false);
+            return;
+        }
+
+        switch (_tool)
+        {
+            case AnnotationTool.Box:
+                _boxCornerRadius = Math.Clamp(_boxCornerRadius + (direction * CornerRadiusStep), 0, MaximumCornerRadius);
+                StatusSizeText.Text = $"radius {_boxCornerRadius:0} px";
+                break;
+            case AnnotationTool.Focus when _focusMode == FocusMode.Loupe:
+                _loupeMagnification = Math.Clamp(_loupeMagnification + (direction * 0.25), 1.25, 6);
+                ApplyToolState();
+                break;
+            default:
+                StepSize(direction, cycle: false);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Samples the screenshot's own pixels and offers the result as the seventh ink.
+    /// Reads the decoded source, never the screen: sampling the screen would pick up
+    /// CursorPocket's own toolbar sitting over the image.
+    /// </summary>
+    private void SampleColour(Point point)
+    {
+        var x = Math.Clamp((int)Math.Round(point.X), 0, _sourceWidth - 1);
+        var y = Math.Clamp((int)Math.Round(point.Y), 0, _sourceHeight - 1);
+        var sampled = _source.GetPixel(x, y);
+        var colour = new AnnColor(255, sampled.R, sampled.G, sampled.B);
+
+        _customInk = new AnnotationInk("Sampled", $"#{sampled.R:X2}{sampled.G:X2}{sampled.B:X2}");
+        _ink = _customInk;
+
+        if (_customSwatch?.Content is StackPanel { Children: [Microsoft.UI.Xaml.Shapes.Ellipse disc, _] })
+        {
+            // The wheel was the "nothing sampled yet" state; a flat disc of the actual
+            // colour is more informative than a gradient once there is one to show.
+            disc.Fill = new SolidColorBrush(ToWinUi(colour));
+        }
+
+        // Sampling is a detour, not a mode.
+        _tool = _toolBeforeEyedrop;
+        ApplyToolState();
+        StatusToolText.Text = $"SAMPLED #{sampled.R:X2}{sampled.G:X2}{sampled.B:X2} · now inking with it";
+    }
+
+    /// <summary>
     /// Turns the gesture in flight into a mark. Every shape's geometry comes from
     /// AnnotationGeometry, which is also what the exporter uses, so the preview and the
     /// saved file cannot describe different shapes.
@@ -621,7 +869,49 @@ public sealed partial class AnnotationWindow : Window
                 var rect = CurrentRect(modifiers);
                 return rect.Width < 2 || rect.Height < 2
                     ? null
-                    : new BoxMark { Id = id, Colour = colour, StrokeWidth = width, Rect = rect, Filled = _boxFilled };
+                    : new BoxMark
+                    {
+                        Id = id,
+                        Colour = colour,
+                        StrokeWidth = width,
+                        Rect = rect,
+                        Filled = _boxFilled,
+                        CornerRadius = _boxCornerRadius,
+                    };
+            }
+
+            case AnnotationTool.Redact:
+            {
+                var rect = CurrentRect(modifiers);
+                // A redaction narrower than this cannot hold a block and is almost
+                // certainly a stray click rather than an intent to obscure something.
+                return rect.Width < 4 || rect.Height < 4
+                    ? null
+                    : new RedactMark
+                    {
+                        Id = id,
+                        Colour = colour,
+                        StrokeWidth = width,
+                        Rect = rect,
+                        Style = _redactStyle,
+                    };
+            }
+
+            case AnnotationTool.Focus:
+            {
+                var rect = CurrentRect(modifiers);
+                return rect.Width < 8 || rect.Height < 8
+                    ? null
+                    : new FocusMark
+                    {
+                        Id = id,
+                        Colour = colour,
+                        StrokeWidth = width,
+                        Rect = rect,
+                        Mode = _focusMode,
+                        Shape = _focusShape,
+                        Magnification = _loupeMagnification,
+                    };
             }
 
             case AnnotationTool.Ellipse:
@@ -659,6 +949,13 @@ public sealed partial class AnnotationWindow : Window
         PruneStaleVisuals();
         AddVisual(mark);
         ApplyHistoryState();
+
+        // One placement, then back to Select — and the new mark is deliberately not
+        // selected, because fresh handles on a just-drawn arrow are noise. The cost is
+        // that three arrows in a row means pressing A three times; the benefit is that a
+        // stray drag can never add a mark you did not mean to place.
+        _tool = AnnotationTool.Select;
+        ApplyToolState();
     }
 
     private void PruneStaleVisuals()
@@ -745,9 +1042,18 @@ public sealed partial class AnnotationWindow : Window
 
             case StrokeMark stroke:
             {
+                // A highlighter strokes opaque and composites once, through the element's
+                // own opacity. Stroking a translucent brush directly makes a single
+                // stroke darken itself everywhere it crosses over, which a highlighter
+                // never does on paper. The exporter does the same thing with a layer
+                // bitmap, so the two agree.
+                var opaque = stroke.Highlight
+                    ? new SolidColorBrush(ToWinUi(stroke.Colour.WithAlpha(255)))
+                    : brush;
                 var polyline = new Polyline
                 {
-                    Stroke = brush,
+                    Stroke = opaque,
+                    Opacity = stroke.Highlight ? stroke.Colour.A / 255d : 1,
                     StrokeThickness = stroke.StrokeWidth,
                     StrokeLineJoin = PenLineJoin.Round,
                     StrokeStartLineCap = PenLineCap.Round,
@@ -767,11 +1073,15 @@ public sealed partial class AnnotationWindow : Window
                 {
                     Width = box.Rect.Width,
                     Height = box.Rect.Height,
+                    RadiusX = box.CornerRadius,
+                    RadiusY = box.CornerRadius,
                     Stroke = brush,
                     StrokeThickness = box.StrokeWidth,
                     // Filled means filled in the file too. The old surface previewed a
                     // faint fill on every box and exported none of it.
-                    Fill = box.Filled ? new SolidColorBrush(ToWinUi(box.Colour.WithAlpha(64))) : null,
+                    Fill = box.Filled
+                        ? new SolidColorBrush(ToWinUi(box.Colour.WithAlpha(AnnotationExport.FillAlpha)))
+                        : null,
                 };
                 Canvas.SetLeft(rectangle, box.Rect.X);
                 Canvas.SetTop(rectangle, box.Rect.Y);
@@ -793,24 +1103,242 @@ public sealed partial class AnnotationWindow : Window
                 return shape;
             }
 
-            case TextMark text:
+            case MarkerMark marker:
             {
-                var label = new TextBlock
+                // A disc with the number inside it. The digit's colour comes from Core so
+                // it matches the exporter's choice: Citron needs dark digits and Violet
+                // needs light ones, and two renderers guessing separately disagree.
+                var host = new Grid { Width = marker.Radius * 2, Height = marker.Radius * 2 };
+                host.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Fill = brush });
+                host.Children.Add(new TextBlock
                 {
-                    Text = text.Text,
-                    FontSize = text.FontSize,
+                    Text = marker.Number.ToString(),
+                    FontSize = marker.Radius * (marker.Number > 9 ? 1.05 : 1.3),
                     FontFamily = new FontFamily(AnnotationExport.TextFamily),
-                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                    Foreground = brush,
-                };
-                Canvas.SetLeft(label, text.Anchor.X);
-                Canvas.SetTop(label, text.Anchor.Y);
-                return label;
+                    Foreground = new SolidColorBrush(ToWinUi(AnnotationPalette.OnInk(marker.Colour))),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    IsTextScaleFactorEnabled = false,
+                });
+                Canvas.SetLeft(host, marker.Center.X - marker.Radius);
+                Canvas.SetTop(host, marker.Center.Y - marker.Radius);
+                return host;
             }
+
+            case RedactMark redact:
+                return PatchImage(AnnotationPatches.Redact(_source, redact), redact.Rect, null, FocusShape.Rectangle);
+
+            case FocusMark { Mode: FocusMode.Loupe } loupe:
+                return PatchImage(
+                    AnnotationPatches.Loupe(_source, loupe),
+                    loupe.Rect,
+                    new SolidColorBrush(ToWinUi(loupe.Colour)),
+                    loupe.Shape,
+                    loupe.StrokeWidth);
+
+            case FocusMark dim:
+                return DimOutside(dim);
+
+            case TextMark text:
+                return TextVisual(text, brush);
 
             default:
                 throw new NotSupportedException($"No visual for {mark.GetType().Name}.");
         }
+    }
+
+    /// <summary>
+    /// Shows a pixel patch on the canvas, optionally clipped to a shape and ringed. The
+    /// patch itself comes from <see cref="AnnotationPatches"/>, which the exporter also
+    /// calls, so the pixels on screen are the pixels in the file.
+    /// </summary>
+    private UIElement PatchImage(
+        AnnotationPatches.Patch patch,
+        AnnRect rect,
+        Brush? ring,
+        FocusShape shape,
+        double ringWidth = 0)
+    {
+        var host = new Grid { Width = rect.Width, Height = rect.Height };
+
+        if (!patch.IsEmpty)
+        {
+            var bitmap = new WriteableBitmap(patch.Width, patch.Height);
+            using (var stream = bitmap.PixelBuffer.AsStream())
+            {
+                stream.Write(patch.Pixels, 0, patch.Pixels.Length);
+            }
+
+            // The patch is painted as a shape's fill rather than shown as an Image with a
+            // clip, because UIElement.Clip only accepts a RectangleGeometry — it cannot
+            // cut an ellipse. Filling the shape handles all three outlines the same way.
+            var canvasShape = ShapeFor(rect, shape);
+            canvasShape.Fill = new ImageBrush { ImageSource = bitmap, Stretch = Stretch.Fill };
+            host.Children.Add(canvasShape);
+        }
+
+        if (ring is not null)
+        {
+            var outline = ShapeFor(rect, shape);
+            outline.Stroke = ring;
+            outline.StrokeThickness = ringWidth;
+            host.Children.Add(outline);
+        }
+
+        Canvas.SetLeft(host, rect.X);
+        Canvas.SetTop(host, rect.Y);
+        return host;
+    }
+
+    /// <summary>
+    /// An unpainted shape the size of a focus region. The rounded radius comes from the
+    /// exporter's own helper, so a rounded region on screen is the same curve as the one
+    /// in the file.
+    /// </summary>
+    private static Microsoft.UI.Xaml.Shapes.Shape ShapeFor(AnnRect rect, FocusShape shape)
+    {
+        if (shape == FocusShape.Ellipse)
+        {
+            return new Microsoft.UI.Xaml.Shapes.Ellipse { Width = rect.Width, Height = rect.Height };
+        }
+
+        var radius = shape == FocusShape.Rounded
+            ? AnnotationExport.CornerRadiusFor(rect.Width, rect.Height)
+            : 0;
+        return new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Width = rect.Width,
+            Height = rect.Height,
+            RadiusX = radius,
+            RadiusY = radius,
+        };
+    }
+
+    /// <summary>
+    /// Darkens everything outside a region, by filling the whole image with one geometry
+    /// group whose even-odd rule punches the region out. This mirrors the exporter's
+    /// GraphicsPath with FillMode.Alternate exactly; four surrounding bands would leave
+    /// the corners of an elliptical or rounded region undimmed.
+    /// </summary>
+    private UIElement DimOutside(FocusMark focus)
+    {
+        var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
+        group.Children.Add(new RectangleGeometry
+        {
+            Rect = new Windows.Foundation.Rect(0, 0, _sourceWidth, _sourceHeight),
+        });
+        group.Children.Add(HoleGeometry(focus));
+
+        return new ShapePath
+        {
+            Data = group,
+            Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(AnnotationExport.DimAlpha, 0, 0, 0)),
+            IsHitTestVisible = false,
+        };
+    }
+
+    private static Geometry HoleGeometry(FocusMark focus)
+    {
+        var rect = new Windows.Foundation.Rect(focus.Rect.X, focus.Rect.Y, focus.Rect.Width, focus.Rect.Height);
+        switch (focus.Shape)
+        {
+            case FocusShape.Ellipse:
+                return new EllipseGeometry
+                {
+                    Center = new Point(focus.Rect.Center.X, focus.Rect.Center.Y),
+                    RadiusX = focus.Rect.Width / 2,
+                    RadiusY = focus.Rect.Height / 2,
+                };
+
+            case FocusShape.Rounded:
+                return RoundedGeometry(rect, AnnotationExport.CornerRadiusFor(rect.Width, rect.Height));
+
+            default:
+                return new RectangleGeometry { Rect = rect };
+        }
+    }
+
+    /// <summary>
+    /// A rounded rectangle as a Geometry. WinUI has no rounded RectangleGeometry, and the
+    /// abbreviated path syntax cannot be used here either — it only parses through
+    /// Path.Data's type converter — so the figure is assembled by hand.
+    /// </summary>
+    private static PathGeometry RoundedGeometry(Windows.Foundation.Rect rect, double radius)
+    {
+        var r = Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2);
+        var figure = new PathFigure
+        {
+            StartPoint = new Point(rect.Left + r, rect.Top),
+            IsClosed = true,
+            IsFilled = true,
+        };
+
+        var size = new Windows.Foundation.Size(r, r);
+        figure.Segments.Add(new LineSegment { Point = new Point(rect.Right - r, rect.Top) });
+        figure.Segments.Add(Arc(new Point(rect.Right, rect.Top + r), size));
+        figure.Segments.Add(new LineSegment { Point = new Point(rect.Right, rect.Bottom - r) });
+        figure.Segments.Add(Arc(new Point(rect.Right - r, rect.Bottom), size));
+        figure.Segments.Add(new LineSegment { Point = new Point(rect.Left + r, rect.Bottom) });
+        figure.Segments.Add(Arc(new Point(rect.Left, rect.Bottom - r), size));
+        figure.Segments.Add(new LineSegment { Point = new Point(rect.Left, rect.Top + r) });
+        figure.Segments.Add(Arc(new Point(rect.Left + r, rect.Top), size));
+
+        var geometry = new PathGeometry();
+        geometry.Figures.Add(figure);
+        return geometry;
+
+        static ArcSegment Arc(Point point, Windows.Foundation.Size size) => new()
+        {
+            Point = point,
+            Size = size,
+            SweepDirection = SweepDirection.Clockwise,
+        };
+    }
+
+    /// <summary>
+    /// Annotation text, with or without its readability pill. The pill is sized from the
+    /// exporter's own measurer rather than from WinUI's, so the pill on screen is the
+    /// same rectangle as the pill in the file — two text stacks measure differently, and
+    /// letting each size its own pill is how they drift.
+    /// </summary>
+    private static UIElement TextVisual(TextMark text, Brush brush)
+    {
+        var measured = AnnotationExport.MeasureText(text.Text, text.FontSize);
+        var pad = text.FontSize * AnnotationExport.PillPaddingFactor;
+
+        var label = new TextBlock
+        {
+            Text = text.Text,
+            FontSize = text.FontSize,
+            FontFamily = new FontFamily(AnnotationExport.TextFamily),
+            IsTextScaleFactorEnabled = false,
+        };
+
+        if (!text.Pill)
+        {
+            label.Foreground = brush;
+            label.Margin = new Thickness(pad, pad / 2, 0, 0);
+            var bare = new Grid();
+            bare.Children.Add(label);
+            Canvas.SetLeft(bare, text.Anchor.X);
+            Canvas.SetTop(bare, text.Anchor.Y);
+            return bare;
+        }
+
+        label.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 11, 16, 15));
+        var pill = new Border
+        {
+            Width = measured.Width + (pad * 2),
+            Height = measured.Height + pad,
+            Padding = new Thickness(pad, pad / 2, pad, pad / 2),
+            CornerRadius = new CornerRadius(
+                AnnotationExport.CornerRadiusFor(measured.Width + (pad * 2), measured.Height + pad)),
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(240, 242, 247, 244)),
+            Child = label,
+        };
+        Canvas.SetLeft(pill, text.Anchor.X);
+        Canvas.SetTop(pill, text.Anchor.Y);
+        return pill;
     }
 
     // ---------------------------------------------------------------------- text tool
@@ -945,15 +1473,17 @@ public sealed partial class AnnotationWindow : Window
         [
             ("Shift", "square, circle, or 45° line"),
             ("Alt", "centre the shape on the press point"),
+            ("Wheel", "smaller or larger marks"),
+            ("Alt+Wheel", "box corner radius · loupe zoom"),
             ("[  ]", "smaller or larger marks"),
-            ("1 – 6", "ink colour"),
         ];
         (string Key, string Meaning)[] right =
         [
-            ("Ctrl+Z", "undo"),
-            ("Ctrl+Y", "redo"),
+            ("1 – 6", "ink colour · 7 is the sampled one"),
+            ("Ctrl+Z", "undo · Ctrl+Y redoes"),
             ("Ctrl+C", "copy without saving"),
             ("Enter", "save · Esc keeps the original"),
+            ("F1", "hide this"),
         ];
 
         foreach (var (column, rows) in new[] { (KeySheetColumnOne, left), (KeySheetColumnTwo, right) })
@@ -988,8 +1518,8 @@ public sealed partial class AnnotationWindow : Window
         const int oemCloseBracket = 221;
         const int oemQuestion = 191;
 
-        Add((VirtualKey)oemOpenBracket, VirtualKeyModifiers.None, () => StepSize(-1));
-        Add((VirtualKey)oemCloseBracket, VirtualKeyModifiers.None, () => StepSize(1));
+        Add((VirtualKey)oemOpenBracket, VirtualKeyModifiers.None, () => StepSize(-1, cycle: false));
+        Add((VirtualKey)oemCloseBracket, VirtualKeyModifiers.None, () => StepSize(1, cycle: false));
         Add((VirtualKey)oemQuestion, VirtualKeyModifiers.Shift, ToggleKeySheet);
 
         void Add(VirtualKey key, VirtualKeyModifiers modifiers, Action action)
@@ -1037,6 +1567,10 @@ public sealed partial class AnnotationWindow : Window
             VirtualKey.R => AnnotationTool.Box,
             VirtualKey.E => AnnotationTool.Ellipse,
             VirtualKey.T => AnnotationTool.Text,
+            VirtualKey.N => AnnotationTool.Step,
+            VirtualKey.D => AnnotationTool.Redact,
+            VirtualKey.S => AnnotationTool.Focus,
+            VirtualKey.I => AnnotationTool.Eyedrop,
             _ => (AnnotationTool?)null,
         };
 
@@ -1056,8 +1590,27 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
-        var digit = sender.Key - VirtualKey.Number0;
-        var ink = AnnotationPalette.ForKey((int)digit);
+        var digit = (int)(sender.Key - VirtualKey.Number0);
+
+        // 7 is the eyedropper's slot. Until something has been sampled there is no ink
+        // there, so the key arms the eyedropper instead of selecting nothing.
+        if (digit == AnnotationPalette.Inks.Count + 1)
+        {
+            eventArgs.Handled = true;
+            if (_customInk is null)
+            {
+                SelectTool_(AnnotationTool.Eyedrop);
+            }
+            else
+            {
+                _ink = _customInk;
+                ApplyToolState();
+            }
+
+            return;
+        }
+
+        var ink = AnnotationPalette.ForKey(digit);
         if (ink is null)
         {
             return;

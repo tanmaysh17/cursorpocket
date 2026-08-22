@@ -95,6 +95,35 @@ public enum AnnotationSizeStep
     Large,
 }
 
+/// <summary>
+/// How a redaction obliterates its patch. Solid is the default because it is the only
+/// one that is not partially reversible — see <c>RedactRenderer</c>.
+/// </summary>
+public enum RedactStyle
+{
+    Solid,
+    Pixelate,
+    Blur,
+}
+
+/// <summary>
+/// What the focus tool does. Dim darkens everything outside the region so the eye lands
+/// inside it; Loupe additionally magnifies what is inside.
+/// </summary>
+public enum FocusMode
+{
+    Dim,
+    Loupe,
+}
+
+/// <summary>The outline a focus region is cut to.</summary>
+public enum FocusShape
+{
+    Rectangle,
+    Ellipse,
+    Rounded,
+}
+
 /// <summary>How a drag is being constrained while the pointer is down.</summary>
 [Flags]
 public enum DrawModifiers

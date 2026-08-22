@@ -13,6 +13,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.20" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>
 
@@ -28,6 +29,10 @@
   <ItemGroup>
     <Compile Include="..\CursorPocket.App\Services\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
     <Compile Include="..\CursorPocket.App\Services\GlobalHotkeyService.cs" Link="Interop\GlobalHotkeyService.cs" />
+    <!-- The annotation exporter has no WinUI dependency, so it can be compiled in and
+         tested against real exported pixels rather than only asserted as text. -->
+    <Compile Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Render\AnnotationExport.cs" />
+    <Compile Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Render\AnnotationPatches.cs" />
     <Compile Include="..\CursorPocket.App\Services\WindowContextService.cs" Link="Interop\WindowContextService.cs" />
   </ItemGroup>
 
@@ -38,6 +43,7 @@
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml" Link="Fixtures\RegionSelectorWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml.cs" Link="Fixtures\RegionSelectorWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml" Link="Fixtures\AnnotationWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Fixtures\AnnotationPatches.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Fixtures\AnnotationExport.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml.cs" Link="Fixtures\AnnotationWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\NativeCompanionWindow.cs" Link="Fixtures\NativeCompanionWindow.cs.txt" CopyToOutputDirectory="PreserveNewest" />

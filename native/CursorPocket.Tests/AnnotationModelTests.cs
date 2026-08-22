@@ -254,4 +254,50 @@ public sealed class AnnotationPaletteTests
     {
         Assert.Throws<FormatException>(() => AnnColor.FromHex("#ABC"));
     }
+
+    [Fact]
+    public void A_step_marker_number_stays_legible_on_every_ink()
+    {
+        var dark = new AnnColor(255, 11, 16, 15);
+        var light = new AnnColor(255, 242, 247, 244);
+
+        foreach (var ink in AnnotationPalette.Inks)
+        {
+            var on = AnnotationPalette.OnInk(ink.Colour);
+            Assert.True(on == dark || on == light, "the digit is only ever near-black or near-white");
+            Assert.True(Contrast(ink.Colour, on) > 3.5, $"{ink.Name} would not carry a readable digit");
+        }
+    }
+
+    [Fact]
+    public void Citron_takes_a_dark_digit_and_Signal_a_light_one()
+    {
+        // The case a plain channel mean gets wrong. Citron #F5E663 and Signal #F4353F
+        // have almost the same mean, but green carries most of perceived brightness and
+        // red carries little, so Rec. 709 luma puts them on opposite sides: 0.85 against
+        // 0.37. A mean would have given both the same digit and made one unreadable.
+        var citron = AnnotationPalette.Inks.Single(ink => ink.Name == "Citron");
+        var signal = AnnotationPalette.Inks.Single(ink => ink.Name == "Signal");
+
+        Assert.Equal(new AnnColor(255, 11, 16, 15), AnnotationPalette.OnInk(citron.Colour));
+        Assert.Equal(new AnnColor(255, 242, 247, 244), AnnotationPalette.OnInk(signal.Colour));
+    }
+
+    private static double Contrast(AnnColor a, AnnColor b)
+    {
+        var first = Relative(a);
+        var second = Relative(b);
+        var lighter = Math.Max(first, second);
+        var darker = Math.Min(first, second);
+        return (lighter + 0.05) / (darker + 0.05);
+
+        static double Relative(AnnColor colour) =>
+            (0.2126 * Channel(colour.R)) + (0.7152 * Channel(colour.G)) + (0.0722 * Channel(colour.B));
+
+        static double Channel(byte value)
+        {
+            var v = value / 255d;
+            return v <= 0.03928 ? v / 12.92 : Math.Pow((v + 0.055) / 1.055, 2.4);
+        }
+    }
 }

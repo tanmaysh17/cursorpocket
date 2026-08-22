@@ -83,6 +83,28 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
+    public void Every_declared_tool_key_is_actually_handled()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Declaring the accelerator in XAML and mapping the key in the handler are two
+        // separate edits, and forgetting the second one is silent: the accelerator fires,
+        // the switch returns null, and the key simply does nothing. Four tools shipped
+        // that way once. Read the declarations and insist each has a mapping.
+        var declared = System.Text.RegularExpressions.Regex
+            .Matches(xaml, "Key=\"(?<key>\\w+)\" Invoked=\"ToolAccelerator_Invoked\"")
+            .Select(match => match.Groups["key"].Value)
+            .ToArray();
+
+        Assert.NotEmpty(declared);
+        foreach (var key in declared)
+        {
+            Assert.Contains($"VirtualKey.{key} =>", code, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void Every_accelerator_stands_down_while_a_text_box_has_focus()
     {
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
@@ -173,11 +195,66 @@ public sealed class AnnotationContractTests
 
         // The old surface previewed a faint fill behind every rectangle and wrote none
         // of it. Fill is now a property of the mark and both renderers honour it at the
-        // same alpha.
+        // same alpha — the preview reads the constant off the exporter rather than
+        // carrying its own copy.
         Assert.Contains("FillAlpha", export, StringComparison.Ordinal);
-        Assert.Contains("FillRectangle", export, StringComparison.Ordinal);
+        Assert.Contains("AnnotationExport.FillAlpha", code, StringComparison.Ordinal);
         Assert.Contains("box.Filled", code, StringComparison.Ordinal);
         Assert.Contains("box.Filled", export, StringComparison.Ordinal);
+        // A rounded box has to round the same way whether it is being filled or stroked,
+        // which is why both come off one path.
+        Assert.Contains("box.CornerRadius", code, StringComparison.Ordinal);
+        Assert.Contains("box.CornerRadius", export, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_highlighter_composites_once_so_it_cannot_darken_itself()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var export = ReadFixture("AnnotationExport.cs.txt");
+
+        // Stroking a translucent brush or pen directly makes a single stroke darken
+        // itself everywhere it crosses over, which a highlighter never does on paper.
+        // The preview strokes opaque and sets the element's own opacity; the exporter
+        // strokes opaque into a layer and composites that once through a colour matrix.
+        Assert.Contains("WithAlpha(255)", code, StringComparison.Ordinal);
+        Assert.Contains("Opacity = stroke.Highlight", code, StringComparison.Ordinal);
+        Assert.Contains("WithAlpha(255)", export, StringComparison.Ordinal);
+        Assert.Contains("ColorMatrix", export, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Redaction_defaults_to_the_only_mode_that_is_not_recoverable()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Pixelation and blur both derive their output from the pixels underneath, so for
+        // short text they are only partially destructive. Solid replaces the pixels.
+        Assert.Contains("RedactStyle _redactStyle = RedactStyle.Solid", code, StringComparison.Ordinal);
+        // ...and the status strip says which of the two the user is currently getting.
+        Assert.Contains("nothing recoverable", code, StringComparison.Ordinal);
+        Assert.Contains("partly recoverable", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Pixel_marks_take_their_pixels_from_one_shared_sampler()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var export = ReadFixture("AnnotationExport.cs.txt");
+        var patches = ReadFixture("AnnotationPatches.cs.txt");
+
+        // Redaction and the loupe read the screenshot rather than drawing over it, so
+        // they are the one place where preview and export could disagree on pixels
+        // instead of geometry. Both call the same sampler.
+        Assert.Contains("AnnotationPatches.Redact", code, StringComparison.Ordinal);
+        Assert.Contains("AnnotationPatches.Redact", export, StringComparison.Ordinal);
+        Assert.Contains("AnnotationPatches.Loupe", code, StringComparison.Ordinal);
+        Assert.Contains("AnnotationPatches.Loupe", export, StringComparison.Ordinal);
+
+        // Always sampled from the untouched source, so a redaction cannot be weakened by
+        // a mark drawn underneath it and re-rendering stays idempotent.
+        Assert.Contains("ImageLockMode.ReadOnly", patches, StringComparison.Ordinal);
+        Assert.Contains("internal static Rectangle Snap", patches, StringComparison.Ordinal);
     }
 
     [Fact]

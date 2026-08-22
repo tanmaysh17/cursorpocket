@@ -22,12 +22,17 @@
             <KeyboardAccelerator Key="R" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="E" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="T" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="N" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="D" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="S" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="I" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number1" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number2" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number3" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number4" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number5" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number6" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number7" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Enter" Invoked="SaveAccelerator_Invoked" />
             <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="UndoAccelerator_Invoked" />
             <KeyboardAccelerator Key="Y" Modifiers="Control" Invoked="RedoAccelerator_Invoked" />
@@ -230,6 +235,101 @@
                         </Grid>
                     </Button>
 
+                    <Button
+                        x:Name="StepTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Step"
+                        AutomationProperties.Name="Step marker tool"
+                        ToolTipService.ToolTip="Step marker · N">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M12,4 A8,8 0 1 0 12,20 A8,8 0 1 0 12,4 Z" Style="{StaticResource PocketToolIconStroke}" />
+                                <!--  The digit says which number you are about to place,
+                                      not a generic glyph.  -->
+                                <TextBlock
+                                    x:Name="StepNumberText"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Cascadia Mono"
+                                    FontSize="10"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource PocketInkDim}"
+                                    IsTextScaleFactorEnabled="False"
+                                    Text="1" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="N" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="RedactTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Redact"
+                        AutomationProperties.Name="Redact tool"
+                        ToolTipService.ToolTip="Redact · D (press again to cycle solid, pixelate, blur)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="RedactSolidGlyph"
+                                    Data="M4,6 H20 V18 H4 Z"
+                                    Style="{StaticResource PocketToolIconFill}" />
+                                <!--  A checkerboard is a literal depiction of pixelation,
+                                      not decoration.  -->
+                                <Path
+                                    x:Name="RedactPixelateGlyph"
+                                    Data="M6,6 h4 v4 h-4 Z M14,6 h4 v4 h-4 Z M10,10 h4 v4 h-4 Z M6,14 h4 v4 h-4 Z M14,14 h4 v4 h-4 Z"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path
+                                    x:Name="RedactBlurGlyph"
+                                    Data="M4,6 H20 V18 H4 Z"
+                                    Opacity="0.3"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path Data="M4,6 H20 V18 H4 Z" Style="{StaticResource PocketToolIconStroke}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="D" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="FocusTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Focus"
+                        AutomationProperties.Name="Focus tool"
+                        ToolTipService.ToolTip="Focus · S (press again to cycle dim and loupe shapes)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="FocusDimGlyph"
+                                    Data="M3,5 H21 V19 H3 Z M8.5,9 H15.5 V15 H8.5 Z"
+                                    Style="{StaticResource PocketToolIconStroke}" />
+                                <Path
+                                    x:Name="FocusLoupeGlyph"
+                                    Data="M11,4 A6.5,6.5 0 1 0 11,17 A6.5,6.5 0 1 0 11,4 Z M15.8,15.8 L20.5,20.5"
+                                    Style="{StaticResource PocketToolIconStroke}"
+                                    Visibility="Collapsed" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="S" />
+                        </Grid>
+                    </Button>
+
                     <Rectangle Style="{StaticResource ToolbarDivider}" />
 
                     <!--  Swatches. The one place a colour is the content, so they stay
@@ -237,6 +337,22 @@
                           this surface green means the active tool, so a green mark would
                           read as CursorPocket talking rather than as the user's ink.  -->
                     <StackPanel x:Name="SwatchStrip" Orientation="Horizontal" Spacing="2" />
+                    <Button
+                        x:Name="EyedropTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Eyedrop"
+                        AutomationProperties.Name="Eyedropper"
+                        ToolTipService.ToolTip="Eyedropper · I (samples the screenshot)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M6,18 V15 L15,6 L18,9 L9,18 Z M16,5 L19,8" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="I" />
+                        </Grid>
+                    </Button>
 
                     <Rectangle Style="{StaticResource ToolbarDivider}" />
 
@@ -342,6 +458,7 @@
                                 <Canvas
                                     x:Name="DrawingSurface"
                                     Background="Transparent"
+                                    PointerWheelChanged="DrawingSurface_PointerWheelChanged"
                                     PointerExited="DrawingSurface_PointerExited"
                                     PointerMoved="DrawingSurface_PointerMoved"
                                     PointerPressed="DrawingSurface_PointerPressed"

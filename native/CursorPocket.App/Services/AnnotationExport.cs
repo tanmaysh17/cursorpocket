@@ -10,13 +10,12 @@ namespace CursorPocket_App;
 /// Flattens marks onto the source pixels and writes the PNG.
 /// </summary>
 /// <remarks>
-/// This is the second consumer of <see cref="AnnotationGeometry"/>; the annotation
-/// surface is the first. Neither computes a shape of its own, which is the whole point:
-/// the previous exporter derived its own geometry and had already drifted from the
-/// preview three ways — a pen-width-scaled arrow anchor where the preview drew a
-/// triangular cap, no fill where the preview showed one, and 6 px where the preview
-/// stroked 5. Every shape below is either a point list from Core or a rectangle the
-/// preview also draws from.
+/// This is the second consumer of <see cref="AnnotationGeometry"/> and
+/// <see cref="AnnotationPatches"/>; the annotation surface is the first. Neither computes
+/// a shape or samples a pixel of its own, which is the whole point: the previous exporter
+/// derived its own geometry and had already drifted from the preview three ways — a
+/// pen-width-scaled arrow anchor where the preview drew a triangular cap, no fill where
+/// the preview showed one, and 6 px where the preview stroked 5.
 /// </remarks>
 internal static class AnnotationExport
 {
@@ -30,11 +29,28 @@ internal static class AnnotationExport
     /// <summary>Alpha behind a filled box or ellipse. Matches the preview exactly.</summary>
     internal const byte FillAlpha = 64;
 
+    /// <summary>How dark the world outside a focus region goes.</summary>
+    internal const byte DimAlpha = 150;
+
+    /// <summary>Pill padding as a fraction of the text size, on each side.</summary>
+    internal const double PillPaddingFactor = 0.34;
+
     internal static void Flatten(Bitmap source, IReadOnlyList<AnnotationMark> marks, string destination)
     {
         using var bitmap = new Bitmap(source);
         using var graphics = Graphics.FromImage(bitmap);
+        Configure(graphics);
 
+        foreach (var mark in marks)
+        {
+            Draw(graphics, source, mark);
+        }
+
+        bitmap.Save(destination, ImageFormat.Png);
+    }
+
+    private static void Configure(Graphics graphics)
+    {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
         // Pixel units on the surface as well as on each font, so a scratch surface's DPI
@@ -44,16 +60,27 @@ internal static class AnnotationExport
         // pixel grid, which makes the same string a different width at a different
         // scale and would break the preview-matches-export property where it shows most.
         graphics.TextRenderingHint = TextRenderingHint.AntiAlias;
-
-        foreach (var mark in marks)
-        {
-            Draw(graphics, mark);
-        }
-
-        bitmap.Save(destination, ImageFormat.Png);
     }
 
-    private static void Draw(Graphics graphics, AnnotationMark mark)
+    /// <summary>
+    /// Measures annotation text. The preview sizes its readability pill from this too, so
+    /// the pill is the same rectangle on screen and in the file rather than two
+    /// independent guesses from two text stacks that measure differently.
+    /// </summary>
+    internal static SizeF MeasureText(string text, double fontSize)
+    {
+        using var scratch = new Bitmap(1, 1, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(scratch);
+        Configure(graphics);
+        using var font = new Font(TextFamily, (float)fontSize, FontStyle.Regular, GraphicsUnit.Pixel);
+        return graphics.MeasureString(text, font, PointF.Empty, StringFormat.GenericTypographic);
+    }
+
+    /// <summary>Corner radius for a rounded focus region or a text pill.</summary>
+    internal static double CornerRadiusFor(double width, double height) =>
+        Math.Clamp(Math.Min(width, height) * 0.16, 4, 48);
+
+    private static void Draw(Graphics graphics, Bitmap source, AnnotationMark mark)
     {
         var colour = ToGdi(mark.Colour);
 
@@ -79,6 +106,10 @@ internal static class AnnotationExport
                 break;
             }
 
+            case StrokeMark { Highlight: true } highlight:
+                DrawHighlight(graphics, highlight);
+                break;
+
             case StrokeMark stroke:
             {
                 if (stroke.Points.Count < 2)
@@ -94,14 +125,26 @@ internal static class AnnotationExport
             case BoxMark box:
             {
                 var rect = ToRect(box.Rect);
+                // One path for both fill and stroke, so a rounded box rounds identically
+                // whichever it is drawn with — and so Alt+wheel's radius reaches the file.
+                using var outline = new GraphicsPath();
+                if (box.CornerRadius > 0)
+                {
+                    AddRoundedRect(outline, rect, (float)box.CornerRadius);
+                }
+                else
+                {
+                    outline.AddRectangle(rect);
+                }
+
                 if (box.Filled)
                 {
                     using var fill = new SolidBrush(ToGdi(box.Colour.WithAlpha(FillAlpha)));
-                    graphics.FillRectangle(fill, rect);
+                    graphics.FillPath(fill, outline);
                 }
 
                 using var pen = RoundPen(colour, box.StrokeWidth);
-                graphics.DrawRectangle(pen, rect.X, rect.Y, rect.Width, rect.Height);
+                graphics.DrawPath(pen, outline);
                 break;
             }
 
@@ -119,22 +162,234 @@ internal static class AnnotationExport
                 break;
             }
 
-            case TextMark text:
+            case MarkerMark marker:
+                DrawMarker(graphics, marker);
+                break;
+
+            case RedactMark redact:
             {
-                using var font = new Font(TextFamily, (float)text.FontSize, FontStyle.Regular, GraphicsUnit.Pixel);
-                using var brush = new SolidBrush(colour);
-                // GenericTypographic for drawing as well as measuring: the default format
-                // adds invisible padding around the string, which shows up as text that
-                // sits a few pixels off from where the preview put it.
-                graphics.DrawString(
-                    text.Text,
-                    font,
-                    brush,
-                    new PointF((float)text.Anchor.X, (float)text.Anchor.Y),
-                    StringFormat.GenericTypographic);
+                var patch = AnnotationPatches.Redact(source, redact);
+                if (patch.IsEmpty)
+                {
+                    return;
+                }
+
+                var target = AnnotationPatches.Snap(redact.Rect, source.Width, source.Height);
+                using var image = AnnotationPatches.ToBitmap(patch);
+                // NearestNeighbor and no smoothing: the patch is already exactly the size
+                // of its target, and any resampling here would soften the very block
+                // edges the redaction depends on.
+                var previous = graphics.InterpolationMode;
+                graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+                graphics.DrawImage(image, target);
+                graphics.InterpolationMode = previous;
                 break;
             }
+
+            case FocusMark focus:
+                DrawFocus(graphics, source, focus);
+                break;
+
+            case TextMark text:
+                DrawText(graphics, text);
+                break;
         }
+    }
+
+    /// <summary>
+    /// A highlighter stroke is drawn opaque into its own layer and composited once at its
+    /// alpha. Stroking a translucent pen directly makes a single stroke darken itself
+    /// everywhere it crosses over, which is what a highlighter never does on paper.
+    /// </summary>
+    private static void DrawHighlight(Graphics graphics, StrokeMark stroke)
+    {
+        if (stroke.Points.Count < 2)
+        {
+            return;
+        }
+
+        var points = ToPoints(stroke.Points);
+        var pad = (float)stroke.StrokeWidth + 2;
+        var minX = points.Min(p => p.X) - pad;
+        var minY = points.Min(p => p.Y) - pad;
+        var maxX = points.Max(p => p.X) + pad;
+        var maxY = points.Max(p => p.Y) + pad;
+
+        // Only the stroke's own bounds, not the whole image: a full-size scratch per
+        // highlighter stroke would be 33 MB on a 4K capture.
+        var width = (int)Math.Ceiling(maxX - minX);
+        var height = (int)Math.Ceiling(maxY - minY);
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        using var layer = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using (var layerGraphics = Graphics.FromImage(layer))
+        {
+            layerGraphics.SmoothingMode = SmoothingMode.AntiAlias;
+            layerGraphics.TranslateTransform(-minX, -minY);
+            using var pen = RoundPen(ToGdi(stroke.Colour.WithAlpha(255)), stroke.StrokeWidth);
+            layerGraphics.DrawLines(pen, points);
+        }
+
+        using var attributes = new ImageAttributes();
+        attributes.SetColorMatrix(new ColorMatrix { Matrix33 = stroke.Colour.A / 255f });
+        graphics.DrawImage(
+            layer,
+            new Rectangle((int)Math.Floor(minX), (int)Math.Floor(minY), width, height),
+            0,
+            0,
+            width,
+            height,
+            GraphicsUnit.Pixel,
+            attributes);
+    }
+
+    private static void DrawMarker(Graphics graphics, MarkerMark marker)
+    {
+        var radius = (float)marker.Radius;
+        var bounds = new RectangleF(
+            (float)(marker.Center.X - radius),
+            (float)(marker.Center.Y - radius),
+            radius * 2,
+            radius * 2);
+
+        using var fill = new SolidBrush(ToGdi(marker.Colour));
+        graphics.FillEllipse(fill, bounds);
+
+        var label = marker.Number.ToString();
+        // Sized so a two-digit marker still fits inside its disc.
+        var fontSize = radius * (label.Length > 1 ? 1.05f : 1.3f);
+        using var font = new Font(TextFamily, fontSize, FontStyle.Regular, GraphicsUnit.Pixel);
+        using var text = new SolidBrush(ToGdi(AnnotationPalette.OnInk(marker.Colour)));
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+        };
+        graphics.DrawString(label, font, text, bounds, format);
+    }
+
+    private static void DrawFocus(Graphics graphics, Bitmap source, FocusMark focus)
+    {
+        var rect = ToRect(focus.Rect);
+        if (rect.Width <= 0 || rect.Height <= 0)
+        {
+            return;
+        }
+
+        if (focus.Mode == FocusMode.Loupe)
+        {
+            var patch = AnnotationPatches.Loupe(source, focus);
+            if (patch.IsEmpty)
+            {
+                return;
+            }
+
+            var target = AnnotationPatches.Snap(focus.Rect, source.Width, source.Height);
+            using var image = AnnotationPatches.ToBitmap(patch);
+            using var clip = ShapePath(rect, focus.Shape);
+            var saved = graphics.Save();
+            graphics.SetClip(clip);
+            graphics.DrawImage(image, target);
+            graphics.Restore(saved);
+
+            using var ring = RoundPen(ToGdi(focus.Colour), focus.StrokeWidth);
+            graphics.DrawPath(ring, clip);
+            return;
+        }
+
+        // Dim everything outside the shape: one path holding the whole image and the
+        // shape, filled with the alternate rule so the shape punches a hole.
+        using var mask = new GraphicsPath { FillMode = FillMode.Alternate };
+        mask.AddRectangle(new RectangleF(0, 0, source.Width, source.Height));
+        using (var inner = ShapePath(rect, focus.Shape))
+        {
+            mask.AddPath(inner, connect: false);
+        }
+
+        using var dim = new SolidBrush(Color.FromArgb(DimAlpha, 0, 0, 0));
+        graphics.FillPath(dim, mask);
+    }
+
+    private static void DrawText(Graphics graphics, TextMark text)
+    {
+        var size = MeasureText(text.Text, text.FontSize);
+        var pad = (float)(text.FontSize * PillPaddingFactor);
+        var origin = new PointF((float)text.Anchor.X, (float)text.Anchor.Y);
+
+        using var font = new Font(TextFamily, (float)text.FontSize, FontStyle.Regular, GraphicsUnit.Pixel);
+
+        if (text.Pill)
+        {
+            var pill = new RectangleF(origin.X, origin.Y, size.Width + (pad * 2), size.Height + pad);
+            using var background = new GraphicsPath();
+            AddRoundedRect(background, pill, (float)CornerRadiusFor(pill.Width, pill.Height));
+            using var fill = new SolidBrush(Color.FromArgb(240, 242, 247, 244));
+            graphics.FillPath(fill, background);
+            using var ink = new SolidBrush(Color.FromArgb(255, 11, 16, 15));
+            graphics.DrawString(
+                text.Text,
+                font,
+                ink,
+                new PointF(origin.X + pad, origin.Y + (pad / 2)),
+                StringFormat.GenericTypographic);
+            return;
+        }
+
+        // No pill, so the glyphs need their own separation from whatever is underneath.
+        using var outline = new GraphicsPath();
+        outline.AddString(
+            text.Text,
+            new FontFamily(TextFamily),
+            (int)FontStyle.Regular,
+            (float)text.FontSize,
+            new PointF(origin.X + pad, origin.Y + (pad / 2)),
+            StringFormat.GenericTypographic);
+        using var halo = new Pen(Color.FromArgb(140, 0, 0, 0), (float)Math.Max(2, text.FontSize * 0.09))
+        {
+            LineJoin = LineJoin.Round,
+        };
+        graphics.DrawPath(halo, outline);
+        using var glyphs = new SolidBrush(ToGdi(text.Colour));
+        graphics.FillPath(glyphs, outline);
+    }
+
+    private static GraphicsPath ShapePath(RectangleF rect, FocusShape shape)
+    {
+        var path = new GraphicsPath();
+        switch (shape)
+        {
+            case FocusShape.Ellipse:
+                path.AddEllipse(rect);
+                break;
+            case FocusShape.Rounded:
+                AddRoundedRect(path, rect, (float)CornerRadiusFor(rect.Width, rect.Height));
+                break;
+            default:
+                path.AddRectangle(rect);
+                break;
+        }
+
+        return path;
+    }
+
+    private static void AddRoundedRect(GraphicsPath path, RectangleF rect, float radius)
+    {
+        var r = Math.Min(radius, Math.Min(rect.Width, rect.Height) / 2);
+        if (r <= 0)
+        {
+            path.AddRectangle(rect);
+            return;
+        }
+
+        var d = r * 2;
+        path.AddArc(rect.X, rect.Y, d, d, 180, 90);
+        path.AddArc(rect.Right - d, rect.Y, d, d, 270, 90);
+        path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+        path.AddArc(rect.X, rect.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
     }
 
     private static Pen RoundPen(Color colour, double width) => new(colour, (float)width)

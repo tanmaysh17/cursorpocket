@@ -45,6 +45,30 @@ public static class PixelResizer
         }
     }
 
+    /// <summary>
+    /// Nearest-neighbour upscale from a packed BGRA buffer to a packed destination of any
+    /// larger size. Pixelation needs this rather than the bilinear path: interpolating
+    /// between block averages smears the block edges back into a soft blur, which is both
+    /// less legible as a deliberate redaction and easier to partially undo.
+    /// </summary>
+    public static void UpscaleNearest(ReadOnlySpan<byte> source, int sourceWidth, int sourceHeight, Span<byte> destination, int destWidth, int destHeight)
+    {
+        for (var y = 0; y < destHeight; y++)
+        {
+            var sy = Math.Min(sourceHeight - 1, y * sourceHeight / Math.Max(1, destHeight));
+            for (var x = 0; x < destWidth; x++)
+            {
+                var sx = Math.Min(sourceWidth - 1, x * sourceWidth / Math.Max(1, destWidth));
+                var sourceIndex = ((sy * sourceWidth) + sx) * 4;
+                var destIndex = ((y * destWidth) + x) * 4;
+                destination[destIndex] = source[sourceIndex];
+                destination[destIndex + 1] = source[sourceIndex + 1];
+                destination[destIndex + 2] = source[sourceIndex + 2];
+                destination[destIndex + 3] = 255;
+            }
+        }
+    }
+
     /// <summary>Bilinear upscale from a packed BGRA buffer to a packed destination of any larger size.</summary>
     public static void UpscaleBilinear(ReadOnlySpan<byte> source, int sourceWidth, int sourceHeight, Span<byte> destination, int destWidth, int destHeight)
     {

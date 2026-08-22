@@ -63,6 +63,40 @@ public sealed record EllipseMark : AnnotationMark
     public bool Filled { get; init; }
 }
 
+/// <summary>
+/// A numbered step marker. The number is stored on the mark, never derived at render
+/// time: undoing marker 3 and drawing a new one has to produce 3 again, and a text mark
+/// that says "see 2" must not be invalidated by deleting marker 1.
+/// </summary>
+public sealed record MarkerMark : AnnotationMark
+{
+    public required AnnPoint Center { get; init; }
+    public required int Number { get; init; }
+    public required double Radius { get; init; }
+}
+
+/// <summary>
+/// A patch of the screenshot obliterated in place. Carries its own style so a document
+/// can mix a solid block over a password with a pixelated face.
+/// </summary>
+public sealed record RedactMark : AnnotationMark
+{
+    public required AnnRect Rect { get; init; }
+    public RedactStyle Style { get; init; } = RedactStyle.Solid;
+}
+
+/// <summary>
+/// Draws the eye to one region: everything outside it is dimmed, and in Loupe mode the
+/// inside is also magnified.
+/// </summary>
+public sealed record FocusMark : AnnotationMark
+{
+    public required AnnRect Rect { get; init; }
+    public FocusMode Mode { get; init; } = FocusMode.Dim;
+    public FocusShape Shape { get; init; } = FocusShape.Rectangle;
+    public double Magnification { get; init; } = 2;
+}
+
 public sealed record TextMark : AnnotationMark
 {
     public required AnnPoint Anchor { get; init; }

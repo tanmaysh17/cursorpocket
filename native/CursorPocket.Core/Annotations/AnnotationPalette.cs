@@ -33,6 +33,22 @@ public static class AnnotationPalette
     /// </summary>
     public static AnnotationInk? ForKey(int digit) =>
         digit >= 1 && digit <= InkSet.Length ? InkSet[digit - 1] : null;
+
+    /// <summary>
+    /// Whichever of near-black and near-white reads on top of this ink. Shared so the
+    /// number inside a step marker is the same colour on screen as in the file — Citron
+    /// needs dark digits and Violet needs light ones, and two renderers guessing
+    /// separately is how they end up disagreeing.
+    /// </summary>
+    public static AnnColor OnInk(AnnColor ink)
+    {
+        // Rec. 709 luma, which tracks perceived brightness far better than a plain mean:
+        // a mean calls Citron and Cyan similarly bright when one clearly is not.
+        var luma = ((0.2126 * ink.R) + (0.7152 * ink.G) + (0.0722 * ink.B)) / 255;
+        return luma > 0.55
+            ? new AnnColor(255, 11, 16, 15)
+            : new AnnColor(255, 242, 247, 244);
+    }
 }
 
 /// <summary>One ink: the name shown to the user and the colour it paints.</summary>
