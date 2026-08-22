@@ -27,6 +27,9 @@
             <KeyboardAccelerator Key="S" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="I" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="O" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="X" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="B" Invoked="BackdropAccelerator_Invoked" />
             <KeyboardAccelerator
                 Key="C"
                 Modifiers="Control,Shift"
@@ -336,6 +339,66 @@
                     </Button>
 
                     <Button
+                        x:Name="CropTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Crop"
+                        AutomationProperties.Name="Crop tool"
+                        ToolTipService.ToolTip="Crop · C (drag to set, drag a corner to adjust)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M8,3 V16 H21 M3,8 H16 V21" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="C" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="CutTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Cut"
+                        AutomationProperties.Name="Cut tool"
+                        ToolTipService.ToolTip="Cut out a strip · X (drag across the rows to remove)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M4,7 H20 M4,17 H20" Style="{StaticResource PocketToolIconStroke}" />
+                                <Path Data="M3,12 H21" Style="{StaticResource PocketToolIconStrokeHair}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="X" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="BackdropTool"
+                        Click="Backdrop_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        AutomationProperties.Name="Backdrop"
+                        ToolTipService.ToolTip="Backdrop · B (press again to cycle)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M3.5,4.5 H20.5 V19.5 H3.5 Z" Style="{StaticResource PocketToolIconStroke}" />
+                                <Path
+                                    x:Name="BackdropInnerGlyph"
+                                    Data="M7,8 H17.5 V16.5 H7 Z"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="B" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
                         x:Name="ReadTextTool"
                         Click="Tool_Click"
                         Style="{StaticResource PocketToolButton}"
@@ -430,6 +493,14 @@
                         ToolTipService.ToolTip="Copy without saving · Ctrl+C">
                         <FontIcon FontSize="14" Glyph="&#xE8C8;" />
                     </Button>
+                    <!--  Destructive, so it sits at the opposite end of the row from
+                          Save rather than beside it.  -->
+                    <Button
+                        x:Name="DiscardButton"
+                        Click="Discard_Click"
+                        Content="Discard"
+                        Style="{StaticResource PocketDangerButton}"
+                        ToolTipService.ToolTip="Throw the screenshot away — it goes to the Recycle Bin" />
                     <Button
                         x:Name="KeepOriginalButton"
                         Click="Cancel_Click"
@@ -479,11 +550,18 @@
                         IsTabStop="True"
                         UseSystemFocusVisuals="False">
                         <Viewbox Stretch="Uniform">
-                            <Grid x:Name="Stage">
+                            <!--  The backdrop is previewed by actually framing the stage,
+                                  so what is on screen is the shape that will be exported
+                                  rather than a description of it.  -->
+                            <Border x:Name="BackdropFrame" Padding="0">
+                                <Grid x:Name="Stage">
                                 <Image x:Name="ScreenshotImage" Stretch="Fill" />
                                 <!--  Recognised word boxes, above the marks and below the
                                       pointer. Informational blue is reserved for text and
                                       link captures, and OCR is a text capture.  -->
+                                <!--  Crop and cut are shown as a dim mask with handles and seams: the export
+                                      applies them, the preview states what will be kept.  -->
+                                <Canvas x:Name="GeometryOverlay" IsHitTestVisible="False" />
                                 <Canvas x:Name="OcrOverlay" IsHitTestVisible="False" />
                                 <Canvas
                                     x:Name="DrawingSurface"
@@ -493,7 +571,8 @@
                                     PointerMoved="DrawingSurface_PointerMoved"
                                     PointerPressed="DrawingSurface_PointerPressed"
                                     PointerReleased="DrawingSurface_PointerReleased" />
-                            </Grid>
+                                </Grid>
+                            </Border>
                         </Viewbox>
                     </ContentControl>
                 </Border>
@@ -608,6 +687,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock
                     x:Name="StatusToolText"
@@ -615,18 +695,25 @@
                     Style="{StaticResource PocketMetaText}"
                     TextTrimming="CharacterEllipsis" />
                 <TextBlock
-                    x:Name="StatusSizeText"
+                    x:Name="StatusOutputText"
                     Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource PocketInkDim}"
+                    Style="{StaticResource PocketNumericText}"
+                    ToolTipService.ToolTip="The size the saved image will be" />
+                <TextBlock
+                    x:Name="StatusSizeText"
+                    Grid.Column="2"
                     VerticalAlignment="Center"
                     Foreground="{StaticResource PocketInk}"
                     Style="{StaticResource PocketNumericText}" />
                 <TextBlock
                     x:Name="StatusPointerText"
-                    Grid.Column="2"
+                    Grid.Column="3"
                     VerticalAlignment="Center"
                     Style="{StaticResource PocketNumericText}" />
                 <Button
-                    Grid.Column="3"
+                    Grid.Column="4"
                     Click="KeySheet_Click"
                     Style="{StaticResource PocketGhostButton}"
                     AutomationProperties.Name="Show the keyboard shortcuts"

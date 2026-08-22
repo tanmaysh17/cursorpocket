@@ -1,4 +1,5 @@
 using System.Drawing;
+using CursorPocket.Core.Annotations;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using Microsoft.UI.Windowing;
@@ -242,6 +243,8 @@ public sealed partial class MainWindow : Window
             // Ctrl+C in the editor puts the marked-up image on the clipboard without
             // closing, so the user can paste a work-in-progress and keep drawing.
             editor.CopyRequested += async (_, _) => await CopyImageToClipboardAsync(path);
+            editor.SavedAsNewCapture += async (_, temporary) => await RegisterEditedCopyAsync(temporary);
+            editor.Discarded += async (_, _) => await DiscardCaptureAsync(record, path);
             editor.Saved += async (_, _) =>
             {
                 // Re-copy so the clipboard holds the marked-up image, not the original.
@@ -260,6 +263,68 @@ public sealed partial class MainWindow : Window
         catch (Exception error)
         {
             ShowError("Screenshot failed", error.Message);
+        }
+    }
+
+    /// <summary>
+    /// Takes a finished PNG the editor wrote and makes it a capture of its own, leaving the
+    /// one it was edited from untouched. Used when a crop, a cut, or a backdrop changed the
+    /// dimensions: those delete pixels, and a save overwrites rather than deleting, so
+    /// there would be no Recycle Bin copy to fall back on.
+    /// </summary>
+    private async Task RegisterEditedCopyAsync(string temporaryPath)
+    {
+        try
+        {
+            var reservation = App.Services.CaptureStore.Reserve(CaptureKind.Screenshot, ".png");
+            File.Move(temporaryPath, reservation.AbsolutePath, true);
+
+            int width;
+            int height;
+            using (var bitmap = new System.Drawing.Bitmap(reservation.AbsolutePath))
+            {
+                width = bitmap.Width;
+                height = bitmap.Height;
+            }
+
+            var record = await App.Services.CaptureStore.RegisterExistingAsync(
+                CaptureKind.Screenshot,
+                reservation.AbsolutePath,
+                $"Screenshot · {width} × {height}",
+                new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
+
+            var copied = await CopyImageToClipboardAsync(reservation.AbsolutePath);
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied));
+        }
+        catch (Exception error)
+        {
+            ShowError("The edited copy was not saved", error.Message);
+        }
+    }
+
+    /// <summary>
+    /// Throws a capture away: to the Recycle Bin, never a hard delete, and out of the
+    /// index. The file was already written before the editor opened, so discarding is the
+    /// only way to undo having taken the shot at all.
+    /// </summary>
+    private async Task DiscardCaptureAsync(CaptureRecord record, string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                    path,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+            }
+
+            await App.Services.CaptureStore.RemoveFromIndexAsync(record.Id);
+            ShowError("Screenshot discarded", "It is in the Recycle Bin if you want it back.");
+        }
+        catch (Exception error)
+        {
+            ShowError("The screenshot was not discarded", error.Message);
         }
     }
 

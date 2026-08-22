@@ -35,18 +35,125 @@ internal static class AnnotationExport
     /// <summary>Pill padding as a fraction of the text size, on each side.</summary>
     internal const double PillPaddingFactor = 0.34;
 
-    internal static void Flatten(Bitmap source, IReadOnlyList<AnnotationMark> marks, string destination)
-    {
-        using var bitmap = new Bitmap(source);
-        using var graphics = Graphics.FromImage(bitmap);
-        Configure(graphics);
+    internal static void Flatten(Bitmap source, IReadOnlyList<AnnotationMark> marks, string destination) =>
+        Flatten(source, marks, null, destination);
 
-        foreach (var mark in marks)
+    /// <summary>
+    /// Composites the marks over the screenshot and writes the PNG, applying the crop,
+    /// cuts, and backdrop if there are any.
+    /// </summary>
+    /// <remarks>
+    /// Marks are composited first, in source coordinates, and the transform is then a pure
+    /// blit of the result. That is deliberately simpler than mapping each mark's geometry
+    /// through the transform, and it is also the more defensible behaviour: cutting a strip
+    /// out cuts the annotated image, exactly like cutting a printed page. A box straddling
+    /// a seam loses its middle and closes up, rather than staying tall and spanning a join.
+    /// </remarks>
+    internal static void Flatten(
+        Bitmap source,
+        IReadOnlyList<AnnotationMark> marks,
+        DocumentTransform? transform,
+        string destination)
+    {
+        using var composited = new Bitmap(source);
+        using (var graphics = Graphics.FromImage(composited))
         {
-            Draw(graphics, source, mark);
+            Configure(graphics);
+            foreach (var mark in marks)
+            {
+                Draw(graphics, source, mark);
+            }
         }
 
-        bitmap.Save(destination, ImageFormat.Png);
+        if (transform is null || transform.IsIdentity)
+        {
+            composited.Save(destination, ImageFormat.Png);
+            return;
+        }
+
+        using var output = new Bitmap(transform.OutputWidth, transform.OutputHeight, PixelFormat.Format32bppArgb);
+        using var target = Graphics.FromImage(output);
+        Configure(target);
+
+        if (transform.Backdrop.IsEnabled)
+        {
+            DrawBackdrop(target, transform);
+        }
+
+        var content = new RectangleF(
+            transform.Backdrop.IsEnabled ? (float)transform.Backdrop.Padding : 0,
+            transform.Backdrop.IsEnabled ? (float)transform.Backdrop.Padding : 0,
+            transform.ContentWidth,
+            transform.ContentHeight);
+
+        // Rounding the screenshot's own corners is what makes a backdrop read as a
+        // presentation frame rather than as an accidental margin.
+        var saved = target.Save();
+        if (transform.Backdrop is { IsEnabled: true, CornerRadius: > 0 })
+        {
+            using var rounded = new GraphicsPath();
+            AddRoundedRect(rounded, content, (float)transform.Backdrop.CornerRadius);
+            target.SetClip(rounded);
+        }
+
+        foreach (var slab in transform.Slabs())
+        {
+            target.DrawImage(
+                composited,
+                new RectangleF((float)slab.Output.X, (float)slab.Output.Y, (float)slab.Output.Width, (float)slab.Output.Height),
+                new RectangleF((float)slab.Source.X, (float)slab.Source.Y, (float)slab.Source.Width, (float)slab.Source.Height),
+                GraphicsUnit.Pixel);
+        }
+
+        target.Restore(saved);
+        output.Save(destination, ImageFormat.Png);
+    }
+
+    /// <summary>
+    /// Fills the backdrop and lays a soft shadow under the image. The shadow is a stack of
+    /// rounded rectangles rather than a real blur, which is cheap and, at this size,
+    /// indistinguishable.
+    /// </summary>
+    private static void DrawBackdrop(Graphics graphics, DocumentTransform transform)
+    {
+        var backdrop = transform.Backdrop;
+        var whole = new RectangleF(0, 0, transform.OutputWidth, transform.OutputHeight);
+
+        using (var fill = new SolidBrush(ToGdi(backdrop.Fill)))
+        {
+            graphics.FillRectangle(fill, whole);
+        }
+
+        if (backdrop.ShadowBlur <= 0 || backdrop.ShadowOpacity <= 0)
+        {
+            return;
+        }
+
+        var content = new RectangleF(
+            (float)backdrop.Padding,
+            (float)backdrop.Padding,
+            transform.ContentWidth,
+            transform.ContentHeight);
+
+        const int layers = 8;
+        for (var layer = layers; layer >= 1; layer--)
+        {
+            var spread = (float)(backdrop.ShadowBlur * layer / layers);
+            var alpha = (int)Math.Round(backdrop.ShadowOpacity * 255 / layers / 1.6);
+            if (alpha <= 0)
+            {
+                continue;
+            }
+
+            var rect = RectangleF.Inflate(content, spread, spread);
+            // Offset downward, so the image reads as lifted off the backdrop rather than
+            // floating in the middle of a halo.
+            rect.Offset(0, spread * 0.35f);
+            using var path = new GraphicsPath();
+            AddRoundedRect(path, rect, (float)(backdrop.CornerRadius + spread));
+            using var brush = new SolidBrush(Color.FromArgb(Math.Clamp(alpha, 1, 255), 0, 0, 0));
+            graphics.FillPath(brush, path);
+        }
     }
 
     private static void Configure(Graphics graphics)

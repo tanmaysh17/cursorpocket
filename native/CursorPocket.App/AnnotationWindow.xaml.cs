@@ -45,6 +45,7 @@ public sealed partial class AnnotationWindow : Window
 
     private readonly CaptureRecord _record;
     private readonly string _path;
+    private readonly AnnotationOrigin _origin;
     private readonly AnnotationHistory _history = new();
     private readonly Dictionary<int, UIElement> _visuals = [];
     private readonly List<Button> _toolButtons = [];
@@ -98,6 +99,9 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private AnnotationTool _toolBeforeEyedrop = AnnotationTool.Arrow;
 
+    /// <summary>Which crop corner is being dragged, if any. Its opposite is the anchor.</summary>
+    private (int Dx, int Dy)? _cropCorner;
+
     // The gesture in flight. Strokes append to their visual as the pointer moves;
     // everything else rebuilds its visual from the mark, so what is on screen mid-drag
     // is exactly what redo would rebuild.
@@ -108,9 +112,15 @@ public sealed partial class AnnotationWindow : Window
     private Polyline? _strokeVisual;
 
     public AnnotationWindow(CaptureRecord record, string path)
+        : this(record, path, AnnotationOrigin.FreshCapture)
+    {
+    }
+
+    public AnnotationWindow(CaptureRecord record, string path, AnnotationOrigin origin)
     {
         _record = record;
         _path = path;
+        _origin = origin;
         InitializeComponent();
 
         ExtendsContentIntoTitleBar = true;
@@ -144,6 +154,7 @@ public sealed partial class AnnotationWindow : Window
         CollectToolButtons();
         ApplyToolState();
         ApplyHistoryState();
+        RefreshGeometry();
 
         Root.SizeChanged += (_, args) => ApplyToolbarWidth(args.NewSize.Width);
 
@@ -187,6 +198,15 @@ public sealed partial class AnnotationWindow : Window
 
     /// <summary>Raised when the marked-up image should be put on the clipboard as-is.</summary>
     public event EventHandler? CopyRequested;
+
+    /// <summary>
+    /// Raised with the path of a finished PNG that should become a capture of its own,
+    /// leaving the original alone. Used when the geometry changed.
+    /// </summary>
+    public event EventHandler<string>? SavedAsNewCapture;
+
+    /// <summary>Raised when the user throws the capture away entirely.</summary>
+    public event EventHandler? Discarded;
 
     // ---------------------------------------------------------------- source loading
 
@@ -237,7 +257,8 @@ public sealed partial class AnnotationWindow : Window
     {
         _toolButtons.AddRange([
             SelectTool, ArrowTool, LineTool, PenTool, HighlightTool, BoxTool, EllipseTool,
-            TextTool, StepTool, RedactTool, FocusTool, ReadTextTool, EyedropTool,
+            TextTool, StepTool, RedactTool, FocusTool, CropTool, CutTool, ReadTextTool,
+            EyedropTool,
         ]);
 
         // Degrade, never fail. OCR is a Windows language pack the user may simply not
@@ -400,6 +421,10 @@ public sealed partial class AnnotationWindow : Window
         RedactBlurGlyph.Visibility = Show(_redactStyle == RedactStyle.Blur);
         FocusDimGlyph.Visibility = Show(_focusMode == FocusMode.Dim);
         FocusLoupeGlyph.Visibility = Show(_focusMode == FocusMode.Loupe);
+        BackdropInnerGlyph.Visibility = Show(Geometry.BackdropIndex != 0);
+        ToolTipService.SetToolTip(
+            BackdropTool,
+            $"Backdrop · B · {AnnotationBackdrops.At(Geometry.BackdropIndex).Name}");
 
         // The digit says which number is about to be placed, not a generic glyph.
         StepNumberText.Text = MarkerNumbering.Next(_history.Visible).ToString();
@@ -486,6 +511,10 @@ public sealed partial class AnnotationWindow : Window
             ? "FOCUS · DIM OUTSIDE · S for loupe"
             : $"FOCUS · LOUPE {_loupeMagnification:0.#}× {_focusShape.ToString().ToUpperInvariant()} · S to cycle",
         AnnotationTool.Eyedrop => "EYEDROPPER · click the screenshot to take its colour",
+        AnnotationTool.Crop => Geometry.Crop is null
+            ? "CROP · drag what to keep"
+            : "CROP · drag a corner to adjust · Ctrl+Z undoes",
+        AnnotationTool.Cut => "CUT · drag across the rows to remove them",
         AnnotationTool.ReadText => _ocr is null
             ? "READ TEXT · no Windows OCR language pack installed"
             : "READ TEXT · click for the whole shot, drag for a region",
@@ -683,6 +712,9 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
+        // Grabbing a corner adjusts the existing crop; pressing anywhere else replaces it.
+        _cropCorner = _tool == AnnotationTool.Crop ? CropCornerAt(_press) : null;
+
         DrawingSurface.CapturePointer(eventArgs.Pointer);
         _dragging = true;
 
@@ -742,6 +774,37 @@ public sealed partial class AnnotationWindow : Window
         _current = eventArgs.GetCurrentPoint(DrawingSurface).Position;
         DrawingSurface.ReleasePointerCapture(eventArgs.Pointer);
         ClearPreview();
+
+        if (_tool == AnnotationTool.Crop)
+        {
+            var frame = PendingCrop();
+            _cropCorner = null;
+            if (frame.Width >= 8 && frame.Height >= 8)
+            {
+                ApplyGeometry(Geometry with { Crop = frame });
+                RefreshGeometry();
+                ApplyHistoryState();
+            }
+
+            ApplyToolState();
+            UpdateReadout();
+            return;
+        }
+
+        if (_tool == AnnotationTool.Cut)
+        {
+            var band = PendingCut();
+            if (band.Length >= 4)
+            {
+                ApplyGeometry(Geometry with { Cuts = [.. Geometry.Cuts, band] });
+                RefreshGeometry();
+                ApplyHistoryState();
+            }
+
+            ApplyToolState();
+            UpdateReadout();
+            return;
+        }
 
         if (_tool == AnnotationTool.ReadText)
         {
@@ -1014,6 +1077,42 @@ public sealed partial class AnnotationWindow : Window
     private void RebuildPreview()
     {
         ClearPreview();
+
+        if (_tool == AnnotationTool.Crop)
+        {
+            var frame = PendingCrop();
+            var outline = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                Stroke = (Brush)Application.Current.Resources["PocketGreen"],
+                StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
+            };
+            Canvas.SetLeft(outline, frame.X);
+            Canvas.SetTop(outline, frame.Y);
+            _preview = outline;
+            DrawingSurface.Children.Add(_preview);
+            return;
+        }
+
+        if (_tool == AnnotationTool.Cut)
+        {
+            var band = PendingCut();
+            var strip = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = _sourceWidth,
+                Height = band.Length,
+                Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(AnnotationExport.DimAlpha, 0, 0, 0)),
+                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
+                StrokeDashArray = [4, 3],
+            };
+            Canvas.SetLeft(strip, 0);
+            Canvas.SetTop(strip, band.Offset);
+            _preview = strip;
+            DrawingSurface.Children.Add(_preview);
+            return;
+        }
 
         if (_tool == AnnotationTool.ReadText)
         {
@@ -1393,6 +1492,213 @@ public sealed partial class AnnotationWindow : Window
         return pill;
     }
 
+    // ----------------------------------------------------------------- image geometry
+
+    /// <summary>The crop, cuts, and backdrop currently in effect.</summary>
+    private DocumentGeometry Geometry => _history.Geometry;
+
+    /// <summary>
+    /// The transform from screenshot pixels to exported pixels. Rebuilt on demand rather
+    /// than cached, because it is derived entirely from the history and a stale copy would
+    /// be worse than a cheap rebuild.
+    /// </summary>
+    private DocumentTransform BuildTransform()
+    {
+        var geometry = Geometry;
+        var crop = geometry.Crop;
+        var content = crop ?? new AnnRect(0, 0, _sourceWidth, _sourceHeight);
+        // Backdrop padding scales off the cropped image, not the original: a preset should
+        // look the same whether the shot was cropped first or not.
+        var backdrop = AnnotationBackdrops.Resolve(
+            geometry.BackdropIndex,
+            (int)Math.Round(content.Width),
+            (int)Math.Round(content.Height));
+        return DocumentTransform.Build(_sourceWidth, _sourceHeight, crop, geometry.Cuts, backdrop);
+    }
+
+    private void ApplyGeometry(DocumentGeometry geometry) =>
+        _history.Add(new GeometryStep(geometry));
+
+    /// <summary>
+    /// The crop the current drag describes. Dragging a corner moves that corner and holds
+    /// its opposite; dragging anywhere else draws a fresh rectangle.
+    /// </summary>
+    private AnnRect PendingCrop()
+    {
+        if (_cropCorner is { } corner && Geometry.Crop is { } existing)
+        {
+            var anchorX = corner.Dx < 0 ? existing.Right : existing.X;
+            var anchorY = corner.Dy < 0 ? existing.Bottom : existing.Y;
+            return AnnotationGeometry.ClampToImage(
+                AnnRect.FromCorners(new AnnPoint(anchorX, anchorY), ToAnn(_current)),
+                _sourceWidth,
+                _sourceHeight);
+        }
+
+        return CurrentRect(CurrentModifiers());
+    }
+
+    /// <summary>The strip the current drag would remove, as whole source rows.</summary>
+    private CutBand PendingCut()
+    {
+        var top = Math.Clamp(Math.Min(_press.Y, _current.Y), 0, _sourceHeight);
+        var bottom = Math.Clamp(Math.Max(_press.Y, _current.Y), 0, _sourceHeight);
+        return new CutBand(top, Math.Max(0, bottom - top));
+    }
+
+    private void Backdrop_Click(object sender, RoutedEventArgs eventArgs) => CycleBackdrop();
+
+    private void BackdropAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!ToolKeysActive())
+        {
+            return;
+        }
+
+        eventArgs.Handled = true;
+        CycleBackdrop();
+    }
+
+    private void CycleBackdrop()
+    {
+        var geometry = Geometry;
+        ApplyGeometry(geometry with { BackdropIndex = AnnotationBackdrops.Next(geometry.BackdropIndex) });
+        RefreshGeometry();
+    }
+
+    /// <summary>
+    /// Redraws everything that depends on the geometry: the backdrop frame, the crop mask
+    /// and its handles, the cut seams, and the size readout.
+    /// </summary>
+    private void RefreshGeometry()
+    {
+        var transform = BuildTransform();
+        var geometry = Geometry;
+
+        // The backdrop is previewed by framing the stage, so the preview is the shape.
+        var backdrop = transform.Backdrop;
+        if (backdrop.IsEnabled)
+        {
+            BackdropFrame.Padding = new Thickness(backdrop.Padding);
+            BackdropFrame.Background = new SolidColorBrush(ToWinUi(backdrop.Fill));
+        }
+        else
+        {
+            BackdropFrame.Padding = new Thickness(0);
+            BackdropFrame.Background = null;
+        }
+
+        GeometryOverlay.Children.Clear();
+        var dim = new SolidColorBrush(Windows.UI.Color.FromArgb(AnnotationExport.DimAlpha, 0, 0, 0));
+        var green = (Brush)Application.Current.Resources["PocketGreen"];
+
+        if (geometry.Crop is { } crop)
+        {
+            // Everything outside the crop is dimmed rather than hidden, so the user can
+            // still see what they are giving up and drag a corner back out to reclaim it.
+            AddBand(0, 0, _sourceWidth, crop.Y);
+            AddBand(0, crop.Bottom, _sourceWidth, _sourceHeight - crop.Bottom);
+            AddBand(0, crop.Y, crop.X, crop.Height);
+            AddBand(crop.Right, crop.Y, _sourceWidth - crop.Right, crop.Height);
+
+            // Corner brackets rather than filled squares: the same green as the active
+            // tool, told apart by form, which is the rule the app already uses for
+            // capture kinds.
+            var arm = Math.Max(12, Math.Min(crop.Width, crop.Height) * 0.08);
+            var weight = Math.Max(2, arm / 6);
+            AddBracket(crop.X, crop.Y, arm, weight, 1, 1);
+            AddBracket(crop.Right, crop.Y, arm, weight, -1, 1);
+            AddBracket(crop.X, crop.Bottom, arm, weight, 1, -1);
+            AddBracket(crop.Right, crop.Bottom, arm, weight, -1, -1);
+        }
+
+        foreach (var band in geometry.Cuts)
+        {
+            var strip = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = _sourceWidth,
+                Height = band.Length,
+                Fill = dim,
+                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                StrokeThickness = Math.Max(1, _sourceHeight * 0.002),
+                StrokeDashArray = [4, 3],
+            };
+            Canvas.SetLeft(strip, 0);
+            Canvas.SetTop(strip, band.Offset);
+            GeometryOverlay.Children.Add(strip);
+        }
+
+        UpdateOutputReadout(transform);
+        return;
+
+        void AddBand(double x, double y, double width, double height)
+        {
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            var band = new Microsoft.UI.Xaml.Shapes.Rectangle { Width = width, Height = height, Fill = dim };
+            Canvas.SetLeft(band, x);
+            Canvas.SetTop(band, y);
+            GeometryOverlay.Children.Add(band);
+        }
+
+        void AddBracket(double x, double y, double arm, double weight, int dx, int dy)
+        {
+            Add(x - (dx < 0 ? arm : 0), y - (dy < 0 ? weight : 0), arm, weight);
+            Add(x - (dx < 0 ? weight : 0), y - (dy < 0 ? arm : 0), weight, arm);
+
+            void Add(double bx, double by, double bw, double bh)
+            {
+                var bar = new Microsoft.UI.Xaml.Shapes.Rectangle { Width = bw, Height = bh, Fill = green };
+                Canvas.SetLeft(bar, bx);
+                Canvas.SetTop(bar, by);
+                GeometryOverlay.Children.Add(bar);
+            }
+        }
+    }
+
+    /// <summary>
+    /// States the size the export will actually be, which is the whole reason the readout
+    /// claims native pixels.
+    /// </summary>
+    private void UpdateOutputReadout(DocumentTransform transform)
+    {
+        StatusOutputText.Text = transform.IsIdentity
+            ? $"{_sourceWidth} × {_sourceHeight}"
+            : $"→ {transform.OutputWidth} × {transform.OutputHeight}";
+    }
+
+    /// <summary>
+    /// The corner of the crop nearest a point, if the point is close enough to grab it.
+    /// Dragging a corner adjusts the crop instead of replacing it.
+    /// </summary>
+    private (int Dx, int Dy)? CropCornerAt(Point point)
+    {
+        if (Geometry.Crop is not { } crop)
+        {
+            return null;
+        }
+
+        var tolerance = Math.Max(12, Math.Min(_sourceWidth, _sourceHeight) * 0.03);
+        foreach (var (x, y, dx, dy) in new[]
+                 {
+                     (crop.X, crop.Y, -1, -1),
+                     (crop.Right, crop.Y, 1, -1),
+                     (crop.X, crop.Bottom, -1, 1),
+                     (crop.Right, crop.Bottom, 1, 1),
+                 })
+        {
+            if (Math.Abs(point.X - x) <= tolerance && Math.Abs(point.Y - y) <= tolerance)
+            {
+                return (dx, dy);
+            }
+        }
+
+        return null;
+    }
+
     // ---------------------------------------------------------------------------- OCR
 
     /// <summary>
@@ -1601,32 +1907,51 @@ public sealed partial class AnnotationWindow : Window
 
     private void Undo()
     {
-        var mark = _history.Undo();
-        if (mark is null)
+        switch (_history.Undo())
         {
-            return;
-        }
+            case null:
+                return;
 
-        if (_visuals.Remove(mark.Id, out var visual))
-        {
-            DrawingSurface.Children.Remove(visual);
+            case MarkStep mark:
+                if (_visuals.Remove(mark.Mark.Id, out var visual))
+                {
+                    DrawingSurface.Children.Remove(visual);
+                }
+
+                break;
+
+            case GeometryStep:
+                // Nothing to unwind by hand: the geometry is read back off the history, so
+                // stepping the index back is the undo.
+                RefreshGeometry();
+                break;
         }
 
         ApplyHistoryState();
+        ApplyToolState();
     }
 
     private void Redo()
     {
-        var mark = _history.Redo();
-        if (mark is null)
+        switch (_history.Redo())
         {
-            return;
+            case null:
+                return;
+
+            case MarkStep mark:
+                // Rebuilt from the mark, which is only possible because a mark is data
+                // rather than a live element. The old surface could not offer redo for
+                // exactly that reason.
+                AddVisual(mark.Mark);
+                break;
+
+            case GeometryStep:
+                RefreshGeometry();
+                break;
         }
 
-        // Rebuilt from the mark, which is only possible because a mark is data rather
-        // than a live element. The old surface could not offer redo for that reason.
-        AddVisual(mark);
         ApplyHistoryState();
+        ApplyToolState();
     }
 
     // ----------------------------------------------------------------------- key sheet
@@ -1745,6 +2070,8 @@ public sealed partial class AnnotationWindow : Window
             VirtualKey.S => AnnotationTool.Focus,
             VirtualKey.I => AnnotationTool.Eyedrop,
             VirtualKey.O => AnnotationTool.ReadText,
+            VirtualKey.C => AnnotationTool.Crop,
+            VirtualKey.X => AnnotationTool.Cut,
             _ => (AnnotationTool?)null,
         };
 
@@ -1877,12 +2204,31 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
-        var temporary = _path + ".annotated.png";
         var marks = _history.Visible;
-        await Task.Run(() => AnnotationExport.Flatten(_source, marks, temporary));
-        File.Move(temporary, _path, true);
+        var transform = BuildTransform();
+        var mode = SaveTarget.For(
+            marksChanged: _history.HasVisibleMarks,
+            geometryChanged: !Geometry.IsUntouched,
+            origin: _origin);
+
+        var temporary = _path + ".annotated.png";
+        await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
+
+        if (mode == AnnotationSaveMode.Overwrite)
+        {
+            File.Move(temporary, _path, true);
+            _finished = true;
+            Saved?.Invoke(this, EventArgs.Empty);
+            Close();
+            return;
+        }
+
+        // A geometry change deletes pixels, and a save overwrites rather than deleting, so
+        // there would be no Recycle Bin copy to go back to. The original capture is left
+        // exactly as it was and the result becomes a capture of its own, which also means
+        // its width, height, and preview text are right without repairing the index.
         _finished = true;
-        Saved?.Invoke(this, EventArgs.Empty);
+        SavedAsNewCapture?.Invoke(this, temporary);
         Close();
     }
 
@@ -1895,13 +2241,26 @@ public sealed partial class AnnotationWindow : Window
     {
         var temporary = _path + ".annotated.png";
         var marks = _history.Visible;
-        await Task.Run(() => AnnotationExport.Flatten(_source, marks, temporary));
+        var transform = BuildTransform();
+        await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
         File.Move(temporary, _path, true);
         CopyRequested?.Invoke(this, EventArgs.Empty);
         StatusToolText.Text = "COPIED · the marked-up image is on the clipboard";
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
+
+    /// <summary>
+    /// Throws the whole capture away. The file was written before this window opened, so
+    /// this is the only way to undo having taken the shot — and it goes to the Recycle
+    /// Bin, never a hard delete.
+    /// </summary>
+    private void Discard_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        _finished = true;
+        Discarded?.Invoke(this, EventArgs.Empty);
+        Close();
+    }
 
     /// <summary>
     /// Escape returns an armed creation tool to Select, and closes once already in

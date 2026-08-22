@@ -255,7 +255,131 @@ public sealed class AnnotationExportTests
         Assert.Equal(before, Snapshot(source));
     }
 
+    [Fact]
+    public void A_crop_exports_only_the_kept_rectangle()
+    {
+        // Left half white, right half black.
+        using var source = Halves(200, 100);
+        var transform = DocumentTransform.Build(200, 100, new AnnRect(100, 0, 100, 100), [], BackdropSettings.None);
+
+        using var result = Export(source, [], transform);
+
+        Assert.Equal(100, result.Width);
+        Assert.Equal(100, result.Height);
+        // Only the black half survived, so nothing in the output is white.
+        Assert.False(IsWhite(result.GetPixel(5, 50)));
+        Assert.False(IsWhite(result.GetPixel(95, 50)));
+    }
+
+    [Fact]
+    public void A_cut_removes_its_rows_and_closes_the_gap()
+    {
+        // Three bands: white, black, white.
+        using var source = Bands(80, 120);
+        var transform = DocumentTransform.Build(80, 120, null, [new CutBand(40, 40)], BackdropSettings.None);
+
+        using var result = Export(source, [], transform);
+
+        Assert.Equal(80, result.Width);
+        Assert.Equal(80, result.Height);
+        // The black middle is gone: both halves of the output are the white bands, now
+        // adjacent.
+        Assert.True(IsWhite(result.GetPixel(40, 10)));
+        Assert.True(IsWhite(result.GetPixel(40, 70)));
+        // And no row of the output is the removed black.
+        var blackRows = 0;
+        for (var y = 0; y < result.Height; y++)
+        {
+            if (result.GetPixel(40, y).R < 60)
+            {
+                blackRows++;
+            }
+        }
+
+        Assert.True(blackRows <= 2, $"{blackRows} rows of the cut band survived");
+    }
+
+    [Fact]
+    public void A_backdrop_pads_the_export_and_fills_the_margin()
+    {
+        using var source = Flat(100, 60, Color.White);
+        var fill = new AnnColor(255, 11, 16, 15);
+        var transform = DocumentTransform.Build(100, 60, null, [], new BackdropSettings(20, 0, fill, 0, 0));
+
+        using var result = Export(source, [], transform);
+
+        Assert.Equal(140, result.Width);
+        Assert.Equal(100, result.Height);
+        // The margin is the backdrop colour...
+        Assert.True(Close(result.GetPixel(5, 5), fill), "the backdrop margin is not filled");
+        // ...and the screenshot still sits inside it, untouched.
+        Assert.True(IsWhite(result.GetPixel(70, 50)), "the image was not placed on the backdrop");
+    }
+
+    [Fact]
+    public void A_mark_is_carried_through_a_crop_rather_than_left_behind()
+    {
+        using var source = Flat(200, 200, Color.White);
+        var ink = AnnotationPalette.Inks[0].Colour;
+        var box = new BoxMark
+        {
+            Id = 1,
+            Colour = ink,
+            StrokeWidth = 6,
+            Rect = new AnnRect(120, 120, 50, 50),
+            Filled = true,
+        };
+        var transform = DocumentTransform.Build(200, 200, new AnnRect(100, 100, 100, 100), [], BackdropSettings.None);
+
+        using var result = Export(source, [box], transform);
+
+        Assert.Equal(100, result.Width);
+        // The box was drawn at 120,120 in source space and the crop starts at 100,100, so
+        // it lands at 20,20 in the output. Marks are composited before the transform is
+        // applied, which is what makes this fall out rather than needing per-mark mapping.
+        Assert.False(IsWhite(result.GetPixel(45, 45)), "the mark did not survive the crop");
+        Assert.True(IsWhite(result.GetPixel(5, 5)), "something bled outside the mark");
+    }
+
+    [Fact]
+    public void An_identity_transform_exports_the_same_bytes_as_no_transform()
+    {
+        using var source = Striped(90, 50);
+        var ink = AnnotationPalette.Inks[0].Colour;
+        AnnotationMark[] marks = [Box(ink, filled: true)];
+        var identity = DocumentTransform.Build(90, 50, null, [], BackdropSettings.None);
+
+        var withTransform = ExportBytes(source, marks, identity);
+        var without = ExportBytes(source, marks, null);
+
+        // The transform path must be a no-op when there is nothing to transform, or every
+        // ordinary save would take the slower route and risk differing.
+        Assert.Equal(without, withTransform);
+    }
+
     // ------------------------------------------------------------------------ helpers
+
+    /// <summary>Left half white, right half black.</summary>
+    private static Bitmap Halves(int width, int height)
+    {
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.White);
+        using var black = new SolidBrush(Color.Black);
+        graphics.FillRectangle(black, width / 2, 0, width - (width / 2), height);
+        return bitmap;
+    }
+
+    /// <summary>White, black, white horizontal bands of equal height.</summary>
+    private static Bitmap Bands(int width, int height)
+    {
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.White);
+        using var black = new SolidBrush(Color.Black);
+        graphics.FillRectangle(black, 0, height / 3, width, height / 3);
+        return bitmap;
+    }
 
     private static RedactMark Redact(Bitmap source, AnnRect rect, RedactStyle style, AnnColor ink) => new()
     {
@@ -275,12 +399,15 @@ public sealed class AnnotationExportTests
         Filled = filled,
     };
 
-    private static Bitmap Export(Bitmap source, IReadOnlyList<AnnotationMark> marks)
+    private static Bitmap Export(Bitmap source, IReadOnlyList<AnnotationMark> marks) =>
+        Export(source, marks, null);
+
+    private static Bitmap Export(Bitmap source, IReadOnlyList<AnnotationMark> marks, DocumentTransform? transform)
     {
         var path = Path.Combine(Path.GetTempPath(), $"cp-export-{Guid.NewGuid():N}.png");
         try
         {
-            AnnotationExport.Flatten(source, marks, path);
+            AnnotationExport.Flatten(source, marks, transform, path);
             // Loaded through a copy so the file handle is released and the temp file can
             // be deleted on every platform.
             using var loaded = new Bitmap(path);
@@ -292,12 +419,15 @@ public sealed class AnnotationExportTests
         }
     }
 
-    private static byte[] ExportBytes(Bitmap source, IReadOnlyList<AnnotationMark> marks)
+    private static byte[] ExportBytes(Bitmap source, IReadOnlyList<AnnotationMark> marks) =>
+        ExportBytes(source, marks, null);
+
+    private static byte[] ExportBytes(Bitmap source, IReadOnlyList<AnnotationMark> marks, DocumentTransform? transform)
     {
         var path = Path.Combine(Path.GetTempPath(), $"cp-export-{Guid.NewGuid():N}.png");
         try
         {
-            AnnotationExport.Flatten(source, marks, path);
+            AnnotationExport.Flatten(source, marks, transform, path);
             return File.ReadAllBytes(path);
         }
         finally

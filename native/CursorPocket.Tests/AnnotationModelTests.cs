@@ -24,11 +24,11 @@ public sealed class AnnotationHistoryTests
 
         Assert.Equal([first, second], history.Visible);
 
-        Assert.Equal(second, history.Undo());
+        Assert.Equal(new MarkStep(second), history.Undo());
         Assert.Equal([first], history.Visible);
         Assert.True(history.CanRedo);
 
-        Assert.Equal(second, history.Redo());
+        Assert.Equal(new MarkStep(second), history.Redo());
         Assert.Equal([first, second], history.Visible);
         Assert.False(history.CanRedo);
     }
