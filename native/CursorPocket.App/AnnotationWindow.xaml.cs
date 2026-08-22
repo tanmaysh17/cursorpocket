@@ -208,6 +208,12 @@ public sealed partial class AnnotationWindow : Window
     /// <summary>Raised when the user throws the capture away entirely.</summary>
     public event EventHandler? Discarded;
 
+    /// <summary>
+    /// Raised when the capture should be left on screen as a pin. A fourth output
+    /// alongside save, copy, and keep-original: it writes nothing and touches nothing.
+    /// </summary>
+    public event EventHandler? PinRequested;
+
     // ---------------------------------------------------------------- source loading
 
     /// <summary>
@@ -2246,6 +2252,30 @@ public sealed partial class AnnotationWindow : Window
         File.Move(temporary, _path, true);
         CopyRequested?.Invoke(this, EventArgs.Empty);
         StatusToolText.Text = "COPIED · the marked-up image is on the clipboard";
+    }
+
+    private void Pin_Click(object sender, RoutedEventArgs eventArgs) => Pin();
+
+    private void PinAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!ToolKeysActive())
+        {
+            return;
+        }
+
+        eventArgs.Handled = true;
+        Pin();
+    }
+
+    /// <summary>
+    /// Saves, then leaves the result on screen. Saving first is what makes the pin a
+    /// reference to a real capture rather than to a temporary file that will be gone the
+    /// next time the pin's Mark up button is pressed.
+    /// </summary>
+    private void Pin()
+    {
+        PinRequested?.Invoke(this, EventArgs.Empty);
+        _ = SaveAsync();
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();

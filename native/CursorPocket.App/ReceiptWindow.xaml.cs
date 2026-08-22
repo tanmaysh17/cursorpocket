@@ -19,6 +19,7 @@ public sealed partial class ReceiptWindow : Window
     private readonly PaletteHotkeyService _keys = new(
         [
             new(VirtualKey.O, Control: true, Alt: true),
+            new(VirtualKey.E, Control: true, Alt: true),
             new(VirtualKey.R, Control: true, Alt: true),
             new(VirtualKey.L, Control: true, Alt: true),
             new(VirtualKey.X, Control: true, Alt: true),
@@ -44,6 +45,11 @@ public sealed partial class ReceiptWindow : Window
         ReceiptDetail.Text = detail ?? record?.Preview ?? "Nothing was saved";
         OpenButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
         RevealButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
+        // The receipt's twelve seconds are exactly when the user is asking "did that come
+        // out right?", which makes this the most useful way back into the editor.
+        EditButton.Visibility = record?.CaptureKind == CaptureKind.Screenshot
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         if (record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio)
         {
             OpenButton.Content = "Play";
@@ -106,12 +112,25 @@ public sealed partial class ReceiptWindow : Window
         Close();
     }
 
+    private void Edit_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_record is not null)
+        {
+            (App.Window as MainWindow)?.AnnotateExisting(_record);
+        }
+
+        Close();
+    }
+
     private void Keys_Invoked(object? sender, PaletteHotkeyEventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
     {
         switch (eventArgs.Key)
         {
             case VirtualKey.O when _record is not null:
                 Open_Click(this, new RoutedEventArgs());
+                break;
+            case VirtualKey.E when _record?.CaptureKind == CaptureKind.Screenshot:
+                Edit_Click(this, new RoutedEventArgs());
                 break;
             case VirtualKey.R when _record is not null:
                 Reveal_Click(this, new RoutedEventArgs());

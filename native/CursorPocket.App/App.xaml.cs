@@ -56,6 +56,22 @@ public partial class App : Microsoft.UI.Xaml.Application
                     Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                     () => Window.AppWindow.Hide());
             }
+
+            // --annotate <path> opens the editor on an image CursorPocket did not take,
+            // which also makes Explorer's "Open with" work without the installer claiming
+            // a file association. A silent default-app grab is the kind of system change
+            // users resent, and the installer stays per-user and admin-free.
+            var commandLine = Environment.GetCommandLineArgs();
+            var annotateAt = Array.FindIndex(
+                commandLine,
+                argument => argument.Equals("--annotate", StringComparison.OrdinalIgnoreCase));
+            if (annotateAt >= 0 && annotateAt + 1 < commandLine.Length)
+            {
+                var path = commandLine[annotateAt + 1];
+                DispatcherQueue.TryEnqueue(
+                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                    async () => await ((MainWindow)Window).AnnotateFileAsync(path));
+            }
         }
         catch (Exception error)
         {

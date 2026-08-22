@@ -29,6 +29,15 @@ Avoid dashboard-like control centers, decorative productivity UI, floating widge
 5. Prefer recognition over recall: visible actions and configurable shortcuts beat memorized key combinations.
 6. Make recording unambiguous: screen, microphone, and webcam capture starts only after an explicit action and stays named on screen until it is saved or discarded.
 
+## Product decisions on the annotation editor
+
+Recorded here because the design system forbids adding sharing-adjacent surface without one, and because these should not be relitigated as design tweaks.
+
+- **Exported backdrops and drop shadows: adopted.** A screenshot can be exported on a flat ground with a rendered shadow, which gives a tight crop room to breathe. Mesh gradients were declined: a gradient generator inside the app leaks into its own chrome, and a flat ground does the actual job.
+- **Pinned captures: adopted.** A pin is the content itself, left on screen by explicit action, never restored after a restart. It is a receipt the user decided to keep, which is what distinguishes it from a floating widget whose purpose is unexplained.
+- **OCR: adopted, local only.** Reading text out of a screenshot uses the engine built into Windows. No sidecar process, no model download, no network. The result becomes an ordinary text capture.
+- **Still excluded:** any account, upload, share target, short link, or analytics. Nothing added here sends a capture anywhere.
+
 ## Accessibility & Inclusion
 
 No additional user-specific accommodations were requested. Preserve native Windows keyboard navigation, readable contrast, visible focus, and non-color recording status as quality defaults.

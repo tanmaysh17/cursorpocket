@@ -46,6 +46,7 @@
             <KeyboardAccelerator Key="Y" Modifiers="Control" Invoked="RedoAccelerator_Invoked" />
             <KeyboardAccelerator Key="Z" Modifiers="Control,Shift" Invoked="RedoAccelerator_Invoked" />
             <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyAccelerator_Invoked" />
+            <KeyboardAccelerator Key="P" Modifiers="Control" Invoked="PinAccelerator_Invoked" />
             <KeyboardAccelerator Key="F1" Invoked="KeySheetAccelerator_Invoked" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
@@ -485,6 +486,23 @@
                     HorizontalAlignment="Right"
                     Orientation="Horizontal"
                     Spacing="8">
+                    <Button
+                        x:Name="PinButton"
+                        Click="Pin_Click"
+                        Style="{StaticResource PocketIconButton}"
+                        AutomationProperties.Name="Pin this screenshot on screen"
+                        ToolTipService.ToolTip="Pin on screen · Ctrl+P">
+                        <Path
+                            Width="24"
+                            Height="24"
+                            Data="M9,4 H15 M12,4 V10 M6.5,14.5 H17.5 L15,10 H9 Z M12,14.5 V20.5"
+                            Stretch="None"
+                            Stroke="{StaticResource PocketInkDim}"
+                            StrokeEndLineCap="Round"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeThickness="2" />
+                    </Button>
                     <Button
                         x:Name="CopyButton"
                         Click="Copy_Click"

@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
@@ -23,6 +24,11 @@ public sealed partial class MainWindow : Window
     private CaptureBounds? _lastRegion;
     private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
+
+    // Pins are held only for their lifetime and never restored after a restart: a window
+    // that reappears after a reboot with no explanation is exactly the unexplained
+    // floating widget the anti-references warn against. The Library holds the durable copy.
+    private readonly List<PinnedCaptureWindow> _pins = [];
 
     public MainWindow()
     {
@@ -219,6 +225,7 @@ public sealed partial class MainWindow : Window
             case "audio": await ToggleAudioRecordingAsync(); break;
             case "text": await CaptureTextAsync(); break;
             case "link": await CaptureLinkAsync(); break;
+            case "clipboard": await AnnotateClipboardAsync(); break;
             case "display": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureDisplayAsync()); break;
             case "all-displays": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureAllDisplaysAsync()); break;
             case "window": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureWindowAsync(source)); break;
@@ -236,34 +243,213 @@ public sealed partial class MainWindow : Window
         {
             var record = await capture();
             var path = App.Services.Library.GetAbsolutePath(record);
-            // Copy immediately, so the shot is pasteable the moment it is taken
-            // rather than only after the annotation surface is dismissed.
+            // Copy immediately, so the shot is pasteable the moment it is taken rather
+            // than only after the annotation surface is dismissed.
             var copied = await CopyImageToClipboardAsync(path);
-            var editor = new AnnotationWindow(record, path);
-            // Ctrl+C in the editor puts the marked-up image on the clipboard without
-            // closing, so the user can paste a work-in-progress and keep drawing.
-            editor.CopyRequested += async (_, _) => await CopyImageToClipboardAsync(path);
-            editor.SavedAsNewCapture += async (_, temporary) => await RegisterEditedCopyAsync(temporary);
-            editor.Discarded += async (_, _) => await DiscardCaptureAsync(record, path);
-            editor.Saved += async (_, _) =>
-            {
-                // Re-copy so the clipboard holds the marked-up image, not the original.
-                var recopied = await CopyImageToClipboardAsync(path);
-                ShowReceipt(record, recopied ? "Screenshot saved · copied" : "Screenshot saved");
-            };
-            editor.Cancelled += (_, _) => ShowReceipt(record, copied
-                ? "Screenshot saved · copied"
-                : "Screenshot saved without annotation");
-            // Command mode has just hidden itself, so the source app already owns the
-            // foreground. Activate() alone loses that race and leaves the annotation
-            // window behind or minimized.
-            editor.AppWindow.Show(true);
-            WindowPlacement.ForceForeground(editor);
+            OpenEditor(record, path, AnnotationOrigin.FreshCapture, cancelled: () => ShowReceipt(
+                record,
+                copied ? "Screenshot saved · copied" : "Screenshot saved without annotation"));
         }
         catch (Exception error)
         {
             ShowError("Screenshot failed", error.Message);
         }
+    }
+
+    /// <summary>Asks for an image on disk and opens the editor on a copy of it.</summary>
+    private async Task PickImageToAnnotateAsync()
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker();
+            foreach (var extension in new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" })
+            {
+                picker.FileTypeFilter.Add(extension);
+            }
+
+            // An unpackaged window has to be handed to the picker explicitly.
+            WinRT.Interop.InitializeWithWindow.Initialize(
+                picker,
+                WinRT.Interop.WindowNative.GetWindowHandle(this));
+
+            var file = await picker.PickSingleFileAsync();
+            if (file is not null)
+            {
+                await AnnotateFileAsync(file.Path);
+            }
+        }
+        catch (Exception error)
+        {
+            ShowError("That image could not be opened", error.Message);
+        }
+    }
+
+    /// <summary>
+    /// Opens the editor on a capture that already exists — from the Library, from a
+    /// receipt, or from a pin. Saving writes an edited copy rather than replacing it,
+    /// because a capture the user kept is an artifact they chose.
+    /// </summary>
+    public void AnnotateExisting(CaptureRecord record)
+    {
+        if (record.CaptureKind != CaptureKind.Screenshot)
+        {
+            ShowError("Only screenshots can be marked up", "This capture is not an image.");
+            return;
+        }
+
+        var path = App.Services.Library.GetAbsolutePath(record);
+        if (!File.Exists(path))
+        {
+            ShowError("That screenshot is missing", "The file is no longer where the index expects it.");
+            return;
+        }
+
+        OpenEditor(record, path, AnnotationOrigin.ExistingCapture);
+    }
+
+    /// <summary>Opens the editor on whatever image is on the clipboard.</summary>
+    public async Task AnnotateClipboardAsync()
+    {
+        try
+        {
+            var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
+            if (!content.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.Bitmap))
+            {
+                ShowError("Nothing to mark up", "The clipboard has no image on it.");
+                return;
+            }
+
+            var reference = await content.GetBitmapAsync();
+            using var stream = await reference.OpenReadAsync();
+            var reservation = App.Services.CaptureStore.Reserve(CaptureKind.Screenshot, ".png");
+
+            var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(stream);
+            using var software = await decoder.GetSoftwareBitmapAsync();
+            using (var file = File.Create(reservation.AbsolutePath))
+            {
+                using var output = file.AsRandomAccessStream();
+                var encoder = await Windows.Graphics.Imaging.BitmapEncoder.CreateAsync(
+                    Windows.Graphics.Imaging.BitmapEncoder.PngEncoderId,
+                    output);
+                encoder.SetSoftwareBitmap(software);
+                await encoder.FlushAsync();
+            }
+
+            var record = await App.Services.CaptureStore.RegisterExistingAsync(
+                CaptureKind.Screenshot,
+                reservation.AbsolutePath,
+                $"Screenshot · {software.PixelWidth} × {software.PixelHeight}",
+                new Dictionary<string, object?>
+                {
+                    ["width"] = software.PixelWidth,
+                    ["height"] = software.PixelHeight,
+                    ["source"] = "clipboard",
+                });
+
+            OpenEditor(record, reservation.AbsolutePath, AnnotationOrigin.FreshCapture);
+        }
+        catch (Exception error)
+        {
+            ShowError("The clipboard image could not be opened", error.Message);
+        }
+    }
+
+    /// <summary>
+    /// Opens the editor on an image already on disk. The file is copied into the capture
+    /// folder first, so marking it up never writes over something outside CursorPocket's
+    /// own tree.
+    /// </summary>
+    public async Task AnnotateFileAsync(string sourcePath)
+    {
+        try
+        {
+            if (!File.Exists(sourcePath))
+            {
+                ShowError("That file is missing", sourcePath);
+                return;
+            }
+
+            int width;
+            int height;
+            using (var probe = new System.Drawing.Bitmap(sourcePath))
+            {
+                width = probe.Width;
+                height = probe.Height;
+            }
+
+            var record = await App.Services.CaptureStore.ImportFileAsync(
+                CaptureKind.Screenshot,
+                sourcePath,
+                $"Screenshot · {width} × {height}",
+                new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
+
+            OpenEditor(record, App.Services.Library.GetAbsolutePath(record), AnnotationOrigin.FreshCapture);
+        }
+        catch (Exception error)
+        {
+            ShowError("That image could not be opened", error.Message);
+        }
+    }
+
+    /// <summary>
+    /// The one place an editor is constructed and wired. Activation differs by origin: a
+    /// fresh capture needs ForceForeground because a transient surface has just hidden
+    /// itself and the source app still owns the foreground lock, whereas an editor opened
+    /// from the Library comes from a window that already has focus.
+    /// </summary>
+    private void OpenEditor(
+        CaptureRecord record,
+        string path,
+        AnnotationOrigin origin,
+        Action? cancelled = null)
+    {
+        var editor = new AnnotationWindow(record, path, origin);
+        if (cancelled is not null)
+        {
+            editor.Cancelled += (_, _) => cancelled();
+        }
+
+        editor.CopyRequested += async (_, _) => await CopyImageToClipboardAsync(path);
+        editor.SavedAsNewCapture += async (_, temporary) => await RegisterEditedCopyAsync(temporary);
+        editor.Discarded += async (_, _) => await DiscardCaptureAsync(record, path);
+        editor.PinRequested += (_, _) => PinCapture(record, path);
+        editor.Saved += async (_, _) =>
+        {
+            var copied = await CopyImageToClipboardAsync(path);
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied));
+        };
+
+        if (origin == AnnotationOrigin.FreshCapture)
+        {
+            editor.AppWindow.Show(true);
+            WindowPlacement.ForceForeground(editor);
+        }
+        else
+        {
+            editor.Activate();
+        }
+    }
+
+    /// <summary>
+    /// Leaves a saved capture on screen. Only ever from an explicit action — a pin the user
+    /// did not ask for is the unexplained floating widget the anti-references warn against.
+    /// </summary>
+    private void PinCapture(CaptureRecord record, string path)
+    {
+        // Deferred one turn: the editor saves on the same gesture, and the pin has to read
+        // the finished file rather than the one being written over.
+        App.DispatcherQueue.TryEnqueue(() =>
+        {
+            var pin = PinnedCaptureWindow.TryShow(record, path, _pins.Count);
+            if (pin is null)
+            {
+                return;
+            }
+
+            pin.EditRequested += (_, pinned) => AnnotateExisting(pinned);
+            pin.Closed += (_, _) => _pins.Remove(pin);
+            _pins.Add(pin);
+        });
     }
 
     /// <summary>
@@ -552,6 +738,12 @@ public sealed partial class MainWindow : Window
         menu.Items.Add("Screenshot…", null, (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette("screenshot")));
         menu.Items.Add("Video…", null, (_, _) => App.DispatcherQueue.TryEnqueue(ShowVideoPreflight));
         menu.Items.Add("Audio note", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await ToggleAudioRecordingAsync()));
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        // Two ways into the editor for an image CursorPocket did not take. On the tray
+        // rather than in command mode, so neither costs a bare key that would then have to
+        // be registered and unregistered around every capture.
+        menu.Items.Add("Mark up clipboard image", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await AnnotateClipboardAsync()));
+        menu.Items.Add("Mark up an image…", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await PickImageToAnnotateAsync()));
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Library", null, (_, _) => App.DispatcherQueue.TryEnqueue(ShowLibrary));
         menu.Items.Add("Settings", null, (_, _) => App.DispatcherQueue.TryEnqueue(ShowSettings));

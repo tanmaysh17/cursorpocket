@@ -44,3 +44,17 @@ For UI changes, also verify the packaged app on Windows with one and multiple di
 Do not commit `.venv`, `bin`, `obj`, `artifacts`, user settings, captures, device information, or downloaded binaries. Distribute compiled executables through GitHub Actions or a versioned Release instead of checking binaries into source control.
 
 `native/build-native.ps1` downloads a checksum-pinned LGPL FFmpeg sidecar through `tools/fetch_ffmpeg.ps1`. The media verifier encodes screen-only, narrated, webcam, combined, and forcibly interrupted fragmented fixtures. Do not update the FFmpeg URL or hashes without repeating those fixtures plus the real-device screen, microphone, webcam, and combined capture gates and updating `THIRD_PARTY_NOTICES.md`.
+
+## Annotation editor gate
+
+The editor cannot be signed off from XAML inspection. On the **installed** build:
+
+1. Draw one of every mark, save, then open the saved PNG and compare it to what was on screen. Repeat at 100 / 125 / 150 / 175 / 200 % display scale.
+2. Confirm every tool key works from a cold open, before clicking anything. An accelerator that only works after a toolbar click means nothing holds focus.
+3. Redact a password with the default mode, reopen the PNG, and confirm the pixels are gone rather than blurred.
+4. Run OCR once with a language pack installed and once without: the button must disable and say which Windows setting to look at.
+5. Crop, then check the Library row's dimensions and the receipt wording match the file, and that the capture it was edited from is still there.
+6. Pin a capture, drag it out to Explorer, confirm it appears in a subsequent screenshot, and confirm `Escape` in another application still does that application's job and `Escape` during a recording still stops and saves.
+7. Confirm `Escape` never loses the original, in one press or two.
+
+Note that `build-native.ps1` overrides the csproj publish flags, so nothing that ships is trimmed and a csproj-only change never reaches the artifact.

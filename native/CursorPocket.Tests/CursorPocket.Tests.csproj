@@ -43,6 +43,8 @@
     <None Include="..\CursorPocket.App\CommandPaletteWindow.xaml" Link="Fixtures\CommandPaletteWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml" Link="Fixtures\RegionSelectorWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml.cs" Link="Fixtures\RegionSelectorWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\PinnedCaptureWindow.xaml" Link="Fixtures\PinnedCaptureWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\PinnedCaptureWindow.xaml.cs" Link="Fixtures\PinnedCaptureWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml" Link="Fixtures\AnnotationWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Fixtures\AnnotationPatches.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\OcrTextService.cs" Link="Fixtures\OcrTextService.cs.txt" CopyToOutputDirectory="PreserveNewest" />

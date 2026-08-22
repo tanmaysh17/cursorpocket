@@ -490,6 +490,167 @@ public sealed class AnnotationContractTests
         Assert.Contains("OcrScaling.CannotBeRead", service, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void The_receipt_lists_every_key_it_registers()
+    {
+        var code = ReadFixture("ReceiptWindow.xaml.cs.txt");
+        var xaml = ReadFixture("ReceiptWindow.xaml");
+
+        // A receipt never takes focus, so its keys are the only mouse-free way to act on
+        // it and nothing else teaches them. Every registered key must therefore appear in
+        // the hint — adding one and forgetting the other is silent.
+        var registered = System.Text.RegularExpressions.Regex
+            .Matches(code, @"new\(VirtualKey\.(?<key>\w+), Control: true, Alt: true\)")
+            .Select(match => match.Groups["key"].Value)
+            .ToArray();
+
+        Assert.NotEmpty(registered);
+        var hint = Slice(xaml, "x:Name=\"ReceiptKeysHint\"", "</Grid>");
+        foreach (var key in registered)
+        {
+            Assert.Contains($" {key} ", hint, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Every_way_into_the_editor_goes_through_one_place()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+
+        // Four entry points now: a fresh capture, the Library, a receipt, and an image
+        // CursorPocket never took. One construction site, so the clipboard re-copy, the
+        // edited-copy path, and Discard cannot be wired on some paths and not others.
+        Assert.Equal(1, Occurrences(main, "new AnnotationWindow("));
+        Assert.Contains("public void AnnotateExisting(", main, StringComparison.Ordinal);
+        Assert.Contains("public async Task AnnotateClipboardAsync()", main, StringComparison.Ordinal);
+        Assert.Contains("public async Task AnnotateFileAsync(", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_fresh_capture_is_forced_forward_and_an_existing_one_is_merely_activated()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var open = Slice(main, "private void OpenEditor(", "private async Task RegisterEditedCopyAsync");
+
+        // A transient surface has just hidden itself on the capture path, so the source app
+        // still owns the foreground lock and Activate() loses that race — this is the
+        // regression that once left the editor minimized. An editor opened from the Library
+        // comes from a window that already has focus, where forcing is the wrong tool.
+        Assert.Contains("AnnotationOrigin.FreshCapture", open, StringComparison.Ordinal);
+        Assert.Contains("WindowPlacement.ForceForeground(editor)", open, StringComparison.Ordinal);
+        Assert.Contains("editor.Activate()", open, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Discarding_goes_to_the_recycle_bin_and_out_of_the_index()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var discard = Slice(main, "private async Task DiscardCaptureAsync", "private void SelectRegion");
+
+        // The file is written before the editor opens, so this is the only way to undo
+        // having taken the shot at all. Never a hard delete.
+        Assert.Contains("RecycleOption.SendToRecycleBin", discard, StringComparison.Ordinal);
+        Assert.Contains("RemoveFromIndexAsync", discard, StringComparison.Ordinal);
+        Assert.DoesNotContain("File.Delete", discard, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_geometry_change_writes_a_new_capture_rather_than_repairing_the_index()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        Assert.Contains("SaveTarget.For(", code, StringComparison.Ordinal);
+        Assert.Contains("RegisterEditedCopyAsync", main, StringComparison.Ordinal);
+        // The new record carries its own dimensions, so captures.jsonl stays append-only
+        // and no path has to go back and rewrite a stale line.
+        Assert.Contains("RegisterExistingAsync", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("RewriteIndex", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_pin_never_takes_the_global_escape_lease()
+    {
+        var code = ReadFixture("PinnedCaptureWindow.xaml.cs.txt");
+        var xaml = ReadFixture("PinnedCaptureWindow.xaml");
+
+        // The escape service is a lease stack. A pin can sit on screen for hours while the
+        // user works elsewhere, so holding the topmost lease would steal Escape from every
+        // other application — including a recording, where Escape means stop and save. A
+        // pin does not own the user's attention, so its Escape is a page accelerator.
+        Assert.DoesNotContain("EscapeHotkey", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("PaletteHotkeyService", code, StringComparison.Ordinal);
+        Assert.Contains("Key=\"Escape\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_pin_is_visible_in_a_capture_because_it_is_visible_on_screen()
+    {
+        var code = ReadFixture("PinnedCaptureWindow.xaml.cs.txt");
+
+        // A pin exists to be looked at, so it must appear in a screenshot or recording
+        // taken while it is up. Visible equals captured; a user who does not want it in the
+        // shot closes it.
+        Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WdaExcludeFromCapture", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_pin_is_dragged_by_pointer_tracking_and_carries_no_window_region()
+    {
+        var code = ReadFixture("PinnedCaptureWindow.xaml.cs.txt");
+
+        // WinUI consumes the messages Windows' modal move loop needs, which is why
+        // WindowPlacement has no such helper. And a window region takes the window off
+        // DWM's fast path, which is exactly what makes a dragged window lag.
+        Assert.Contains("Root.CapturePointer", code, StringComparison.Ordinal);
+        Assert.Contains("WindowPlacement.MoveTo", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetWindowRgn", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ClipToRoundedRegion", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_pin_only_ever_appears_because_the_user_asked_for_it()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+
+        // Explicit action only, and never restored: a window that reappears after a reboot
+        // with no explanation is the unexplained floating widget the anti-references warn
+        // against. The Library holds the durable copy.
+        Assert.Contains("editor.PinRequested", main, StringComparison.Ordinal);
+        Assert.Equal(1, Occurrences(main, "PinnedCaptureWindow.TryShow"));
+        Assert.DoesNotContain("RestorePins", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("pin_geometry", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_pin_offers_all_three_payloads_when_dragged_out()
+    {
+        var code = ReadFixture("PinnedCaptureWindow.xaml.cs.txt");
+        var xaml = ReadFixture("PinnedCaptureWindow.xaml");
+
+        // Different targets want different things: Explorer takes the storage item, an
+        // image editor takes the bitmap, and the preview is what makes the gesture legible.
+        Assert.Contains("SetStorageItems", code, StringComparison.Ordinal);
+        Assert.Contains("SetBitmap", code, StringComparison.Ordinal);
+        Assert.Contains("DragUI.SetContentFromBitmapImage", code, StringComparison.Ordinal);
+        // On its own element, because CanDrag competes with the window-move drag.
+        Assert.Contains("x:Name=\"DragHandle\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CanDrag=\"True\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_new_top_level_window_is_added_to_the_publish_verification_list()
+    {
+        var build = ReadFixture("build-native.ps1.txt");
+
+        // An unpackaged WinUI publish can omit compiled XAML, and the app then dies with
+        // XamlParseException only in the installed build. The staging step throws if a
+        // listed resource is missing, so the list has to name every top-level XAML.
+        Assert.Contains("PinnedCaptureWindow.xbf", build, StringComparison.Ordinal);
+        Assert.Contains("AnnotationWindow.xbf", build, StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string source, string value)
     {
         var count = 0;

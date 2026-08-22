@@ -133,6 +133,16 @@ public sealed partial class MainPage : Page
         ViewModel.OpenSelectedCommand.Execute(null);
     }
 
+    private void EditAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        Edit_Click(this, new RoutedEventArgs());
+    }
+
     private void RevealAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
         if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
@@ -411,6 +421,19 @@ public sealed partial class MainPage : Page
         if (folder is not null)
         {
             ViewModel.CaptureDirectory = folder.Path;
+        }
+    }
+
+    /// <summary>
+    /// Opens the annotation editor on the selected screenshot. Saving there writes an
+    /// edited copy: a capture the user kept is an artifact they chose, and rewriting it
+    /// silently would be destructive in a way overwriting a fresh shot is not.
+    /// </summary>
+    private void Edit_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (ViewModel.SelectedItem?.Record is { } record)
+        {
+            (App.Window as MainWindow)?.AnnotateExisting(record);
         }
     }
 
