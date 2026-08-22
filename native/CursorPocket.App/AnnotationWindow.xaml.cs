@@ -80,6 +80,12 @@ public sealed partial class AnnotationWindow : Window
     private double _boxCornerRadius;
     private double _loupeMagnification = 2;
 
+    /// <summary>
+    /// Null when Windows has no OCR recognizer installed, which disables one button
+    /// rather than taking down the editor.
+    /// </summary>
+    private readonly OcrTextService? _ocr = OcrTextService.TryCreate();
+
     /// <summary>The eyedropper's last sample, offered as a seventh ink once taken.</summary>
     private AnnotationInk? _customInk;
 
@@ -231,8 +237,19 @@ public sealed partial class AnnotationWindow : Window
     {
         _toolButtons.AddRange([
             SelectTool, ArrowTool, LineTool, PenTool, HighlightTool, BoxTool, EllipseTool,
-            TextTool, StepTool, RedactTool, FocusTool, EyedropTool,
+            TextTool, StepTool, RedactTool, FocusTool, ReadTextTool, EyedropTool,
         ]);
+
+        // Degrade, never fail. OCR is a Windows language pack the user may simply not
+        // have, so a missing recognizer disables one button and says why — it does not
+        // offer to install anything, because there is no network in this app.
+        if (_ocr is null)
+        {
+            ReadTextTool.IsEnabled = false;
+            ToolTipService.SetToolTip(
+                ReadTextTool,
+                "Read text needs a Windows OCR language pack · Settings → Time & language → Language & region");
+        }
     }
 
     private void BuildSwatches()
@@ -469,6 +486,9 @@ public sealed partial class AnnotationWindow : Window
             ? "FOCUS · DIM OUTSIDE · S for loupe"
             : $"FOCUS · LOUPE {_loupeMagnification:0.#}× {_focusShape.ToString().ToUpperInvariant()} · S to cycle",
         AnnotationTool.Eyedrop => "EYEDROPPER · click the screenshot to take its colour",
+        AnnotationTool.ReadText => _ocr is null
+            ? "READ TEXT · no Windows OCR language pack installed"
+            : "READ TEXT · click for the whole shot, drag for a region",
         _ => _tool.ToString().ToUpperInvariant(),
     };
 
@@ -722,6 +742,16 @@ public sealed partial class AnnotationWindow : Window
         _current = eventArgs.GetCurrentPoint(DrawingSurface).Position;
         DrawingSurface.ReleasePointerCapture(eventArgs.Pointer);
         ClearPreview();
+
+        if (_tool == AnnotationTool.ReadText)
+        {
+            // A drag reads that rectangle; a click, which leaves a rect of nothing, reads
+            // the whole shot. Reading commits no mark, so the tool stays armed.
+            var region = CurrentRect(CurrentModifiers());
+            _ = ReadTextAsync(region.Width > 4 && region.Height > 4 ? region : null);
+            UpdateReadout();
+            return;
+        }
 
         var mark = BuildMark();
         if (mark is not null)
@@ -984,6 +1014,28 @@ public sealed partial class AnnotationWindow : Window
     private void RebuildPreview()
     {
         ClearPreview();
+
+        if (_tool == AnnotationTool.ReadText)
+        {
+            // A dashed marquee rather than a mark: this region is being read, not drawn,
+            // and nothing will be committed when the pointer comes up.
+            var region = CurrentRect(CurrentModifiers());
+            var marquee = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = region.Width,
+                Height = region.Height,
+                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
+                StrokeDashArray = [4, 3],
+                Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(24, 127, 187, 255)),
+            };
+            Canvas.SetLeft(marquee, region.X);
+            Canvas.SetTop(marquee, region.Y);
+            _preview = marquee;
+            DrawingSurface.Children.Add(_preview);
+            return;
+        }
+
         var mark = BuildMark();
         if (mark is null)
         {
@@ -1341,6 +1393,127 @@ public sealed partial class AnnotationWindow : Window
         return pill;
     }
 
+    // ---------------------------------------------------------------------------- OCR
+
+    /// <summary>
+    /// Reads text out of the screenshot. A click reads the whole image, a drag reads that
+    /// rectangle — one key, both behaviours, discoverable by trying.
+    /// </summary>
+    private async Task ReadTextAsync(AnnRect? region)
+    {
+        if (_ocr is null)
+        {
+            return;
+        }
+
+        var rect = region is { } area && area.Width > 4 && area.Height > 4
+            ? AnnotationPatches.Snap(area, _sourceWidth, _sourceHeight)
+            : new System.Drawing.Rectangle(0, 0, _sourceWidth, _sourceHeight);
+
+        StatusToolText.Text = "READING…";
+        OcrReading? reading;
+        try
+        {
+            reading = await _ocr.ReadAsync(_source, rect);
+        }
+        catch (Exception)
+        {
+            // Degrade, never fail: a recognition error costs the reading, never the shot.
+            StatusToolText.Text = "READ TEXT · that region could not be read";
+            return;
+        }
+
+        if (reading is null)
+        {
+            StatusToolText.Text = "READ TEXT · that region is too small or too large to read";
+            return;
+        }
+
+        ShowOcr(reading);
+    }
+
+    private void ShowOcr(OcrReading reading)
+    {
+        OcrText.Text = reading.Text;
+        OcrSummaryText.Text = reading.WordCount == 0
+            ? $"no text found · {reading.Language}"
+            : $"{reading.WordCount} words · {reading.Language}";
+        OcrPanel.Visibility = Visibility.Visible;
+
+        // Faint boxes over each word, so it is obvious which part of the image the text
+        // came from. Informational blue is reserved for text and link captures, and this
+        // is a text capture.
+        OcrOverlay.Children.Clear();
+        var stroke = (Brush)Application.Current.Resources["PocketBlue"];
+        foreach (var word in reading.Words)
+        {
+            var box = new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Width = word.Bounds.Width,
+                Height = word.Bounds.Height,
+                Stroke = stroke,
+                StrokeThickness = 1,
+                Opacity = 0.4,
+            };
+            Canvas.SetLeft(box, word.Bounds.X);
+            Canvas.SetTop(box, word.Bounds.Y);
+            OcrOverlay.Children.Add(box);
+        }
+
+        StatusToolText.Text = reading.WordCount == 0
+            ? "READ TEXT · nothing recognised here"
+            : $"READ TEXT · {reading.WordCount} words · Ctrl+Shift+C copies";
+    }
+
+    private void CloseOcr_Click(object sender, RoutedEventArgs eventArgs) => HideOcr();
+
+    private void HideOcr()
+    {
+        OcrPanel.Visibility = Visibility.Collapsed;
+        OcrOverlay.Children.Clear();
+        OcrText.Text = string.Empty;
+    }
+
+    private void CopyOcrText_Click(object sender, RoutedEventArgs eventArgs) => CopyOcrText();
+
+    /// <summary>
+    /// Puts the recognised text on the clipboard, only ever when asked. A screenshot is
+    /// on the clipboard from the moment it is taken; silently replacing that with text
+    /// would break a promise the app makes everywhere else.
+    /// </summary>
+    private void CopyOcrText()
+    {
+        if (string.IsNullOrEmpty(OcrText.Text))
+        {
+            return;
+        }
+
+        var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        package.SetText(OcrText.Text);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        StatusToolText.Text = "TEXT COPIED · the screenshot is no longer on the clipboard";
+    }
+
+    private async void SaveOcrText_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (string.IsNullOrWhiteSpace(OcrText.Text))
+        {
+            return;
+        }
+
+        try
+        {
+            // A normal text capture, so it gets a receipt and a Library row like any
+            // other. OCR is the same capture kind reached a different way.
+            await App.Services.CaptureStore.SaveTextAsync(OcrText.Text);
+            StatusToolText.Text = "SAVED · the recognised text is now its own capture";
+        }
+        catch (Exception error)
+        {
+            StatusToolText.Text = $"NOT SAVED · {error.Message}";
+        }
+    }
+
     // ---------------------------------------------------------------------- text tool
 
     private void BeginText(Point point)
@@ -1571,6 +1744,7 @@ public sealed partial class AnnotationWindow : Window
             VirtualKey.D => AnnotationTool.Redact,
             VirtualKey.S => AnnotationTool.Focus,
             VirtualKey.I => AnnotationTool.Eyedrop,
+            VirtualKey.O => AnnotationTool.ReadText,
             _ => (AnnotationTool?)null,
         };
 
@@ -1668,6 +1842,22 @@ public sealed partial class AnnotationWindow : Window
         _ = CopyAsync();
     }
 
+    /// <summary>
+    /// Copies the recognised text. Deliberately its own key rather than sharing Ctrl+C:
+    /// the screenshot is on the clipboard from the moment it is taken, and taking that
+    /// away without being asked would break a promise the app makes everywhere else.
+    /// </summary>
+    private void CopyTextAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (OcrPanel.Visibility != Visibility.Visible)
+        {
+            return;
+        }
+
+        eventArgs.Handled = true;
+        CopyOcrText();
+    }
+
     private void KeySheetAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
         eventArgs.Handled = true;
@@ -1723,6 +1913,14 @@ public sealed partial class AnnotationWindow : Window
         if (KeySheet.Visibility == Visibility.Visible)
         {
             KeySheet.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        // Anything overlaid closes before the editor does, so Escape never skips past a
+        // panel to discard the whole session.
+        if (OcrPanel.Visibility == Visibility.Visible)
+        {
+            HideOcr();
             return;
         }
 

@@ -26,6 +26,11 @@
             <KeyboardAccelerator Key="D" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="S" Invoked="ToolAccelerator_Invoked" />
             <KeyboardAccelerator Key="I" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator
+                Key="C"
+                Modifiers="Control,Shift"
+                Invoked="CopyTextAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number1" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number2" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number3" Invoked="InkAccelerator_Invoked" />
@@ -330,6 +335,23 @@
                         </Grid>
                     </Button>
 
+                    <Button
+                        x:Name="ReadTextTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="ReadText"
+                        AutomationProperties.Name="Read text tool"
+                        ToolTipService.ToolTip="Read text · O (click for the whole shot, drag for a region)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,5 H20 V19 H4 Z M7,10 H17 M7,13 H14 M7,16 H11" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="O" />
+                        </Grid>
+                    </Button>
+
                     <Rectangle Style="{StaticResource ToolbarDivider}" />
 
                     <!--  Swatches. The one place a colour is the content, so they stay
@@ -431,7 +453,11 @@
 
             <!--  The canvas well. DESIGN.md assigns 16 to wells; this used to borrow the
                   12 px card radius.  -->
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <Border
                     Padding="12"
                     Background="#FF070C0E"
@@ -455,6 +481,10 @@
                         <Viewbox Stretch="Uniform">
                             <Grid x:Name="Stage">
                                 <Image x:Name="ScreenshotImage" Stretch="Fill" />
+                                <!--  Recognised word boxes, above the marks and below the
+                                      pointer. Informational blue is reserved for text and
+                                      link captures, and OCR is a text capture.  -->
+                                <Canvas x:Name="OcrOverlay" IsHitTestVisible="False" />
                                 <Canvas
                                     x:Name="DrawingSurface"
                                     Background="Transparent"
@@ -500,6 +530,72 @@
                             Content="Close"
                             Style="{StaticResource PocketQuietButton}" />
                     </StackPanel>
+                </Border>
+
+                <!--  Recognised text sits beside the image rather than over it, so the
+                      words and the place they came from can be read together.  -->
+                <Border
+                    x:Name="OcrPanel"
+                    Grid.Column="1"
+                    Width="320"
+                    Padding="16"
+                    Background="{StaticResource PocketSurface}"
+                    BorderBrush="{StaticResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource PocketWellCorner}"
+                    Visibility="Collapsed">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="RECOGNISED TEXT" />
+                            <Button
+                                HorizontalAlignment="Right"
+                                Click="CloseOcr_Click"
+                                Style="{StaticResource PocketIconButton}"
+                                AutomationProperties.Name="Close the recognised text panel">
+                                <FontIcon FontSize="12" Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+                        <!--  A TextBox, not a TextBlock, so part of the result can be
+                              selected. It is also exactly the focusable control the
+                              accelerator guard exists for.  -->
+                        <TextBox
+                            x:Name="OcrText"
+                            Grid.Row="1"
+                            AcceptsReturn="True"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            IsReadOnly="True"
+                            IsSpellCheckEnabled="False"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="OcrSummaryText"
+                            Grid.Row="2"
+                            Style="{StaticResource PocketNumericText}" />
+                        <StackPanel
+                            Grid.Row="3"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button
+                                Click="CopyOcrText_Click"
+                                Content="Copy text"
+                                Style="{StaticResource PocketQuietButton}"
+                                ToolTipService.ToolTip="Ctrl+Shift+C — the screenshot stays on the clipboard until you ask for this" />
+                            <Button
+                                Click="SaveOcrText_Click"
+                                Content="Save as note"
+                                Style="{StaticResource PocketQuietButton}"
+                                ToolTipService.ToolTip="Keep the recognised text as its own text capture" />
+                        </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
 

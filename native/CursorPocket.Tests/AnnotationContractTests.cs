@@ -418,6 +418,78 @@ public sealed class AnnotationContractTests
         Assert.Contains("Property=\"Width\" Value=\"46\"", style, StringComparison.Ordinal);
         Assert.Contains("Property=\"Height\" Value=\"36\"", style, StringComparison.Ordinal);
     }
+    [Fact]
+    public void Ocr_uses_the_engine_built_into_Windows_and_nothing_else()
+    {
+        var service = ReadFixture("OcrTextService.cs.txt");
+
+        // Windows has shipped an OCR engine since 1809 and it reaches us through the same
+        // WinRT projections the camera pipeline already uses. No Tesseract sidecar, no
+        // model download, no network.
+        Assert.Contains("OcrEngine.TryCreateFromUserProfileLanguages()", service, StringComparison.Ordinal);
+        // No sidecar process and no network. Asserted on what the code can actually do
+        // rather than on the word "tesseract", which the comment above the class uses to
+        // explain why we do not need it.
+        Assert.DoesNotContain("Process.Start", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("HttpClient", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("System.Net", service, StringComparison.Ordinal);
+
+        // Read off the engine, never hardcoded: it is a property for a reason and has
+        // differed between Windows versions.
+        Assert.Contains("OcrEngine.MaxImageDimension", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("8192", service, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_missing_language_pack_disables_one_button_rather_than_crashing()
+    {
+        var service = ReadFixture("OcrTextService.cs.txt");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // TryCreate returning null, following the segmentation model's precedent: OCR is
+        // a language pack the user may simply not have installed.
+        Assert.Contains("internal static OcrTextService? TryCreate()", service, StringComparison.Ordinal);
+        Assert.Contains("return null", service, StringComparison.Ordinal);
+        Assert.Contains("ReadTextTool.IsEnabled = false", code, StringComparison.Ordinal);
+        // ...and says why, without offering to install anything, because there is no
+        // network in this app.
+        Assert.Contains("language pack", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Download", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recognised_text_never_reaches_the_clipboard_unasked()
+    {
+        var service = ReadFixture("OcrTextService.cs.txt");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // A screenshot is on the clipboard from the moment it is taken, and the design
+        // gate says so. Silently replacing that image with text would break a promise the
+        // app makes everywhere else, so the recognition path must not touch the clipboard
+        // at all — only the explicit Copy action may.
+        Assert.DoesNotContain("Clipboard", service, StringComparison.Ordinal);
+
+        var reading = Slice(code, "private async Task ReadTextAsync", "private void CloseOcr_Click");
+        Assert.DoesNotContain("Clipboard", reading, StringComparison.Ordinal);
+
+        // The explicit path exists, on its own key rather than sharing Ctrl+C.
+        Assert.Contains("CopyTextAccelerator_Invoked", code, StringComparison.Ordinal);
+        Assert.Contains("Modifiers=\"Control,Shift\"", ReadFixture("AnnotationWindow.xaml"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recognised_word_boxes_are_mapped_back_out_of_the_engines_coordinates()
+    {
+        var service = ReadFixture("OcrTextService.cs.txt");
+
+        // The engine is handed a resampled copy and answers in that copy's space, so every
+        // box has to come back through the same factor plus the region's own origin. Get
+        // it wrong and the text is right while every highlight sits in the wrong place.
+        Assert.Contains("OcrScaling.ScaleFor", service, StringComparison.Ordinal);
+        Assert.Contains("OcrScaling.ToSource", service, StringComparison.Ordinal);
+        Assert.Contains("OcrScaling.CannotBeRead", service, StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string source, string value)
     {
         var count = 0;
