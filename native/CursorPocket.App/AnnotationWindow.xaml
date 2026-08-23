@@ -7,173 +7,769 @@
     <Window.SystemBackdrop>
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
-    <Grid Padding="18" RowSpacing="14">
-        <Grid.Resources>
-            <!--  Swatches are the one place a colour is the content, so they are plain
-                  circles with a ring, sized to a comfortable target.  -->
-            <Style x:Key="SwatchButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Width" Value="32" />
-                <Setter Property="Height" Value="32" />
-                <Setter Property="MinHeight" Value="32" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="CornerRadius" Value="16" />
-            </Style>
-        </Grid.Resources>
-        <!--  A Canvas cannot take keyboard focus, so the drawing surface never
-              receives KeyDown. Accelerators on the root keep Enter and Ctrl+Z working
-              no matter which toolbar control currently has focus.  -->
+    <!--  A Canvas cannot take keyboard focus, so the drawing surface never receives
+          KeyDown. Every key lives here as a root accelerator instead, which also keeps
+          them page-scoped: unlike command mode's global bare keys, these cannot reach
+          another application if this window loses activation. Each handler stands down
+          while a text box has focus, so the inline text tool keeps its own typing.  -->
+    <Grid x:Name="Root">
         <Grid.KeyboardAccelerators>
+            <KeyboardAccelerator Key="V" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="A" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="L" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="P" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="H" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="R" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="E" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="T" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="N" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="D" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="S" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="I" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="O" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="X" Invoked="ToolAccelerator_Invoked" />
+            <KeyboardAccelerator Key="B" Invoked="BackdropAccelerator_Invoked" />
+            <KeyboardAccelerator
+                Key="C"
+                Modifiers="Control,Shift"
+                Invoked="CopyTextAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number1" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number2" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number3" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number4" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number5" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number6" Invoked="InkAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Number7" Invoked="InkAccelerator_Invoked" />
             <KeyboardAccelerator Key="Enter" Invoked="SaveAccelerator_Invoked" />
             <KeyboardAccelerator Key="Z" Modifiers="Control" Invoked="UndoAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Y" Modifiers="Control" Invoked="RedoAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Z" Modifiers="Control,Shift" Invoked="RedoAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyAccelerator_Invoked" />
+            <KeyboardAccelerator Key="P" Modifiers="Control" Invoked="PinAccelerator_Invoked" />
+            <KeyboardAccelerator Key="F1" Invoked="KeySheetAccelerator_Invoked" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                    <ToggleButton
-                        x:Name="PenTool"
-                        MinHeight="36"
-                        Click="Tool_Click"
-                        Content="Pen"
-                        IsChecked="True"
-                        Tag="pen" />
-                    <ToggleButton
-                        x:Name="HighlightTool"
-                        MinHeight="36"
-                        Click="Tool_Click"
-                        Content="Highlight"
-                        Tag="highlight" />
-                    <ToggleButton
-                        x:Name="ArrowTool"
-                        MinHeight="36"
-                        Click="Tool_Click"
-                        Content="Arrow"
-                        Tag="arrow" />
-                    <ToggleButton
-                        x:Name="RectangleTool"
-                        MinHeight="36"
-                        Click="Tool_Click"
-                        Content="Rectangle"
-                        Tag="rectangle" />
-                    <ToggleButton
-                        x:Name="TextTool"
-                        MinHeight="36"
-                        Click="Tool_Click"
-                        Content="Text"
-                        Tag="text" />
-                </StackPanel>
-                <Rectangle
-                    Width="1"
-                    Height="26"
-                    Margin="6,0"
-                    VerticalAlignment="Center"
-                    Fill="{StaticResource PocketLine}" />
-                <StackPanel Orientation="Horizontal" Spacing="2">
-                    <Button
-                        Click="Color_Click"
-                        Style="{StaticResource SwatchButton}"
-                        Tag="#45E08C"
-                        ToolTipService.ToolTip="Green"
-                        AutomationProperties.Name="Green">
-                        <Ellipse
-                            Width="18"
-                            Height="18"
-                            Fill="#FF45E08C" />
-                    </Button>
-                    <Button
-                        Click="Color_Click"
-                        Style="{StaticResource SwatchButton}"
-                        Tag="#FF5F6B"
-                        ToolTipService.ToolTip="Red"
-                        AutomationProperties.Name="Red">
-                        <Ellipse
-                            Width="18"
-                            Height="18"
-                            Fill="#FFFF5F6B" />
-                    </Button>
-                    <Button
-                        Click="Color_Click"
-                        Style="{StaticResource SwatchButton}"
-                        Tag="#F0B056"
-                        ToolTipService.ToolTip="Amber"
-                        AutomationProperties.Name="Amber">
-                        <Ellipse
-                            Width="18"
-                            Height="18"
-                            Fill="#FFF0B056" />
-                    </Button>
-                    <Button
-                        Click="Color_Click"
-                        Style="{StaticResource SwatchButton}"
-                        Tag="#F2F7F4"
-                        ToolTipService.ToolTip="White"
-                        AutomationProperties.Name="White">
-                        <Ellipse
-                            Width="18"
-                            Height="18"
-                            Fill="#FFF2F7F4" />
-                    </Button>
-                </StackPanel>
-                <Button
-                    Margin="6,0,0,0"
-                    Click="Undo_Click"
-                    Style="{StaticResource PocketQuietButton}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon FontSize="14" Glyph="&#xE7A7;" />
-                        <TextBlock Text="Undo" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-            <StackPanel
-                HorizontalAlignment="Right"
-                Orientation="Horizontal"
-                Spacing="8">
-                <Button
-                    Click="Cancel_Click"
-                    Content="Keep original"
-                    Style="{StaticResource PocketQuietButton}" />
-                <Button Click="Save_Click" Style="{StaticResource PocketPrimaryButton}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock Text="Save screenshot" />
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            FontFamily="Cascadia Mono"
-                            FontSize="12"
-                            IsTextScaleFactorEnabled="False"
-                            Opacity="0.62"
-                            Text="&#x21B5;" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
+        <!--  The title bar names the file being marked up, which matters as soon as the
+              editor can be opened on something other than the shot just taken.  -->
+        <Grid
+            x:Name="AnnotationTitleBar"
+            Height="36"
+            Padding="18,0,18,0"
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                VerticalAlignment="Center"
+                Style="{StaticResource PocketLabelText}"
+                Text="ANNOTATE" />
+            <TextBlock
+                x:Name="SourceNameText"
+                Grid.Column="1"
+                VerticalAlignment="Center"
+                Style="{StaticResource PocketMetaText}"
+                TextTrimming="CharacterEllipsis" />
         </Grid>
 
-        <Border
+        <Grid
             Grid.Row="1"
-            Padding="10"
-            Background="#FF070C0E"
-            BorderBrush="{StaticResource PocketLine}"
-            BorderThickness="1"
-            CornerRadius="{StaticResource PocketCardCorner}">
-            <Viewbox Stretch="Uniform">
-                <Grid x:Name="Stage">
-                    <Image x:Name="ScreenshotImage" Stretch="Fill" />
-                    <Canvas
-                        x:Name="DrawingSurface"
-                        Background="Transparent"
-                        PointerMoved="DrawingSurface_PointerMoved"
-                        PointerPressed="DrawingSurface_PointerPressed"
-                        PointerReleased="DrawingSurface_PointerReleased" />
-                </Grid>
-            </Viewbox>
-        </Border>
+            Padding="18,4,18,18"
+            RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <Grid Grid.Row="2">
-            <TextBlock Style="{StaticResource PocketMetaText}" Text="Drawing on the full-resolution image · Enter saves, with or without marks · Ctrl+Z undoes · Esc keeps the original" />
+            <!--  Toolbar. Every tool carries its own key as an engraved mono letter, so
+                  the surface teaches its shortcuts instead of hiding them in a legend.
+                  The letters collapse before any tool does when the window narrows —
+                  degrade the teaching, never the capability.  -->
+            <!--  Two columns, not one. Both clusters used to sit in a single cell, one
+                  aligned left and one aligned right, so once the tools outgrew the space
+                  they drew straight over the output buttons instead of the row adapting.  -->
+            <Grid x:Name="ToolbarRow" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <!--  The tool cluster scrolls rather than shrinking. Shrinking meant
+                      dropping the engraved keys first, which throws away the whole reason
+                      the toolbar teaches itself; and the thresholds it used were set for
+                      eight tools and silently outgrown. Scrolling keeps every tool
+                      reachable and every key visible at any width, which is the same
+                      answer command mode already uses for its command list.  -->
+                <ScrollViewer
+                    x:Name="ToolbarScroller"
+                    HorizontalScrollBarVisibility="Auto"
+                    HorizontalScrollMode="Enabled"
+                    VerticalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Disabled"
+                    ZoomMode="Disabled">
+                    <StackPanel
+                        x:Name="ToolbarLeft"
+                        Orientation="Horizontal"
+                        Spacing="2">
+                    <Button
+                        x:Name="SelectTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Select"
+                        AutomationProperties.Name="Select tool"
+                        ToolTipService.ToolTip="Select · V">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M5,3 L5,19.5 L9.2,15.4 L11.8,21 L14.4,19.9 L11.9,14.4 L17.6,13.8 Z" Style="{StaticResource PocketToolIconFill}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="V" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="ArrowTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Arrow"
+                        AutomationProperties.Name="Arrow tool"
+                        ToolTipService.ToolTip="Arrow · A">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,20 L20,4 M20,4 L12.5,4 M20,4 L20,11.5" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="A" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="LineTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Line"
+                        AutomationProperties.Name="Line tool"
+                        ToolTipService.ToolTip="Line · L">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,20 L20,4" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="L" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="PenTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Pen"
+                        AutomationProperties.Name="Pen tool"
+                        ToolTipService.ToolTip="Pen · P">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,17 C7,7 11,21 20,7" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="P" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="HighlightTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Highlight"
+                        AutomationProperties.Name="Highlighter tool"
+                        ToolTipService.ToolTip="Highlighter · H">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M5,15.5 C8,9 11,19 19,9" Style="{StaticResource PocketToolIconStrokeHeavy}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="H" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="BoxTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Box"
+                        AutomationProperties.Name="Box tool"
+                        ToolTipService.ToolTip="Box · R (press again for filled)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="BoxFillGlyph"
+                                    Data="M4,6 H20 V18 H4 Z"
+                                    Opacity="0.35"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path Data="M4,6 H20 V18 H4 Z" Style="{StaticResource PocketToolIconStroke}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="R" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="EllipseTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Ellipse"
+                        AutomationProperties.Name="Ellipse tool"
+                        ToolTipService.ToolTip="Ellipse · E (press again for filled)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="EllipseFillGlyph"
+                                    Data="M12,5.5 A6.5,6.5 0 1 0 12,18.5 A6.5,6.5 0 1 0 12,5.5 Z"
+                                    Opacity="0.35"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path Data="M12,5.5 A6.5,6.5 0 1 0 12,18.5 A6.5,6.5 0 1 0 12,5.5 Z" Style="{StaticResource PocketToolIconStroke}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="E" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="TextTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Text"
+                        AutomationProperties.Name="Text tool"
+                        ToolTipService.ToolTip="Text · T">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M5,6 H19 M12,6 V19" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="T" />
+                        </Grid>
+                    </Button>
+
+                    <Button
+                        x:Name="StepTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Step"
+                        AutomationProperties.Name="Step marker tool"
+                        ToolTipService.ToolTip="Step marker · N">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M12,4 A8,8 0 1 0 12,20 A8,8 0 1 0 12,4 Z" Style="{StaticResource PocketToolIconStroke}" />
+                                <!--  The digit says which number you are about to place,
+                                      not a generic glyph.  -->
+                                <TextBlock
+                                    x:Name="StepNumberText"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Cascadia Mono"
+                                    FontSize="10"
+                                    FontWeight="SemiBold"
+                                    Foreground="{StaticResource PocketInkDim}"
+                                    IsTextScaleFactorEnabled="False"
+                                    Text="1" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="N" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="RedactTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Redact"
+                        AutomationProperties.Name="Redact tool"
+                        ToolTipService.ToolTip="Redact · D (press again to cycle solid, pixelate, blur)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="RedactSolidGlyph"
+                                    Data="M4,6 H20 V18 H4 Z"
+                                    Style="{StaticResource PocketToolIconFill}" />
+                                <!--  A checkerboard is a literal depiction of pixelation,
+                                      not decoration.  -->
+                                <Path
+                                    x:Name="RedactPixelateGlyph"
+                                    Data="M6,6 h4 v4 h-4 Z M14,6 h4 v4 h-4 Z M10,10 h4 v4 h-4 Z M6,14 h4 v4 h-4 Z M14,14 h4 v4 h-4 Z"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path
+                                    x:Name="RedactBlurGlyph"
+                                    Data="M4,6 H20 V18 H4 Z"
+                                    Opacity="0.3"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                                <Path Data="M4,6 H20 V18 H4 Z" Style="{StaticResource PocketToolIconStroke}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="D" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="FocusTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Focus"
+                        AutomationProperties.Name="Focus tool"
+                        ToolTipService.ToolTip="Focus · S (press again to cycle dim and loupe shapes)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path
+                                    x:Name="FocusDimGlyph"
+                                    Data="M3,5 H21 V19 H3 Z M8.5,9 H15.5 V15 H8.5 Z"
+                                    Style="{StaticResource PocketToolIconStroke}" />
+                                <Path
+                                    x:Name="FocusLoupeGlyph"
+                                    Data="M11,4 A6.5,6.5 0 1 0 11,17 A6.5,6.5 0 1 0 11,4 Z M15.8,15.8 L20.5,20.5"
+                                    Style="{StaticResource PocketToolIconStroke}"
+                                    Visibility="Collapsed" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="S" />
+                        </Grid>
+                    </Button>
+
+                    <Button
+                        x:Name="CropTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Crop"
+                        AutomationProperties.Name="Crop tool"
+                        ToolTipService.ToolTip="Crop · C (drag to set, drag a corner to adjust)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M8,3 V16 H21 M3,8 H16 V21" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="C" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="CutTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Cut"
+                        AutomationProperties.Name="Cut tool"
+                        ToolTipService.ToolTip="Cut out a strip · X (drag across the rows to remove)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M4,7 H20 M4,17 H20" Style="{StaticResource PocketToolIconStroke}" />
+                                <Path Data="M3,12 H21" Style="{StaticResource PocketToolIconStrokeHair}" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="X" />
+                        </Grid>
+                    </Button>
+                    <Button
+                        x:Name="BackdropTool"
+                        Click="Backdrop_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        AutomationProperties.Name="Backdrop"
+                        ToolTipService.ToolTip="Backdrop · B (press again to cycle)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Path Data="M3.5,4.5 H20.5 V19.5 H3.5 Z" Style="{StaticResource PocketToolIconStroke}" />
+                                <Path
+                                    x:Name="BackdropInnerGlyph"
+                                    Data="M7,8 H17.5 V16.5 H7 Z"
+                                    Style="{StaticResource PocketToolIconFill}"
+                                    Visibility="Collapsed" />
+                            </Grid>
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="B" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="ReadTextTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="ReadText"
+                        AutomationProperties.Name="Read text tool"
+                        ToolTipService.ToolTip="Read text · O (click for the whole shot, drag for a region)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,5 H20 V19 H4 Z M7,10 H17 M7,13 H14 M7,16 H11" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="O" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <!--  Swatches. The one place a colour is the content, so they stay
+                          plain discs. Green is deliberately absent from the palette: on
+                          this surface green means the active tool, so a green mark would
+                          read as CursorPocket talking rather than as the user's ink.  -->
+                    <StackPanel x:Name="SwatchStrip" Orientation="Horizontal" Spacing="2" />
+                    <Button
+                        x:Name="EyedropTool"
+                        Click="Tool_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        Tag="Eyedrop"
+                        AutomationProperties.Name="Eyedropper"
+                        ToolTipService.ToolTip="Eyedropper · I (samples the screenshot)">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M4,20 L7,13 L16,4 L20,8 L11,17 Z" Style="{StaticResource PocketToolIconStroke}" />
+                            <TextBlock Grid.Column="1" Style="{StaticResource ToolKeyText}" Text="I" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="SizeButton"
+                        Click="Size_Click"
+                        Style="{StaticResource PocketToolButton}"
+                        AutomationProperties.Name="Mark size"
+                        ToolTipService.ToolTip="Size · [ and ]">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Data="M7.5,15.5 A1.5,1.5 0 1 0 4.5,15.5 A1.5,1.5 0 1 0 7.5,15.5 Z M14.5,14 A2.5,2.5 0 1 0 9.5,14 A2.5,2.5 0 1 0 14.5,14 Z M21,12 A4,4 0 1 0 13,12 A4,4 0 1 0 21,12 Z" Style="{StaticResource PocketToolIconFill}" />
+                            <TextBlock
+                                x:Name="SizeStepText"
+                                Grid.Column="1"
+                                Style="{StaticResource ToolKeyText}"
+                                Text="M" />
+                        </Grid>
+                    </Button>
+
+                    <Rectangle Style="{StaticResource ToolbarDivider}" />
+
+                    <Button
+                        x:Name="UndoButton"
+                        Click="Undo_Click"
+                        Style="{StaticResource PocketIconButton}"
+                        AutomationProperties.Name="Undo"
+                        ToolTipService.ToolTip="Undo · Ctrl+Z">
+                        <FontIcon FontSize="14" Glyph="&#xE7A7;" />
+                    </Button>
+                    <Button
+                        x:Name="RedoButton"
+                        Click="Redo_Click"
+                        Style="{StaticResource PocketIconButton}"
+                        AutomationProperties.Name="Redo"
+                        ToolTipService.ToolTip="Redo · Ctrl+Y">
+                        <FontIcon FontSize="14" Glyph="&#xE7A6;" />
+                    </Button>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel
+                    x:Name="ToolbarRight"
+                    Grid.Column="1"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Button
+                        x:Name="PinButton"
+                        Click="Pin_Click"
+                        Style="{StaticResource PocketIconButton}"
+                        AutomationProperties.Name="Pin this screenshot on screen"
+                        ToolTipService.ToolTip="Pin on screen · Ctrl+P">
+                        <Path
+                            Width="24"
+                            Height="24"
+                            Data="M9,4 H15 M12,4 V10 M6.5,14.5 H17.5 L15,10 H9 Z M12,14.5 V20.5"
+                            Stretch="None"
+                            Stroke="{StaticResource PocketInkDim}"
+                            StrokeEndLineCap="Round"
+                            StrokeLineJoin="Round"
+                            StrokeStartLineCap="Round"
+                            StrokeThickness="2" />
+                    </Button>
+                    <Button
+                        x:Name="CopyButton"
+                        Click="Copy_Click"
+                        Style="{StaticResource PocketIconButton}"
+                        AutomationProperties.Name="Copy the marked-up image"
+                        ToolTipService.ToolTip="Copy without saving · Ctrl+C">
+                        <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                    </Button>
+                    <Button
+                        x:Name="KeepOriginalButton"
+                        Click="Cancel_Click"
+                        Content="Keep original"
+                        Style="{StaticResource PocketQuietButton}"
+                        ToolTipService.ToolTip="Discard the marks and keep the screenshot as it was · Esc" />
+                    <Button Click="Save_Click" Style="{StaticResource PocketPrimaryButton}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Save screenshot" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontFamily="Cascadia Mono"
+                                FontSize="12"
+                                IsTextScaleFactorEnabled="False"
+                                Opacity="0.62"
+                                Text="&#x21B5;" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!--  The canvas well. DESIGN.md assigns 16 to wells; this used to borrow the
+                  12 px card radius.  -->
+            <Grid Grid.Row="1" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border
+                    Padding="12"
+                    Background="#FF070C0E"
+                    BorderBrush="{StaticResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource PocketWellCorner}">
+                    <!--  A focusable host around the drawing area. Keyboard accelerators
+                          only route while something inside the window holds focus, and a
+                          Canvas cannot take focus — Focus() on it silently returns false,
+                          which left every accelerator dead until the user happened to
+                          click a toolbar button. A Grid cannot stand in either: IsTabStop
+                          belongs to Control and a Grid is a Panel. This ContentControl
+                          holds focus without drawing a ring and without eating the
+                          pointer input the Canvas below needs.  -->
+                    <ContentControl
+                        x:Name="CanvasHost"
+                        HorizontalContentAlignment="Stretch"
+                        VerticalContentAlignment="Stretch"
+                        IsTabStop="True"
+                        UseSystemFocusVisuals="False">
+                        <Viewbox Stretch="Uniform">
+                            <!--  The backdrop is previewed by actually framing the stage,
+                                  so what is on screen is the shape that will be exported
+                                  rather than a description of it.  -->
+                            <Border x:Name="BackdropFrame" Padding="0">
+                                <Grid x:Name="Stage">
+                                <Image x:Name="ScreenshotImage" Stretch="Fill" />
+                                <!--  Recognised word boxes, above the marks and below the
+                                      pointer. Informational blue is reserved for text and
+                                      link captures, and OCR is a text capture.  -->
+                                <!--  Crop and cut are shown as a dim mask with handles and seams: the export
+                                      applies them, the preview states what will be kept.  -->
+                                <Canvas x:Name="GeometryOverlay" IsHitTestVisible="False" />
+                                <Canvas x:Name="OcrOverlay" IsHitTestVisible="False" />
+                                <Canvas
+                                    x:Name="DrawingSurface"
+                                    Background="Transparent"
+                                    PointerWheelChanged="DrawingSurface_PointerWheelChanged"
+                                    PointerExited="DrawingSurface_PointerExited"
+                                    PointerMoved="DrawingSurface_PointerMoved"
+                                    PointerPressed="DrawingSurface_PointerPressed"
+                                    PointerReleased="DrawingSurface_PointerReleased" />
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+                    </ContentControl>
+                </Border>
+
+                <!--  Key sheet. Only the modifiers live here — every tool key is already
+                      engraved on its own button, so nothing behind this panel is needed
+                      for a first successful edit.  -->
+                <Border
+                    x:Name="KeySheet"
+                    Padding="24"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{StaticResource PocketSurface}"
+                    BorderBrush="{StaticResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource PocketWellCorner}"
+                    Visibility="Collapsed">
+                    <StackPanel Spacing="14">
+                        <TextBlock Style="{StaticResource PocketLabelText}" Text="KEYS" />
+                        <Grid ColumnSpacing="32" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="KeySheetColumnOne" Spacing="10" />
+                            <StackPanel
+                                x:Name="KeySheetColumnTwo"
+                                Grid.Column="1"
+                                Spacing="10" />
+                        </Grid>
+                        <Button
+                            HorizontalAlignment="Left"
+                            Click="KeySheet_Click"
+                            Content="Close"
+                            Style="{StaticResource PocketQuietButton}" />
+                    </StackPanel>
+                </Border>
+
+                <!--  Recognised text sits beside the image rather than over it, so the
+                      words and the place they came from can be read together.  -->
+                <Border
+                    x:Name="OcrPanel"
+                    Grid.Column="1"
+                    Width="320"
+                    Padding="16"
+                    Background="{StaticResource PocketSurface}"
+                    BorderBrush="{StaticResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource PocketWellCorner}"
+                    Visibility="Collapsed">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource PocketLabelText}"
+                                Text="RECOGNISED TEXT" />
+                            <Button
+                                HorizontalAlignment="Right"
+                                Click="CloseOcr_Click"
+                                Style="{StaticResource PocketIconButton}"
+                                AutomationProperties.Name="Close the recognised text panel">
+                                <FontIcon FontSize="12" Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+                        <!--  A TextBox, not a TextBlock, so part of the result can be
+                              selected. It is also exactly the focusable control the
+                              accelerator guard exists for.  -->
+                        <TextBox
+                            x:Name="OcrText"
+                            Grid.Row="1"
+                            AcceptsReturn="True"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            IsReadOnly="True"
+                            IsSpellCheckEnabled="False"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            x:Name="OcrSummaryText"
+                            Grid.Row="2"
+                            Style="{StaticResource PocketNumericText}" />
+                        <StackPanel
+                            Grid.Row="3"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <Button
+                                Click="CopyOcrText_Click"
+                                Content="Copy text"
+                                Style="{StaticResource PocketQuietButton}"
+                                ToolTipService.ToolTip="Ctrl+Shift+C — the screenshot stays on the clipboard until you ask for this" />
+                            <Button
+                                Click="SaveOcrText_Click"
+                                Content="Save as note"
+                                Style="{StaticResource PocketQuietButton}"
+                                ToolTipService.ToolTip="Keep the recognised text as its own text capture" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!--  Status strip. Replaces the prose hint, so it costs no vertical space.
+                  Field two is the ruler: the size of the mark being dragged, in the
+                  pixels the export will actually contain.  -->
+            <Grid Grid.Row="2" ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <!--  A destructive action is never adjacent to a benign one. This used
+                          to sit between Keep original and Save, which is as adjacent as it
+                          gets; the far end of the status strip is the opposite corner of
+                          the surface from the primary action.  -->
+                    <Button
+                        x:Name="DiscardButton"
+                        MinHeight="26"
+                        Padding="0"
+                        Click="Discard_Click"
+                        Style="{StaticResource PocketDangerButton}"
+                        AutomationProperties.Name="Discard this screenshot"
+                        ToolTipService.ToolTip="Throw the screenshot away — it goes to the Recycle Bin">
+                        <TextBlock Style="{StaticResource PocketNumericText}" Text="Discard" />
+                    </Button>
+                    <TextBlock
+                        x:Name="StatusToolText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource PocketMetaText}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock
+                    x:Name="StatusOutputText"
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource PocketInkDim}"
+                    Style="{StaticResource PocketNumericText}"
+                    ToolTipService.ToolTip="The size the saved image will be" />
+                <TextBlock
+                    x:Name="StatusSizeText"
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Foreground="{StaticResource PocketInk}"
+                    Style="{StaticResource PocketNumericText}" />
+                <TextBlock
+                    x:Name="StatusPointerText"
+                    Grid.Column="3"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PocketNumericText}" />
+                <Button
+                    Grid.Column="4"
+                    Click="KeySheet_Click"
+                    Style="{StaticResource PocketGhostButton}"
+                    AutomationProperties.Name="Show the keyboard shortcuts"
+                    ToolTipService.ToolTip="Keys · F1">
+                    <TextBlock Style="{StaticResource PocketNumericText}" Text="? keys" />
+                </Button>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

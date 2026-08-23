@@ -124,6 +124,29 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
 - The level meter is a rolling waveform across a short history of samples (`AudioLevelHistory`), not a single bar tracking the current level. Stems grow from a mid-line in both directions with a bright centre, so the form has a spine and reads as a waveform rather than a bar chart; quiet samples fade back instead of vanishing. Silence still draws a visible baseline so a quiet room does not look like a broken meter, and levels are square-rooted so ordinary speech registers.
 
+### Annotation editor
+
+- The editor is a normal Mica window the user works *in*, not a transient overlay, so the opaque-root and capture-exclusion rules for transient surfaces do not apply to it. It is brought up with `WindowPlacement.ForceForeground` on the capture path and plain `Activate()` everywhere else — a transient surface has just hidden itself on the capture path, so the source app still owns the foreground lock.
+- **The toolbar teaches its own keys.** Every tool carries its key engraved on its own button as a bare mono letter. Icons are 19 px of content in a 24 px box on a 2 px round-capped stroke; that ratio is what makes a dense toolbar read as an instrument rather than a puzzle. As the window narrows the letters collapse, then a label shortens — **the teaching degrades, never the capability.** No tool is ever hidden, there is no overflow menu, and the toolbar never scrolls.
+- A tool's variants are reached by pressing its key again, and the status strip states the current variant and what the next press will do. That is the teaching surface a hover submenu would otherwise be.
+- **Green on this surface means the active tool and the crop handles, plus the one solid-green Save button. Nothing else.** No annotation ink may be a state colour: green is absent from the palette entirely, red is present at a deliberately different value from `Recording`, and blue is absent because it is too close to `Informational`. A green arrow would read as CursorPocket talking rather than as the user's own mark. The active *swatch* is deliberately not green either — two competing selection greens in one toolbar would make neither readable — so it takes an ink-white ring instead. Crop handles are green corner brackets: same hue as the active tool, told apart by form, which is the rule the app already uses for capture kinds.
+- Mark weight and text size are derived from the image's short edge, never fixed. A constant is illegible on a 4K shot and most of the frame on a small region capture.
+- **What is drawn is what is saved.** The preview and the exporter take every shape from one Core geometry source and every sampled patch from one shared sampler. Neither may compute a shape or read a pixel of its own.
+- **Redaction defaults to solid**, and the status strip says "nothing recoverable" against "partly recoverable" in those words. Pixelation and blur derive their output from the pixels underneath, so for a short string they are only partially destructive.
+- Recognised text never reaches the clipboard unasked. A screenshot is on the clipboard from the moment it is taken; replacing that with text silently would break a promise the app makes everywhere else.
+- Crop, cut, and backdrop change the exported dimensions, so **a geometry change writes a new capture and leaves the original alone.** Marks are additive and still overwrite in place. The status strip carries an output-size field, so the claim that the readout is in native export pixels survives the export no longer matching the shot.
+- Backdrops are flat fills with a rendered shadow, not mesh gradients. See the exceptions table below.
+- The editor is fully keyboard-drivable through page accelerators, which cannot reach another application. Only `Escape` is a scoped global, because the drawing canvas cannot take focus and the window can lose activation. Something focusable must always hold focus or no accelerator routes at all.
+
+### Pinned captures
+
+- A pin is a receipt the user decided to keep: it is the content itself, at a smaller size, on top. That is what separates it from a floating widget whose purpose is unexplained.
+- **Only ever by explicit action, and never restored after a restart.** A window that reappears after a reboot with no explanation is precisely the anti-reference. The Library holds the durable copy.
+- Deliberately **not** capture-excluded. A pin exists to be visible, so it must appear in a screenshot or recording taken while it is up. Visible equals captured; a user who does not want it in the shot closes it.
+- Controls appear on hover in a strip at the bottom — a screenshot's own content usually starts at its top-left, and covering that is what makes a floating thumbnail useless.
+- Dragged by pointer tracking, never by Windows' modal move loop, and it carries no window region: a region takes the window off DWM's fast path, which is what makes a dragged window lag.
+- Its `Escape` is a page accelerator, never a scoped global lease. A pin can sit on screen for hours while the user works elsewhere, and holding the topmost lease would steal `Escape` from every application — including a recording, where `Escape` means stop and save.
+
 ### Receipt and Library
 
 - The Library gives the preview the majority of the width, and the preview can take the whole window when the list is collapsed. Video and audio use the full transport controls — seek, volume, playback rate, skip, fast forward and rewind, zoom, repeat, full window.
@@ -147,6 +170,17 @@ The mark is one idea: a cursor crossing into a pocket. Above the pocket mouth th
 - The command panel header is the one place a raster of the mark is used, at 26 dips over a green pulse. `tools/make_logo.py` writes that asset in the cursor-only form so it stays crisp from 100% to 250% scale.
 - Regenerate with `python tools/make_logo.py && python tools/make_icon.py`.
 
+## Deliberate exceptions
+
+Four rules above are overridden by explicit product decision on one surface each. They are written down here so the code and the design system do not contradict each other, and so nobody "fixes" the code back.
+
+| Rule | Override | Scope |
+| --- | --- | --- |
+| Avoid excessive gradients | The custom-ink swatch shows a colour wheel | One 26 px control, and only until a colour has been sampled. Backdrops are flat fills, not mesh gradients — that half of the reference tool's look was declined. |
+| Separation comes from the opaque surface, radius, and restrained shadow | Exported backdrops render a layered drop shadow under the image | The exported artwork only. No app chrome gains a shadow stack, and `ThemeShadow` is still absent everywhere. |
+| Default tooltip delay | Instant tooltips | The annotation toolbar only. |
+| `Escape` in annotation cancels without losing the original | `Escape` is two-stage: an armed tool returns to Select, and Select closes | The end state is unchanged — nothing is ever lost — but it can take two presses. The status strip says so after the first, and creation tools return to Select on their own, so most first presses *are* the closing press. |
+
 ## Design acceptance gate
 
 The design-consultation gate requires all of the following before release:
@@ -168,5 +202,13 @@ The design-consultation gate requires all of the following before release:
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
+- every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
+- no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;
+- a drawn mark and the saved PNG are the same shape, at every display scale;
+- a solid redaction leaves nothing of the content recoverable, and the status strip says which mode is live;
+- recognised text reaches the clipboard only when asked;
+- a crop, a cut, or a backdrop writes a new capture and leaves the original untouched, with correct dimensions in the Library;
+- `Escape` never loses the original, in one press or two;
+- a pin appears only by explicit action, is visible in a subsequent capture, does not survive a restart, and never swallows `Escape` from another application.
 
 Approval is based on an end-to-end visual and interaction pass of the installed build, not on XAML inspection alone.

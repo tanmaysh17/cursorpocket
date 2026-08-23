@@ -72,6 +72,13 @@
                             Style="{StaticResource PocketPrimaryButton}"
                             ToolTipService.ToolTip="Ctrl+Alt+O" />
                         <Button
+                            x:Name="EditButton"
+                            MinHeight="32"
+                            Click="Edit_Click"
+                            Content="Mark up"
+                            Style="{StaticResource PocketGhostButton}"
+                            ToolTipService.ToolTip="Ctrl+Alt+E" />
+                        <Button
                             x:Name="RevealButton"
                             MinHeight="32"
                             Click="Reveal_Click"
@@ -94,7 +101,7 @@
                         FontFamily="Cascadia Mono"
                         FontSize="10"
                         Foreground="{StaticResource PocketMuted}"
-                        Text="Ctrl+Alt · O open · R reveal · L library · X dismiss" />
+                        Text="Ctrl+Alt · O open · E mark up · R reveal · L library · X dismiss" />
                 </Grid>
             </Grid>
         </Border>

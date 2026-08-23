@@ -13,6 +13,7 @@
     <PackageReference Include="coverlet.collector" Version="6.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.20" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
   </ItemGroup>
 
@@ -28,6 +29,11 @@
   <ItemGroup>
     <Compile Include="..\CursorPocket.App\Services\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
     <Compile Include="..\CursorPocket.App\Services\GlobalHotkeyService.cs" Link="Interop\GlobalHotkeyService.cs" />
+    <!-- The annotation exporter has no WinUI dependency, so it can be compiled in and
+         tested against real exported pixels rather than only asserted as text. -->
+    <Compile Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Render\AnnotationExport.cs" />
+    <Compile Include="..\CursorPocket.App\Services\OcrTextService.cs" Link="Render\OcrTextService.cs" />
+    <Compile Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Render\AnnotationPatches.cs" />
     <Compile Include="..\CursorPocket.App\Services\WindowContextService.cs" Link="Interop\WindowContextService.cs" />
   </ItemGroup>
 
@@ -37,6 +43,12 @@
     <None Include="..\CursorPocket.App\CommandPaletteWindow.xaml" Link="Fixtures\CommandPaletteWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml" Link="Fixtures\RegionSelectorWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml.cs" Link="Fixtures\RegionSelectorWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\PinnedCaptureWindow.xaml" Link="Fixtures\PinnedCaptureWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\PinnedCaptureWindow.xaml.cs" Link="Fixtures\PinnedCaptureWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\AnnotationWindow.xaml" Link="Fixtures\AnnotationWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Fixtures\AnnotationPatches.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\OcrTextService.cs" Link="Fixtures\OcrTextService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Fixtures\AnnotationExport.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml.cs" Link="Fixtures\AnnotationWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\NativeCompanionWindow.cs" Link="Fixtures\NativeCompanionWindow.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\DesktopSnapshot.cs" Link="Fixtures\DesktopSnapshot.cs.txt" CopyToOutputDirectory="PreserveNewest" />
@@ -60,6 +72,7 @@
     <None Include="..\CursorPocket.App\MainWindow.xaml.cs" Link="Fixtures\MainWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\PreviewService.cs" Link="Fixtures\PreviewService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\AppServices.cs" Link="Fixtures\AppServices.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\App.xaml" Link="Fixtures\App.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\App.xaml.cs" Link="Fixtures\App.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\CameraEffectRenderer.cs" Link="Fixtures\CameraEffectRenderer.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\SelfieSegmenter.cs" Link="Fixtures\SelfieSegmenter.cs.txt" CopyToOutputDirectory="PreserveNewest" />

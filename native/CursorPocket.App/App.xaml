@@ -49,6 +49,26 @@
             <SolidColorBrush x:Key="PocketBlue" Color="{StaticResource PocketBlueColor}" />
             <SolidColorBrush x:Key="PocketTransparent" Color="Transparent" />
 
+            <!--  Annotation ink. These are the user's marks, not app state, and that is
+                  exactly why none of them is a state token: a green arrow on a surface
+                  whose selection is green would read as CursorPocket talking. Green is
+                  deliberately absent from the palette, so green here always means the
+                  active tool or the crop handles. Blue is absent too — it is too close
+                  to PocketBlue, which marks text and link captures.  -->
+            <Color x:Key="AnnotationInkSignalColor">#FFF4353F</Color>
+            <Color x:Key="AnnotationInkAmberColor">#FFF0B056</Color>
+            <Color x:Key="AnnotationInkCitronColor">#FFF5E663</Color>
+            <Color x:Key="AnnotationInkCyanColor">#FF2FD8E8</Color>
+            <Color x:Key="AnnotationInkVioletColor">#FFB57BF0</Color>
+            <Color x:Key="AnnotationInkChalkColor">#FFFFFFFF</Color>
+
+            <SolidColorBrush x:Key="AnnotationInkSignal" Color="{StaticResource AnnotationInkSignalColor}" />
+            <SolidColorBrush x:Key="AnnotationInkAmber" Color="{StaticResource AnnotationInkAmberColor}" />
+            <SolidColorBrush x:Key="AnnotationInkCitron" Color="{StaticResource AnnotationInkCitronColor}" />
+            <SolidColorBrush x:Key="AnnotationInkCyan" Color="{StaticResource AnnotationInkCyanColor}" />
+            <SolidColorBrush x:Key="AnnotationInkViolet" Color="{StaticResource AnnotationInkVioletColor}" />
+            <SolidColorBrush x:Key="AnnotationInkChalk" Color="{StaticResource AnnotationInkChalkColor}" />
+
             <!--  One canonical cursor, shared by the icon generator in tools/make_logo.py.
                   A Setter converts the literal to a Geometry; a plain string resource would
                   reach Path.Data untyped and fail at load.  -->
@@ -259,6 +279,91 @@
                 <Setter Property="FontSize" Value="16" />
                 <Setter Property="CornerRadius" Value="9" />
             </Style>
+
+            <!--  Annotation toolbar. A tool button is an icon plus its own key, engraved:
+                  the toolbar teaches its shortcuts instead of hiding them in a legend.
+                  46 wide at full width; the letter column collapses when the window is
+                  too narrow, which degrades the teaching and never the capability.  -->
+            <Style x:Key="PocketToolButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Width" Value="46" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            </Style>
+            <!--  A swatch is the one place a colour is the content, so it stays a plain
+                  disc. Its numeral is the key, matching the tool buttons.  -->
+            <Style x:Key="PocketSwatchButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            </Style>
+
+            <!--  Tool icons. 19 px of content inside a 24 px box on a 2 px round-capped
+                  stroke: the proportions are what make a dense toolbar read as an
+                  instrument rather than a puzzle. Stretch is None, so every geometry
+                  below is authored directly in that 24 px box, inside [2.5, 21.5].  -->
+            <Style x:Key="PocketToolIconStroke" TargetType="Path">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Stretch" Value="None" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="StrokeThickness" Value="2" />
+                <Setter Property="StrokeLineJoin" Value="Round" />
+                <Setter Property="StrokeStartLineCap" Value="Round" />
+                <Setter Property="StrokeEndLineCap" Value="Round" />
+                <Setter Property="Stroke" Value="{StaticResource PocketInkDim}" />
+            </Style>
+            <!--  The highlighter icon is drawn with a highlighter's own nib width.  -->
+            <Style x:Key="PocketToolIconStrokeHeavy" TargetType="Path" BasedOn="{StaticResource PocketToolIconStroke}">
+                <Setter Property="StrokeThickness" Value="5" />
+                <Setter Property="Opacity" Value="0.55" />
+            </Style>
+            <Style x:Key="PocketToolIconStrokeHair" TargetType="Path" BasedOn="{StaticResource PocketToolIconStroke}">
+                <Setter Property="StrokeThickness" Value="1.4" />
+                <Setter Property="StrokeDashArray" Value="2,2" />
+            </Style>
+            <Style x:Key="PocketToolIconFill" TargetType="Path">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Stretch" Value="None" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Fill" Value="{StaticResource PocketInkDim}" />
+            </Style>
+
+
+            <!--  The engraved key on a tool button. A bare mono letter, not a KeyCap
+                  chip: a chip inside a button double-nests interactive-looking elements,
+                  which is the trap command mode had to walk the visual tree to work
+                  around. An engraved letter is quieter and more instrument-like.  -->
+            <Style x:Key="ToolKeyText" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="Cascadia Mono" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="IsTextScaleFactorEnabled" Value="False" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0,0,7,0" />
+            </Style>
+            <Style x:Key="ToolbarDivider" TargetType="Rectangle">
+                <Setter Property="Width" Value="1" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="Margin" Value="8,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Fill" Value="{StaticResource PocketLine}" />
+            </Style>
+
+            <!--  Icon geometry is written inline as Path.Data at each use site, not held
+                  here as PathGeometry resources. WinUI only parses the abbreviated
+                  "M4,20 L20,4" syntax through Path.Data's own type converter:
+                  PathGeometry.Figures rejects it outright (WMC0055), and an x:String
+                  resource reaches Path.Data untyped and fails at load. That is the same
+                  constraint PocketCursorMark's comment records. The styles above carry
+                  the part worth sharing — box size, stroke weight, caps, joins, brush.  -->
 
             <!--  Containers  -->
             <Style x:Key="PocketCard" TargetType="Border">

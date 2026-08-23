@@ -91,6 +91,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Installer signing failed" }
           Remove-Item -LiteralPath $certificatePath -Force
 
+      # Every push produces a ~290 MB installer plus ZIP. At the default 90 day
+      # retention that reached 8 GB across 28 artifacts and hit the account's
+      # storage quota, which fails this step even though the build itself is fine
+      # -- and deleting artifacts does not clear it immediately, because the usage
+      # figure is only recalculated every 6-12 hours. Two weeks is long enough to
+      # install a build from a PR under review and short enough that it cannot
+      # accumulate that far again.
       - uses: actions/upload-artifact@v4
         with:
           name: CursorPocket-windows-x64
@@ -98,5 +105,6 @@ jobs:
             artifacts/CursorPocket-portable-win-x64.zip
             artifacts/CursorPocket-Setup-x64.exe
           if-no-files-found: error
+          retention-days: 14
 
 

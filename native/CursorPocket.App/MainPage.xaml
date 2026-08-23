@@ -35,6 +35,7 @@
             <KeyboardAccelerator Key="Space" Invoked="PlayAccelerator_Invoked" />
             <KeyboardAccelerator Key="Delete" Invoked="DeleteAccelerator_Invoked" />
             <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RevealAccelerator_Invoked" />
+            <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="EditAccelerator_Invoked" />
             <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyPathAccelerator_Invoked" />
             <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="MaximizeAccelerator_Invoked" />
             <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
@@ -476,6 +477,12 @@
                                             Command="{x:Bind ViewModel.RevealSelectedCommand}"
                                             Content="Reveal"
                                             Style="{StaticResource PocketQuietButton}" />
+                                        <Button
+                                            x:Name="EditButton"
+                                            Click="Edit_Click"
+                                            Content="Mark up"
+                                            Style="{StaticResource PocketQuietButton}"
+                                            ToolTipService.ToolTip="Ctrl+E — saves an edited copy and leaves this one alone" />
                                         <Button
                                             Click="CopyPath_Click"
                                             Style="{StaticResource PocketIconButton}"
