@@ -633,7 +633,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
     private void StartClock()
     {
         _stopwatch = Stopwatch.StartNew();
-        _elapsedTimer.Change(0, 100);
+        // The HUD only renders whole seconds, so ten ticks a second was nine wasted.
+        _elapsedTimer.Change(0, 250);
     }
 
     private TimeSpan StopClock()

@@ -55,8 +55,12 @@ New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 Remove-ArtifactPath $publishRoot
 if (Test-Path -LiteralPath $portableArchive) { Remove-Item -LiteralPath $portableArchive -Force }
 
+# ReadyToRun precompiles the managed code that WinUI startup would otherwise JIT
+# method by method, which is the bulk of cold-start time for an unpackaged app.
+# Trimming stays off: this publish also stages XAML resources and reflection-driven
+# WinForms/System.Drawing paths that a trimmer cannot see.
 & $dotnet publish $appProject -c Release -r win-x64 --self-contained true --no-restore `
-    -p:PublishTrimmed=false -p:PublishReadyToRun=false -o $publishRoot
+    -p:PublishTrimmed=false -p:PublishReadyToRun=true -o $publishRoot
 if ($LASTEXITCODE -ne 0) { throw "Native publish failed." }
 
 # Unpackaged WinUI publish can omit compiled XAML resources even though they

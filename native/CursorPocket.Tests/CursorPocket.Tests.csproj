@@ -40,6 +40,8 @@
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml.cs" Link="Fixtures\AnnotationWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\NativeCompanionWindow.cs" Link="Fixtures\NativeCompanionWindow.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\DesktopSnapshot.cs" Link="Fixtures\DesktopSnapshot.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\MouseActivityService.cs" Link="Fixtures\MouseActivityService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\ScreenshotCaptureService.cs" Link="Fixtures\ScreenshotCaptureService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CommandPaletteWindow.xaml.cs" Link="Fixtures\CommandPaletteWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\PaletteHotkeyService.cs" Link="Fixtures\PaletteHotkeyService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\ScopedEscapeHotkeyService.cs" Link="Fixtures\ScopedEscapeHotkeyService.cs.txt" CopyToOutputDirectory="PreserveNewest" />

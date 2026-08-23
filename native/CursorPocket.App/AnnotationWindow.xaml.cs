@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+using System.Buffers.Binary;
+using System.Text.Json;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using Microsoft.UI;
@@ -25,6 +26,7 @@ public sealed partial class AnnotationWindow : Window
     private Windows.UI.Color _color = Windows.UI.Color.FromArgb(255, 69, 224, 140);
     private AnnotationOperation? _active;
     private Point _start;
+    private Point _lastStrokePoint;
     private bool _finished;
     private readonly IDisposable _escapeLease;
 
@@ -35,11 +37,19 @@ public sealed partial class AnnotationWindow : Window
         InitializeComponent();
         var bounds = WindowPlacement.MonitorUnderPointer(true);
         AppWindow.MoveAndResize(new RectInt32(bounds.Left + 20, bounds.Top + 20, Math.Max(760, bounds.Right - bounds.Left - 40), Math.Max(560, bounds.Bottom - bounds.Top - 40)));
-        using var source = new System.Drawing.Bitmap(path);
-        Stage.Width = source.Width;
-        Stage.Height = source.Height;
-        DrawingSurface.Width = source.Width;
-        DrawingSurface.Height = source.Height;
+        // The capture already recorded its pixel size, so the full screenshot is
+        // decoded once by the BitmapImage below rather than twice.
+        if (!TryReadRecordedSize(record, out var pixelWidth, out var pixelHeight) &&
+            !TryReadPngSize(path, out pixelWidth, out pixelHeight))
+        {
+            using var source = new System.Drawing.Bitmap(path);
+            pixelWidth = source.Width;
+            pixelHeight = source.Height;
+        }
+        Stage.Width = pixelWidth;
+        Stage.Height = pixelHeight;
+        DrawingSurface.Width = pixelWidth;
+        DrawingSurface.Height = pixelHeight;
         ScreenshotImage.Source = new BitmapImage(new Uri(path));
         DrawingSurface.KeyDown += DrawingSurface_KeyDown;
         _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
@@ -81,10 +91,11 @@ public sealed partial class AnnotationWindow : Window
     private void DrawingSurface_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
         _start = eventArgs.GetCurrentPoint(DrawingSurface).Position;
+        _lastStrokePoint = _start;
         DrawingSurface.CapturePointer(eventArgs.Pointer);
         if (_tool is "pen" or "highlight")
         {
-            var points = new ObservableCollection<Point> { _start };
+            var points = new List<Point> { _start };
             var polyline = new Polyline
             {
                 Stroke = new SolidColorBrush(_tool == "highlight" ? WithAlpha(_color, 92) : _color),
@@ -126,6 +137,13 @@ public sealed partial class AnnotationWindow : Window
         switch (_active.Visual)
         {
             case Polyline polyline:
+                // A Polyline re-tessellates its whole geometry every frame, so a
+                // long freehand stroke gets slower the more samples it holds.
+                if (SquaredDistance(current, _lastStrokePoint) < MinimumStrokeStep * MinimumStrokeStep)
+                {
+                    break;
+                }
+                _lastStrokePoint = current;
                 polyline.Points.Add(current);
                 _active.Points?.Add(current);
                 break;
@@ -288,6 +306,52 @@ public sealed partial class AnnotationWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
     private void Cancel() { _finished = true; Cancelled?.Invoke(this, EventArgs.Empty); Close(); }
 
+    private const double MinimumStrokeStep = 2.5;
+
+    private static double SquaredDistance(Point first, Point second)
+    {
+        var dx = first.X - second.X;
+        var dy = first.Y - second.Y;
+        return dx * dx + dy * dy;
+    }
+
+    private static bool TryReadRecordedSize(CaptureRecord record, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        return record.Metadata.TryGetValue("width", out var recordedWidth)
+            && recordedWidth.ValueKind == JsonValueKind.Number
+            && recordedWidth.TryGetInt32(out width)
+            && record.Metadata.TryGetValue("height", out var recordedHeight)
+            && recordedHeight.ValueKind == JsonValueKind.Number
+            && recordedHeight.TryGetInt32(out height)
+            && width > 0
+            && height > 0;
+    }
+
+    private static bool TryReadPngSize(string path, out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            Span<byte> header = stackalloc byte[24];
+            if (stream.Read(header) != header.Length ||
+                header[0] != 0x89 || header[1] != (byte)'P' || header[2] != (byte)'N' || header[3] != (byte)'G')
+            {
+                return false;
+            }
+            width = BinaryPrimitives.ReadInt32BigEndian(header[16..20]);
+            height = BinaryPrimitives.ReadInt32BigEndian(header[20..24]);
+            return width > 0 && height > 0;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private static Windows.UI.Color ParseColor(string hex)
     {
         var value = hex.TrimStart('#');
@@ -295,13 +359,13 @@ public sealed partial class AnnotationWindow : Window
     }
     private static Windows.UI.Color WithAlpha(Windows.UI.Color value, byte alpha) => Windows.UI.Color.FromArgb(alpha, value.R, value.G, value.B);
 
-    private sealed class AnnotationOperation(string tool, Windows.UI.Color color, Point start, Point end, ObservableCollection<Point>? points, string? text, UIElement visual)
+    private sealed class AnnotationOperation(string tool, Windows.UI.Color color, Point start, Point end, List<Point>? points, string? text, UIElement visual)
     {
         public string Tool { get; } = tool;
         public Windows.UI.Color Color { get; } = color;
         public Point Start { get; } = start;
         public Point End { get; set; } = end;
-        public ObservableCollection<Point>? Points { get; } = points;
+        public List<Point>? Points { get; } = points;
         public string? Text { get; } = text;
         public UIElement Visual { get; } = visual;
     }
