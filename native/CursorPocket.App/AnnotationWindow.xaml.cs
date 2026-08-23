@@ -29,15 +29,6 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private const int SmoothingPasses = 2;
 
-    /// <summary>
-    /// Toolbar width thresholds in dips. At 46 px a button plus its engraved key, the
-    /// full toolbar needs roughly 1060 dips — more than a 1920 display gives at 150%
-    /// scale. Below each threshold the teaching degrades; no tool is ever hidden.
-    /// </summary>
-    private const double CompactToolbarWidth = 1060;
-
-    private const double TightToolbarWidth = 900;
-
     /// <summary>Corner-radius step and ceiling for a box, in source pixels.</summary>
     private const double CornerRadiusStep = 2;
 
@@ -155,8 +146,6 @@ public sealed partial class AnnotationWindow : Window
         ApplyToolState();
         ApplyHistoryState();
         RefreshGeometry();
-
-        Root.SizeChanged += (_, args) => ApplyToolbarWidth(args.NewSize.Width);
 
         _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(HandleEscape));
         // Focus has to land on Loaded, not on Activated: Activated fires before the
@@ -531,32 +520,6 @@ public sealed partial class AnnotationWindow : Window
     {
         UndoButton.IsEnabled = _history.CanUndo;
         RedoButton.IsEnabled = _history.CanRedo;
-    }
-
-    private void ApplyToolbarWidth(double width)
-    {
-        var showKeys = width >= CompactToolbarWidth;
-        var buttonWidth = width >= CompactToolbarWidth ? 46d : 36d;
-
-        foreach (var button in _toolButtons.Append(SizeButton))
-        {
-            button.Width = buttonWidth;
-            if (button.Content is Grid grid)
-            {
-                foreach (var text in grid.Children.OfType<TextBlock>())
-                {
-                    text.Visibility = showKeys ? Visibility.Visible : Visibility.Collapsed;
-                }
-            }
-        }
-
-        // The last thing to go is a label on a button that has an icon anyway. Every
-        // tool stays reachable at every width.
-        KeepOriginalButton.Content = width >= TightToolbarWidth ? "Keep original" : "Keep";
-        foreach (var button in _swatchButtons)
-        {
-            button.Width = width >= TightToolbarWidth ? 26 : 22;
-        }
     }
 
     // ------------------------------------------------------------------- tool changes

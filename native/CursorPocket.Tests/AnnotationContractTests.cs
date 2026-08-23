@@ -286,17 +286,72 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
-    public void The_toolbar_degrades_its_teaching_and_never_its_capability()
+    public void The_two_toolbar_clusters_cannot_overlap()
     {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+        var row = Slice(xaml, "x:Name=\"ToolbarRow\"", "x:Name=\"SelectTool\"");
+
+        // Both clusters used to sit in one cell, left-aligned and right-aligned. Once the
+        // tools outgrew the space they drew straight over the output buttons — a
+        // strikethrough through "Discard" — rather than the row adapting. Two columns make
+        // that structurally impossible.
+        Assert.Contains("<Grid.ColumnDefinitions>", row, StringComparison.Ordinal);
+        Assert.Equal(2, Occurrences(row, "<ColumnDefinition"));
+        Assert.Contains("x:Name=\"ToolbarRight\"", xaml, StringComparison.Ordinal);
+        var right = Slice(xaml, "x:Name=\"ToolbarRight\"", "x:Name=\"PinButton\"");
+        Assert.Contains("Grid.Column=\"1\"", right, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_tool_cluster_scrolls_and_never_hides_a_key()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
-        var apply = Slice(code, "private void ApplyToolbarWidth", "// ------");
-        // At full width every tool shows its key. As the window narrows the keys go, then
-        // a label shortens — but no tool is hidden, there is no overflow menu, and the
-        // toolbar never scrolls.
-        Assert.Contains("Visibility.Collapsed", apply, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsEnabled = false", apply, StringComparison.Ordinal);
-        Assert.DoesNotContain("Children.Remove", apply, StringComparison.Ordinal);
+        // Shrinking to fit meant dropping the engraved keys first, which throws away the
+        // whole reason the toolbar teaches itself — and the thresholds it compared against
+        // were set for eight tools and then silently outgrown as more were added.
+        // Scrolling keeps every tool reachable and every key visible at any width, which is
+        // the answer command mode already uses for its command list.
+        Assert.Contains("x:Name=\"ToolbarScroller\"", xaml, StringComparison.Ordinal);
+        var scroller = Slice(xaml, "x:Name=\"ToolbarScroller\"", "x:Name=\"ToolbarLeft\"");
+        Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", scroller, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollMode=\"Disabled\"", scroller, StringComparison.Ordinal);
+
+        // No width state machine, and nothing collapses a key.
+        Assert.DoesNotContain("CompactToolbarWidth", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("TightToolbarWidth", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyToolbarWidth", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Every_tool_button_carries_its_key_on_its_face()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+
+        // The engraved letter is the teaching mechanism: it is why there is no hover
+        // submenu and no legend anyone has to read. Every tool button has one, always.
+        var toolButtons = Occurrences(xaml, "Style=\"{StaticResource PocketToolButton}\"");
+        var engraved = Occurrences(xaml, "Style=\"{StaticResource ToolKeyText}\"");
+
+        Assert.True(toolButtons > 10, $"only {toolButtons} tool buttons found — the regex has drifted");
+        Assert.Equal(toolButtons, engraved);
+    }
+
+    [Fact]
+    public void The_destructive_action_is_not_adjacent_to_a_benign_one()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+
+        // Discard shipped between Keep original and Save, which is as adjacent as it gets.
+        // It now lives at the far end of the status strip — the opposite corner of the
+        // surface from the primary action.
+        var outputs = Slice(xaml, "x:Name=\"ToolbarRight\"", "</Grid>");
+        Assert.DoesNotContain("DiscardButton", outputs, StringComparison.Ordinal);
+        Assert.Contains("PocketDangerButton", xaml, StringComparison.Ordinal);
+
+        // Save is still the one primary action, and still on its own.
+        Assert.Equal(1, Occurrences(xaml, "PocketPrimaryButton"));
     }
 
     [Fact]
