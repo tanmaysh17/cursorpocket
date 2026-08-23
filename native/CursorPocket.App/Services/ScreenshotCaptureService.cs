@@ -8,6 +8,7 @@ namespace CursorPocket_App.Services;
 
 public sealed class ScreenshotCaptureService(CaptureStore store) : ICaptureService
 {
+    private readonly CaptureTransaction _transaction = new(store);
     public Task<CaptureRecord> CaptureDisplayAsync(CancellationToken cancellationToken = default)
     {
         NativeMethods.GetCursorPos(out var cursor);
@@ -48,28 +49,25 @@ public sealed class ScreenshotCaptureService(CaptureStore store) : ICaptureServi
         {
             throw new ArgumentException("Screenshot selection is empty.", nameof(bounds));
         }
-        var reservation = store.Reserve(CaptureKind.Screenshot, ".png");
-        // The screen grab and the PNG encode are both expensive at 4K. Doing them
-        // inline froze the UI thread for the whole encode after every screenshot key.
-        await Task.Run(
-            () =>
+        var result = await _transaction.CommitAsync(
+            new CaptureTransactionRequest(
+                CaptureKind.Screenshot,
+                ".png",
+                $"Screenshot · {bounds.Width} × {bounds.Height}",
+                new Dictionary<string, object?>
+                {
+                    ["bounds"] = new[] { bounds.Left, bounds.Top, bounds.Right, bounds.Bottom },
+                    ["width"] = bounds.Width,
+                    ["height"] = bounds.Height,
+                }),
+            (temporaryPath, token) => Task.Run(() =>
             {
                 using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
                 using var graphics = Graphics.FromImage(bitmap);
                 graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-                bitmap.Save(reservation.AbsolutePath, ImageFormat.Png);
-            },
+                bitmap.Save(temporaryPath, ImageFormat.Png);
+            }, token),
             cancellationToken);
-        return await store.RegisterExistingAsync(
-            CaptureKind.Screenshot,
-            reservation.AbsolutePath,
-            $"Screenshot · {bounds.Width} × {bounds.Height}",
-            new Dictionary<string, object?>
-            {
-                ["bounds"] = new[] { bounds.Left, bounds.Top, bounds.Right, bounds.Bottom },
-                ["width"] = bounds.Width,
-                ["height"] = bounds.Height,
-            },
-            cancellationToken);
+        return result.Record;
     }
 }

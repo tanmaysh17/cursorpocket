@@ -6,6 +6,7 @@ namespace CursorPocket.Core.Storage;
 
 public sealed class SettingsStore(string? settingsPath = null)
 {
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
     public string SettingsPath { get; } = settingsPath ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CursorPocket",
@@ -32,22 +33,65 @@ public sealed class SettingsStore(string? settingsPath = null)
         }
         catch (Exception error) when (error is IOException or JsonException or UnauthorizedAccessException)
         {
+            var backupPath = SettingsPath + ".bak";
+            if (File.Exists(backupPath))
+            {
+                try
+                {
+                    await using var backup = File.OpenRead(backupPath);
+                    var recovered = await JsonSerializer.DeserializeAsync<AppSettings>(backup, JsonOptions, cancellationToken);
+                    return Normalize(recovered ?? new AppSettings());
+                }
+                catch (Exception backupError) when (backupError is IOException or JsonException or UnauthorizedAccessException)
+                {
+                    // Both copies are invalid; defaults are safer than blocking launch.
+                }
+            }
             return Normalize(new AppSettings());
         }
     }
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        var normalized = Normalize(settings);
-        var directory = Path.GetDirectoryName(SettingsPath)!;
-        Directory.CreateDirectory(directory);
-        var temporaryPath = SettingsPath + ".tmp";
-        await using (var stream = File.Create(temporaryPath))
+        await _writeLock.WaitAsync(cancellationToken);
+        var temporaryPath = string.Empty;
+        try
         {
-            await JsonSerializer.SerializeAsync(stream, normalized, JsonOptions, cancellationToken);
-            await stream.FlushAsync(cancellationToken);
+            var normalized = Normalize(settings);
+            var directory = Path.GetDirectoryName(SettingsPath)!;
+            Directory.CreateDirectory(directory);
+            temporaryPath = Path.Combine(directory, $".{Path.GetFileName(SettingsPath)}.{Guid.NewGuid():N}.tmp");
+            await using (var stream = new FileStream(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.Write,
+                FileShare.None,
+                4096,
+                FileOptions.WriteThrough))
+            {
+                await JsonSerializer.SerializeAsync(stream, normalized, JsonOptions, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+                stream.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(SettingsPath))
+            {
+                File.Replace(temporaryPath, SettingsPath, SettingsPath + ".bak", ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, SettingsPath);
+            }
+            temporaryPath = string.Empty;
         }
-        File.Move(temporaryPath, SettingsPath, true);
+        finally
+        {
+            if (!string.IsNullOrEmpty(temporaryPath))
+            {
+                try { File.Delete(temporaryPath); } catch (IOException) { }
+            }
+            _writeLock.Release();
+        }
     }
 
     public static AppSettings Normalize(AppSettings value)
@@ -94,9 +138,11 @@ public sealed class SettingsStore(string? settingsPath = null)
         // A corrupt or out-of-range anchor must never put command mode off screen.
         var anchorX = ClampAnchor(value.CommandPanelAnchorX, CommandPanelPlacement.DefaultAnchorX);
         var anchorY = ClampAnchor(value.CommandPanelAnchorY, CommandPanelPlacement.DefaultAnchorY);
+        var themeMode = Enum.IsDefined(value.ThemeMode) ? value.ThemeMode : AppThemeMode.System;
 
         return value with
         {
+            ThemeMode = themeMode,
             CaptureDirectory = captureDirectory,
             VideoFramesPerSecond = fps,
             VideoCountdownSeconds = countdown,

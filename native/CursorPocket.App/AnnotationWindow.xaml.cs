@@ -54,6 +54,7 @@ public sealed partial class AnnotationWindow : Window
     private readonly List<Button> _toolButtons = [];
     private readonly List<Button> _swatchButtons = [];
     private readonly IDisposable _escapeLease;
+    private readonly SemaphoreSlim _outputGate = new(1, 1);
 
     /// <summary>
     /// The source pixels, decoded once and held for the session. The first version set
@@ -126,6 +127,7 @@ public sealed partial class AnnotationWindow : Window
         _path = path;
         _origin = origin;
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.Workspace);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AnnotationTitleBar);
@@ -140,6 +142,8 @@ public sealed partial class AnnotationWindow : Window
         _source = LoadSource(path, out var displaySource);
         _sourceWidth = _source.Width;
         _sourceHeight = _source.Height;
+
+        BuildToolRail();
 
         // The stage is sized to the source bitmap, so a canvas coordinate is an image
         // pixel. Nudging, the native-pixel readout, and a faithful export all rest on
@@ -199,7 +203,7 @@ public sealed partial class AnnotationWindow : Window
     public event EventHandler? Cancelled;
 
     /// <summary>Raised when the marked-up image should be put on the clipboard as-is.</summary>
-    public event EventHandler? CopyRequested;
+    public event EventHandler<string>? CopyRequested;
 
     /// <summary>
     /// Raised with the path of a finished PNG that should become a capture of its own,
@@ -214,7 +218,7 @@ public sealed partial class AnnotationWindow : Window
     /// Raised when the capture should be left on screen as a pin. A fourth output
     /// alongside save, copy, and keep-original: it writes nothing and touches nothing.
     /// </summary>
-    public event EventHandler? PinRequested;
+    public event EventHandler<string>? PinExportRequested;
 
     // ---------------------------------------------------------------- source loading
 
@@ -311,7 +315,7 @@ public sealed partial class AnnotationWindow : Window
                 FontSize = 10,
                 IsTextScaleFactorEnabled = false,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Foreground = (Brush)Application.Current.Resources["PocketMuted"],
+                Foreground = App.Theme.Brush("PocketMuted"),
             });
 
             button.Content = stack;
@@ -354,7 +358,7 @@ public sealed partial class AnnotationWindow : Window
             FontSize = 10,
             IsTextScaleFactorEnabled = false,
             HorizontalAlignment = HorizontalAlignment.Center,
-            Foreground = (Brush)Application.Current.Resources["PocketMuted"],
+            Foreground = App.Theme.Brush("PocketMuted"),
         });
 
         button.Content = stack;
@@ -384,10 +388,10 @@ public sealed partial class AnnotationWindow : Window
 
     private void ApplyToolState()
     {
-        var green = (Brush)Application.Current.Resources["PocketGreen"];
-        var greenSoft = (Brush)Application.Current.Resources["PocketGreenSoft"];
-        var dim = (Brush)Application.Current.Resources["PocketInkDim"];
-        var muted = (Brush)Application.Current.Resources["PocketMuted"];
+        var green = App.Theme.Brush("PocketGreen");
+        var greenSoft = App.Theme.Brush("PocketGreenSoft");
+        var dim = App.Theme.Brush("PocketInkDim");
+        var muted = App.Theme.Brush("PocketMuted");
         var clear = (Brush)Application.Current.Resources["PocketTransparent"];
 
         foreach (var button in _toolButtons)
@@ -411,11 +415,11 @@ public sealed partial class AnnotationWindow : Window
                 : ReferenceEquals(button.Tag, _ink);
             // Deliberately not green: green already means the active tool here, and two
             // competing selection greens in one toolbar would make neither readable.
-            button.BorderBrush = active ? (Brush)Application.Current.Resources["PocketInk"] : clear;
-            button.Background = active ? (Brush)Application.Current.Resources["PocketRaised"] : clear;
+            button.BorderBrush = active ? App.Theme.Brush("PocketInk") : clear;
+            button.Background = active ? App.Theme.Brush("PocketRaised") : clear;
             if (button.Content is StackPanel { Children: [_, TextBlock numeral] })
             {
-                numeral.Foreground = active ? (Brush)Application.Current.Resources["PocketInk"] : muted;
+                numeral.Foreground = active ? App.Theme.Brush("PocketInk") : muted;
             }
         }
 
@@ -444,7 +448,7 @@ public sealed partial class AnnotationWindow : Window
             _ => "M",
         };
 
-        StatusToolText.Text = DescribeTool();
+        StatusToolText.Text = ToSentenceCase(DescribeTool());
 
         static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -1077,7 +1081,7 @@ public sealed partial class AnnotationWindow : Window
             {
                 Width = frame.Width,
                 Height = frame.Height,
-                Stroke = (Brush)Application.Current.Resources["PocketGreen"],
+                Stroke = App.Theme.Brush("PocketGreen"),
                 StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
             };
             Canvas.SetLeft(outline, frame.X);
@@ -1095,7 +1099,7 @@ public sealed partial class AnnotationWindow : Window
                 Width = _sourceWidth,
                 Height = band.Length,
                 Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(AnnotationExport.DimAlpha, 0, 0, 0)),
-                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                Stroke = App.Theme.Brush("PocketBlue"),
                 StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
                 StrokeDashArray = [4, 3],
             };
@@ -1115,7 +1119,7 @@ public sealed partial class AnnotationWindow : Window
             {
                 Width = region.Width,
                 Height = region.Height,
-                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                Stroke = App.Theme.Brush("PocketBlue"),
                 StrokeThickness = Math.Max(1, CurrentStrokeWidth / 3),
                 StrokeDashArray = [4, 3],
                 Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(24, 127, 187, 255)),
@@ -1582,7 +1586,7 @@ public sealed partial class AnnotationWindow : Window
 
         GeometryOverlay.Children.Clear();
         var dim = new SolidColorBrush(Windows.UI.Color.FromArgb(AnnotationExport.DimAlpha, 0, 0, 0));
-        var green = (Brush)Application.Current.Resources["PocketGreen"];
+        var green = App.Theme.Brush("PocketGreen");
 
         if (geometry.Crop is { } crop)
         {
@@ -1611,7 +1615,7 @@ public sealed partial class AnnotationWindow : Window
                 Width = _sourceWidth,
                 Height = band.Length,
                 Fill = dim,
-                Stroke = (Brush)Application.Current.Resources["PocketBlue"],
+                Stroke = App.Theme.Brush("PocketBlue"),
                 StrokeThickness = Math.Max(1, _sourceHeight * 0.002),
                 StrokeDashArray = [4, 3],
             };
@@ -1742,7 +1746,7 @@ public sealed partial class AnnotationWindow : Window
         // came from. Informational blue is reserved for text and link captures, and this
         // is a text capture.
         OcrOverlay.Children.Clear();
-        var stroke = (Brush)Application.Current.Resources["PocketBlue"];
+        var stroke = App.Theme.Brush("PocketBlue");
         foreach (var word in reading.Words)
         {
             var box = new Microsoft.UI.Xaml.Shapes.Rectangle
@@ -2191,38 +2195,153 @@ public sealed partial class AnnotationWindow : Window
 
     private async Task SaveAsync()
     {
-        if (_finished)
+        if (_finished || !await _outputGate.WaitAsync(0))
         {
             return;
         }
-
-        var marks = _history.Visible;
-        var transform = BuildTransform();
-        var mode = SaveTarget.For(
-            marksChanged: _history.HasVisibleMarks,
-            geometryChanged: !Geometry.IsUntouched,
-            origin: _origin);
-
-        var temporary = _path + ".annotated.png";
-        await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
-
-        if (mode == AnnotationSaveMode.Overwrite)
+        try
         {
-            File.Move(temporary, _path, true);
+            StatusToolText.Text = "Saving…";
+            var marks = _history.Visible;
+            var transform = BuildTransform();
+            var mode = SaveTarget.For(
+                marksChanged: _history.HasVisibleMarks,
+                geometryChanged: !Geometry.IsUntouched,
+                origin: _origin);
+            var temporary = UniqueExportPath();
+            await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
+
+            if (mode == AnnotationSaveMode.Overwrite)
+            {
+                File.Move(temporary, _path, true);
+                _finished = true;
+                Saved?.Invoke(this, EventArgs.Empty);
+                Close();
+                return;
+            }
+
             _finished = true;
-            Saved?.Invoke(this, EventArgs.Empty);
+            SavedAsNewCapture?.Invoke(this, temporary);
             Close();
+        }
+        finally
+        {
+            _outputGate.Release();
+        }
+    }
+
+    private void BuildToolRail()
+    {
+        ToolRail.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        ToolRail.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        for (var row = 0; row < 8; row++)
+        {
+            ToolRail.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+
+        var visibleTools = new (Button Button, AnnotationTool Tool)[]
+        {
+            (SelectTool, AnnotationTool.Select), (ArrowTool, AnnotationTool.Arrow),
+            (LineTool, AnnotationTool.Line), (PenTool, AnnotationTool.Pen),
+            (HighlightTool, AnnotationTool.Highlight), (BoxTool, AnnotationTool.Box),
+            (EllipseTool, AnnotationTool.Ellipse), (TextTool, AnnotationTool.Text),
+            (StepTool, AnnotationTool.Step), (RedactTool, AnnotationTool.Redact),
+            (FocusTool, AnnotationTool.Focus), (EyedropTool, AnnotationTool.Eyedrop),
+            (ReadTextTool, AnnotationTool.ReadText), (CropTool, AnnotationTool.Crop),
+            (CutTool, AnnotationTool.Cut), (BackdropTool, AnnotationTool.Backdrop),
+        };
+
+        for (var index = 0; index < visibleTools.Length; index++)
+        {
+            var (button, tool) = visibleTools[index];
+            ToolbarLeft.Children.Remove(button);
+            button.Width = 116;
+            button.Height = 40;
+            AddToolLabel(button, AnnotationToolCatalog.Get(tool).Label);
+            Grid.SetColumn(button, index % 2);
+            Grid.SetRow(button, index / 2);
+            ToolRail.Children.Add(button);
+        }
+
+        MoveToPanel(SwatchStrip, ToolbarLeft, ToolContextHost);
+        MoveToPanel(SizeButton, ToolbarLeft, ToolContextHost);
+        SizeButton.Width = double.NaN;
+        SizeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+
+        MoveToPanel(UndoButton, ToolbarLeft, HistoryHost);
+        MoveToPanel(RedoButton, ToolbarLeft, HistoryHost);
+
+        MoreToolsButton.Visibility = Visibility.Collapsed;
+        MoveOutput(PinButton, "Pin");
+        MoveOutput(CopyButton, "Copy");
+        MoveOutput(KeepOriginalButton);
+        MoveOutput(SaveButton);
+        ToolbarRow.Visibility = Visibility.Collapsed;
+    }
+
+    private static void AddToolLabel(Button button, string label)
+    {
+        if (button.Content is not Grid content)
+        {
             return;
         }
 
-        // A geometry change deletes pixels, and a save overwrites rather than deleting, so
-        // there would be no Recycle Bin copy to go back to. The original capture is left
-        // exactly as it was and the result becomes a capture of its own, which also means
-        // its width, height, and preview text are right without repairing the index.
-        _finished = true;
-        SavedAsNewCapture?.Invoke(this, temporary);
-        Close();
+        var key = content.Children.OfType<TextBlock>()
+            .LastOrDefault(text => Grid.GetColumn(text) == 1);
+        content.ColumnDefinitions.Clear();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        if (key is not null)
+        {
+            Grid.SetColumn(key, 2);
+        }
+
+        var title = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        Grid.SetColumn(title, 1);
+        content.Children.Add(title);
     }
+
+    private static void MoveToPanel(UIElement child, Panel source, Panel destination)
+    {
+        source.Children.Remove(child);
+        destination.Children.Add(child);
+    }
+
+    private void MoveOutput(Button button, string? label = null)
+    {
+        ToolbarRight.Children.Remove(button);
+        button.Width = double.NaN;
+        button.MinHeight = 40;
+        button.HorizontalAlignment = HorizontalAlignment.Stretch;
+        if (label is not null)
+        {
+            button.Style = (Style)Application.Current.Resources["PocketQuietButton"];
+            button.Content = label;
+        }
+        OutputHost.Children.Add(button);
+    }
+
+    private void MoreTool_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<AnnotationTool>(tag, out var tool))
+        {
+            SelectTool_(tool);
+            CanvasHost.Focus(FocusState.Programmatic);
+        }
+    }
+
+    private void MoreBackdrop_Click(object sender, RoutedEventArgs eventArgs) => Backdrop_Click(sender, eventArgs);
+
+    private static string ToSentenceCase(string value) => value.Length == 0
+        ? value
+        : value[..1] + value[1..].ToLowerInvariant();
 
     /// <summary>
     /// Writes the marked-up image over the capture and asks for it to be re-copied,
@@ -2231,16 +2350,26 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private async Task CopyAsync()
     {
-        var temporary = _path + ".annotated.png";
-        var marks = _history.Visible;
-        var transform = BuildTransform();
-        await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
-        File.Move(temporary, _path, true);
-        CopyRequested?.Invoke(this, EventArgs.Empty);
-        StatusToolText.Text = "COPIED · the marked-up image is on the clipboard";
+        if (_finished || !await _outputGate.WaitAsync(0)) return;
+        var temporary = UniqueExportPath();
+        try
+        {
+            StatusToolText.Text = "Copying…";
+            var marks = _history.Visible;
+            var transform = BuildTransform();
+            await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
+            CopyRequested?.Invoke(this, temporary);
+            StatusToolText.Text = "Copied · the original capture is unchanged";
+            temporary = string.Empty;
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(temporary)) try { File.Delete(temporary); } catch (IOException) { }
+            _outputGate.Release();
+        }
     }
 
-    private void Pin_Click(object sender, RoutedEventArgs eventArgs) => Pin();
+    private async void Pin_Click(object sender, RoutedEventArgs eventArgs) => await PinAsync();
 
     private void PinAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
@@ -2250,7 +2379,7 @@ public sealed partial class AnnotationWindow : Window
         }
 
         eventArgs.Handled = true;
-        Pin();
+        _ = PinAsync();
     }
 
     /// <summary>
@@ -2258,11 +2387,31 @@ public sealed partial class AnnotationWindow : Window
     /// reference to a real capture rather than to a temporary file that will be gone the
     /// next time the pin's Mark up button is pressed.
     /// </summary>
-    private void Pin()
+    private async Task PinAsync()
     {
-        PinRequested?.Invoke(this, EventArgs.Empty);
-        _ = SaveAsync();
+        if (_finished || !await _outputGate.WaitAsync(0)) return;
+        var temporary = UniqueExportPath();
+        try
+        {
+            StatusToolText.Text = "Preparing pin…";
+            var transform = BuildTransform();
+            var marks = _history.Visible;
+            await Task.Run(() => AnnotationExport.Flatten(_source, marks, transform, temporary));
+            _finished = true;
+            PinExportRequested?.Invoke(this, temporary);
+            temporary = string.Empty;
+            Close();
+        }
+        finally
+        {
+            if (!string.IsNullOrEmpty(temporary)) try { File.Delete(temporary); } catch (IOException) { }
+            _outputGate.Release();
+        }
     }
+
+    private string UniqueExportPath() => Path.Combine(
+        Path.GetDirectoryName(_path)!,
+        $".{Path.GetFileNameWithoutExtension(_path)}.{Guid.NewGuid():N}.annotated.png");
 
     private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
 
@@ -2347,3 +2496,4 @@ public sealed partial class AnnotationWindow : Window
     private static Windows.UI.Color ToWinUi(AnnColor colour) =>
         Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B);
 }
+

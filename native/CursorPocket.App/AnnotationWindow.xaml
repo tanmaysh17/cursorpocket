@@ -68,7 +68,7 @@
             <TextBlock
                 VerticalAlignment="Center"
                 Style="{StaticResource PocketLabelText}"
-                Text="ANNOTATE" />
+                Text="Annotation" />
             <TextBlock
                 x:Name="SourceNameText"
                 Grid.Column="1"
@@ -87,10 +87,8 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!--  Toolbar. Every tool carries its own key as an engraved mono letter, so
-                  the surface teaches its shortcuts instead of hiding them in a legend.
-                  The letters collapse before any tool does when the window narrows —
-                  degrade the teaching, never the capability.  -->
+            <!--  Contextual controls only. Primary tools live in the stable rail beside
+                  the canvas; infrequent tools are in the labelled More menu.  -->
             <!--  Two columns, not one. Both clusters used to sit in a single cell, one
                   aligned left and one aligned right, so once the tools outgrew the space
                   they drew straight over the output buttons instead of the row adapting.  -->
@@ -99,19 +97,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <!--  The tool cluster scrolls rather than shrinking. Shrinking meant
-                      dropping the engraved keys first, which throws away the whole reason
-                      the toolbar teaches itself; and the thresholds it used were set for
-                      eight tools and silently outgrown. Scrolling keeps every tool
-                      reachable and every key visible at any width, which is the same
-                      answer command mode already uses for its command list.  -->
-                <ScrollViewer
-                    x:Name="ToolbarScroller"
-                    HorizontalScrollBarVisibility="Auto"
-                    HorizontalScrollMode="Enabled"
-                    VerticalScrollBarVisibility="Disabled"
-                    VerticalScrollMode="Disabled"
-                    ZoomMode="Disabled">
+                <Grid x:Name="ToolbarScroller">
                     <StackPanel
                         x:Name="ToolbarLeft"
                         Orientation="Horizontal"
@@ -287,7 +273,7 @@
                                     FontFamily="Cascadia Mono"
                                     FontSize="10"
                                     FontWeight="SemiBold"
-                                    Foreground="{StaticResource PocketInkDim}"
+                                    Foreground="{ThemeResource PocketInkDim}"
                                     IsTextScaleFactorEnabled="False"
                                     Text="1" />
                             </Grid>
@@ -501,7 +487,7 @@
                         <FontIcon FontSize="14" Glyph="&#xE7A6;" />
                     </Button>
                     </StackPanel>
-                </ScrollViewer>
+                </Grid>
 
                 <StackPanel
                     x:Name="ToolbarRight"
@@ -509,6 +495,27 @@
                     HorizontalAlignment="Right"
                     Orientation="Horizontal"
                     Spacing="8">
+                    <Button
+                        x:Name="MoreToolsButton"
+                        Content="More"
+                        Style="{StaticResource PocketQuietButton}"
+                        AutomationProperties.Name="More annotation tools">
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Line" Tag="Line" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Ellipse" Tag="Ellipse" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Step marker" Tag="Step" Click="MoreTool_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Focus" Tag="Focus" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Crop" Tag="Crop" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Cut strip" Tag="Cut" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Read text" Tag="ReadText" Click="MoreTool_Click" />
+                                <MenuFlyoutItem Text="Eyedropper" Tag="Eyedrop" Click="MoreTool_Click" />
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="Change backdrop" Click="MoreBackdrop_Click" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                     <Button
                         x:Name="PinButton"
                         Click="Pin_Click"
@@ -520,7 +527,7 @@
                             Height="24"
                             Data="M9,4 H15 M12,4 V10 M6.5,14.5 H17.5 L15,10 H9 Z M12,14.5 V20.5"
                             Stretch="None"
-                            Stroke="{StaticResource PocketInkDim}"
+                            Stroke="{ThemeResource PocketInkDim}"
                             StrokeEndLineCap="Round"
                             StrokeLineJoin="Round"
                             StrokeStartLineCap="Round"
@@ -540,7 +547,7 @@
                         Content="Keep original"
                         Style="{StaticResource PocketQuietButton}"
                         ToolTipService.ToolTip="Discard the marks and keep the screenshot as it was · Esc" />
-                    <Button Click="Save_Click" Style="{StaticResource PocketPrimaryButton}">
+                    <Button x:Name="SaveButton" Click="Save_Click" Style="{StaticResource PocketPrimaryButton}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Save screenshot" />
                             <TextBlock
@@ -559,13 +566,23 @@
                   12 px card radius.  -->
             <Grid Grid.Row="1" ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Border
+                    Padding="4"
+                    Background="{ThemeResource PocketGlassPanel}"
+                    BorderBrush="{ThemeResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                    <Grid x:Name="ToolRail" ColumnSpacing="4" RowSpacing="4" />
+                </Border>
+                <Border
+                    Grid.Column="1"
                     Padding="12"
-                    Background="#FF070C0E"
-                    BorderBrush="{StaticResource PocketLine}"
+                    Background="{ThemeResource PocketSunken}"
+                    BorderBrush="{ThemeResource PocketLine}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource PocketWellCorner}">
                     <!--  A focusable host around the drawing area. Keyboard accelerators
@@ -610,21 +627,52 @@
                     </ContentControl>
                 </Border>
 
+                <Border
+                    x:Name="PropertyPanel"
+                    Grid.Column="2"
+                    Width="248"
+                    Padding="14"
+                    Background="{ThemeResource PocketGlassPanel}"
+                    BorderBrush="{ThemeResource PocketLine}"
+                    BorderThickness="1"
+                    CornerRadius="12">
+                    <Grid RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel x:Name="ToolContextHost" Spacing="10">
+                            <TextBlock Style="{StaticResource PocketLabelText}" Text="Properties" />
+                        </StackPanel>
+                        <StackPanel
+                            x:Name="HistoryHost"
+                            Grid.Row="1"
+                            VerticalAlignment="Bottom"
+                            Orientation="Horizontal"
+                            Spacing="8" />
+                        <StackPanel x:Name="OutputHost" Grid.Row="2" Spacing="8">
+                            <TextBlock Style="{StaticResource PocketLabelText}" Text="Output" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!--  Key sheet. Only the modifiers live here — every tool key is already
                       engraved on its own button, so nothing behind this panel is needed
                       for a first successful edit.  -->
                 <Border
                     x:Name="KeySheet"
+                    Grid.Column="1"
                     Padding="24"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
-                    Background="{StaticResource PocketSurface}"
-                    BorderBrush="{StaticResource PocketLine}"
+                    Background="{ThemeResource PocketSurface}"
+                    BorderBrush="{ThemeResource PocketLine}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource PocketWellCorner}"
                     Visibility="Collapsed">
                     <StackPanel Spacing="14">
-                        <TextBlock Style="{StaticResource PocketLabelText}" Text="KEYS" />
+                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Keyboard shortcuts" />
                         <Grid ColumnSpacing="32" RowSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -648,11 +696,11 @@
                       words and the place they came from can be read together.  -->
                 <Border
                     x:Name="OcrPanel"
-                    Grid.Column="1"
+                    Grid.Column="2"
                     Width="320"
                     Padding="16"
-                    Background="{StaticResource PocketSurface}"
-                    BorderBrush="{StaticResource PocketLine}"
+                    Background="{ThemeResource PocketSurface}"
+                    BorderBrush="{ThemeResource PocketLine}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource PocketWellCorner}"
                     Visibility="Collapsed">
@@ -667,7 +715,7 @@
                             <TextBlock
                                 VerticalAlignment="Center"
                                 Style="{StaticResource PocketLabelText}"
-                                Text="RECOGNISED TEXT" />
+                                Text="Recognised text" />
                             <Button
                                 HorizontalAlignment="Right"
                                 Click="CloseOcr_Click"
@@ -747,14 +795,14 @@
                     x:Name="StatusOutputText"
                     Grid.Column="1"
                     VerticalAlignment="Center"
-                    Foreground="{StaticResource PocketInkDim}"
+                    Foreground="{ThemeResource PocketInkDim}"
                     Style="{StaticResource PocketNumericText}"
                     ToolTipService.ToolTip="The size the saved image will be" />
                 <TextBlock
                     x:Name="StatusSizeText"
                     Grid.Column="2"
                     VerticalAlignment="Center"
-                    Foreground="{StaticResource PocketInk}"
+                    Foreground="{ThemeResource PocketInk}"
                     Style="{StaticResource PocketNumericText}" />
                 <TextBlock
                     x:Name="StatusPointerText"
@@ -773,3 +821,4 @@
         </Grid>
     </Grid>
 </Window>
+

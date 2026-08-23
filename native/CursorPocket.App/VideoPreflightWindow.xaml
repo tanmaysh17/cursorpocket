@@ -45,9 +45,11 @@
             </Grid.ColumnDefinitions>
 
             <ScrollViewer
-                x:Name="OptionsScroll"
+                x:Name="OptionsPanel"
                 HorizontalScrollBarVisibility="Disabled"
-                VerticalScrollBarVisibility="Visible">
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                VerticalScrollMode="Auto">
                 <StackPanel Margin="0,0,8,0" Spacing="12">
                     <Border Style="{StaticResource PocketCard}">
                         <StackPanel Padding="16" Spacing="12">
@@ -72,7 +74,7 @@
                                 <FontIcon
                                     VerticalAlignment="Center"
                                     FontSize="13"
-                                    Foreground="{StaticResource PocketMuted}"
+                                    Foreground="{ThemeResource PocketMuted}"
                                     Glyph="&#xE7F4;" />
                                 <TextBlock
                                     x:Name="SourceSummary"
@@ -117,8 +119,8 @@
                                     x:Name="MicrophoneLevel"
                                     Height="6"
                                     VerticalAlignment="Center"
-                                    Background="{StaticResource PocketSunken}"
-                                    Foreground="{StaticResource PocketGreen}"
+                                    Background="{ThemeResource PocketSunken}"
+                                    Foreground="{ThemeResource PocketGreen}"
                                     Maximum="1"
                                     Minimum="0"
                                     Value="0" />
@@ -191,6 +193,14 @@
                                     DisplayMemberPath="Name"
                                     SelectionChanged="CameraBox_SelectionChanged"
                                     AutomationProperties.Name="Camera" />
+                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <Expander.Header>
+                                        <StackPanel Padding="0,4">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Camera appearance" />
+                                            <TextBlock Style="{StaticResource PocketMetaText}" Text="Position, shape, background, and image tuning" />
+                                        </StackPanel>
+                                    </Expander.Header>
+                                    <StackPanel Padding="0,8,0,0" Spacing="12">
                                 <StackPanel
                                     x:Name="CameraSourceNotice"
                                     Orientation="Horizontal"
@@ -199,7 +209,7 @@
                                     <FontIcon
                                         VerticalAlignment="Top"
                                         FontSize="14"
-                                        Foreground="{StaticResource PocketMuted}"
+                                        Foreground="{ThemeResource PocketMuted}"
                                         Glyph="&#xE7BA;" />
                                     <TextBlock
                                         x:Name="CameraSourceNoticeText"
@@ -280,7 +290,7 @@
                                     <FontIcon
                                         VerticalAlignment="Top"
                                         FontSize="14"
-                                        Foreground="{StaticResource PocketMuted}"
+                                        Foreground="{ThemeResource PocketMuted}"
                                         Glyph="&#xE7BA;" />
                                     <TextBlock
                                         Style="{StaticResource PocketCaptionText}"
@@ -368,6 +378,8 @@
                                         Style="{StaticResource PocketNumericText}"
                                         Text="0" />
                                 </Grid>
+                                    </StackPanel>
+                                </Expander>
                             </StackPanel>
                             <TextBlock
                                 x:Name="CameraStatus"
@@ -381,7 +393,7 @@
                     <Expander
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Stretch"
-                        Expanding="MoreOptions_Expanding">
+                        >
                         <Expander.Header>
                             <StackPanel Padding="0,4">
                                 <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="More recording options" />
@@ -425,7 +437,7 @@
             <Border
                 Grid.Column="1"
                 Background="#FF0F171C"
-                BorderBrush="{StaticResource PocketLineStrong}"
+                BorderBrush="{ThemeResource PocketLineStrong}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource PocketCardCorner}">
                 <Grid x:Name="FramingWell" CornerRadius="{StaticResource PocketCardCorner}">
@@ -508,7 +520,7 @@
                     Width="6"
                     Height="6"
                     VerticalAlignment="Center"
-                    Fill="{StaticResource PocketMuted}" />
+                    Fill="{ThemeResource PocketMuted}" />
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock
                         x:Name="ReadinessTitle"
@@ -548,3 +560,4 @@
         </Grid>
     </Grid>
 </Window>
+

@@ -117,13 +117,13 @@ The installer offers startup at sign-in; portable builds leave it off until you 
 
 ## Native Windows build
 
-The current application is a native .NET 8 / WinUI 3 x64 build. It is self-contained, unpackaged, and does not require Python on the destination PC.
+The current application is a native .NET 8 / WinUI 3 x64 build. It is self-contained and does not require Python on the destination PC.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 ```
 
-This creates `artifacts\CursorPocket-portable-win-x64.zip`. If Inno Setup 6 is installed it also creates `artifacts\CursorPocket-Setup-x64.exe`. The installer adds CursorPocket to Start, offers sign-in startup, and leaves taskbar pinning to Windows; search for CursorPocket in Start and choose **Pin to taskbar**.
+This creates `artifacts\CursorPocket-portable-win-x64.zip`. With the Windows SDK it also creates `artifacts\CursorPocket-x64.msix`; if Inno Setup 6 is installed it creates `artifacts\CursorPocket-Setup-x64.exe` as well.
 
 Internal builds are currently unsigned, so Windows can display a publisher warning. The GitHub workflow has an optional signing stage for a future certificate.
 
@@ -139,22 +139,9 @@ dotnet test .\native\CursorPocket.Tests\CursorPocket.Tests.csproj -c Debug
 
 The native app preserves the existing `settings.json`, capture root, dated folders, `captures.jsonl`, and ordinary PNG/WAV/MP4/TXT/URL files. It never moves or rewrites existing captures.
 
-### Python behavioral reference
+### Historical implementation
 
-The previous Python implementation remains in the repository as a parity reference during the native transition. It is not included in the final native artifacts.
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.\.venv\Scripts\python.exe main.py
-```
-
-Run the automated checks with:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe main.py --self-test
-```
+The unsupported pre-native Python source is retained under `legacy-python/` for archaeology only. It is not tested, packaged, or released. The WinUI 3 application under `native/` is the sole maintained product path.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packaging.
 

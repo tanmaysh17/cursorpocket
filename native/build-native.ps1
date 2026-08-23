@@ -4,7 +4,8 @@ param(
     [switch]$SkipTests,
     [switch]$SkipFfmpeg,
     [switch]$SkipModels,
-    [switch]$RequireInstaller
+    [switch]$RequireInstaller,
+    [switch]$RequireMsix
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +16,8 @@ $testsProject = Join-Path $PSScriptRoot "CursorPocket.Tests\CursorPocket.Tests.c
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishRoot = Join-Path $artifactsRoot "CursorPocket-win-x64"
 $portableArchive = Join-Path $artifactsRoot "CursorPocket-portable-win-x64.zip"
+$msixPath = Join-Path $artifactsRoot "CursorPocket-x64.msix"
+$msixStaging = Join-Path $artifactsRoot ".msix-staging"
 
 function Resolve-Dotnet {
     $command = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -54,6 +57,8 @@ if (-not $SkipTests) {
 New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 Remove-ArtifactPath $publishRoot
 if (Test-Path -LiteralPath $portableArchive) { Remove-Item -LiteralPath $portableArchive -Force }
+if (Test-Path -LiteralPath $msixPath) { Remove-Item -LiteralPath $msixPath -Force }
+Remove-ArtifactPath $msixStaging
 
 # ReadyToRun precompiles the managed code that WinUI startup would otherwise JIT
 # method by method, which is the bulk of cold-start time for an unpackaged app.
@@ -124,6 +129,24 @@ foreach ($packageNotice in $packageNotices) {
         $destinationName = "$($packageNotice.Package)-$($packageNotice.Version)-$($file.Replace('.txt', '').Replace('.TXT', '').Replace('.md', ''))" + [IO.Path]::GetExtension($file)
         Copy-Item -LiteralPath $source -Destination (Join-Path $licenseRoot $destinationName) -Force
     }
+}
+
+$makeAppx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter makeappx.exe -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '\\x64\\makeappx\.exe$' } |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1
+if ($makeAppx) {
+    Copy-Item -LiteralPath $publishRoot -Destination $msixStaging -Recurse
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "packaging\AppxManifest.xml") -Destination (Join-Path $msixStaging "AppxManifest.xml") -Force
+    & $makeAppx.FullName pack /d $msixStaging /p $msixPath /o
+    if ($LASTEXITCODE -ne 0) { throw "MSIX packaging failed." }
+    Remove-ArtifactPath $msixStaging
+}
+elseif ($RequireMsix) {
+    throw "The Windows SDK makeappx.exe is required to create the MSIX artifact."
+}
+else {
+    Write-Warning "makeappx.exe is not installed; no MSIX was created."
 }
 
 Compress-Archive -Path (Join-Path $publishRoot "*") -DestinationPath $portableArchive -CompressionLevel Optimal

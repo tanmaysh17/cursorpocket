@@ -3,6 +3,7 @@ using CursorPocket_App.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.Core;
@@ -20,6 +21,23 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+        ApplyCaptureActionCatalog();
+    }
+
+    private void ApplyCaptureActionCatalog()
+    {
+        foreach (var (button, id) in new[]
+        {
+            (ScreenshotTile, CaptureActionId.Screenshot),
+            (VideoTile, CaptureActionId.Video),
+            (AudioTile, CaptureActionId.Audio),
+            (LibraryTile, CaptureActionId.Library),
+        })
+        {
+            var action = CaptureActionCatalog.Get(id);
+            AutomationProperties.SetName(button, $"{action.Title}. {action.Description}. Key {action.Key} in command mode.");
+            ToolTipService.SetToolTip(button, $"{action.Title} · {action.Key}");
+        }
     }
 
     public void NavigateTo(string destination)
@@ -454,6 +472,7 @@ public sealed partial class MainPage : Page
     private void LibraryTile_Click(object sender, RoutedEventArgs eventArgs) => NavigateTo("library");
     private void ScreenshotTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowCommandPalette("screenshot");
     private void VideoTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowVideoPreflight();
+    private async void RepeatVideoTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.RepeatVideoRecordingAsync();
     private async void AudioTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.ToggleAudioRecordingAsync();
     private async void TextTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.CaptureTextAsync();
     private async void LinkTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.CaptureLinkAsync();
@@ -462,6 +481,11 @@ public sealed partial class MainPage : Page
 
     private async void ChooseCaptureFolder_Click(object sender, RoutedEventArgs eventArgs)
     {
+        if (App.Services.RecordingSession.IsActive)
+        {
+            ViewModel.StatusMessage = "Finish the current recording before changing the capture folder.";
+            return;
+        }
         var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
         picker.FileTypeFilter.Add("*");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);

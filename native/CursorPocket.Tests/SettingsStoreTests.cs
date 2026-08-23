@@ -120,7 +120,7 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.True(actual.VideoCameraEnabled);
         Assert.Equal("Win+Alt+Space", actual.ActivationShortcut);
-        Assert.False(File.Exists(path + ".tmp"));
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, "*.tmp"));
     }
 
     public void Dispose()

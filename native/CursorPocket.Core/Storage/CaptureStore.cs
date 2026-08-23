@@ -106,9 +106,11 @@ public sealed class CaptureStore
             throw new ArgumentException("Text capture is empty.", nameof(text));
         }
 
-        var reservation = Reserve(CaptureKind.Text, ".txt");
-        await File.WriteAllTextAsync(reservation.AbsolutePath, value + Environment.NewLine, cancellationToken);
-        return await AppendAsync(CreateRecord(reservation, Compact(value), []), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(CaptureKind.Text, ".txt", Compact(value)),
+            (path, token) => File.WriteAllTextAsync(path, value + Environment.NewLine, token),
+            cancellationToken);
+        return result.Record;
     }
 
     public async Task<CaptureRecord> SaveLinkAsync(string url, CancellationToken cancellationToken = default)
@@ -119,11 +121,12 @@ public sealed class CaptureStore
             throw new ArgumentException("The active window is not a complete web page.", nameof(url));
         }
 
-        var reservation = Reserve(CaptureKind.Link, ".url");
-        await File.WriteAllTextAsync(reservation.AbsolutePath, $"[InternetShortcut]{Environment.NewLine}URL={value}{Environment.NewLine}", cancellationToken);
         var host = uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
-        var metadata = JsonMetadata(("url", value), ("host", host));
-        return await AppendAsync(CreateRecord(reservation, Compact(value), metadata), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(CaptureKind.Link, ".url", Compact(value), new Dictionary<string, object?> { ["url"] = value, ["host"] = host }),
+            (path, token) => File.WriteAllTextAsync(path, $"[InternetShortcut]{Environment.NewLine}URL={value}{Environment.NewLine}", token),
+            cancellationToken);
+        return result.Record;
     }
 
     public async Task<CaptureRecord> ImportFileAsync(
@@ -138,14 +141,16 @@ public sealed class CaptureStore
             throw new FileNotFoundException("The capture output is missing.", sourcePath);
         }
 
-        var suffix = Path.GetExtension(sourcePath);
-        var reservation = Reserve(kind, suffix);
-        await using (var input = File.OpenRead(sourcePath))
-        await using (var output = File.Create(reservation.AbsolutePath))
-        {
-            await input.CopyToAsync(output, cancellationToken);
-        }
-        return await AppendAsync(CreateRecord(reservation, preview, JsonMetadata(metadata)), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(kind, Path.GetExtension(sourcePath), preview, metadata),
+            async (path, token) =>
+            {
+                await using var input = File.OpenRead(sourcePath);
+                await using var output = File.Create(path);
+                await input.CopyToAsync(output, token);
+            },
+            cancellationToken);
+        return result.Record;
     }
 
     public async Task<CaptureRecord> RegisterExistingAsync(
@@ -173,6 +178,20 @@ public sealed class CaptureStore
             Metadata = JsonMetadata(metadata),
         };
         return await AppendAsync(record, cancellationToken);
+    }
+
+    public async Task<CaptureRecord> RegisterReservationAsync(
+        CaptureReservation reservation,
+        string preview,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureInsideRoot(Path.GetFullPath(reservation.AbsolutePath));
+        if (!File.Exists(reservation.AbsolutePath))
+        {
+            throw new FileNotFoundException("The capture output is missing.", reservation.AbsolutePath);
+        }
+        return await AppendAsync(CreateRecord(reservation, preview, JsonMetadata(metadata)), cancellationToken);
     }
 
     public CaptureReservation Reserve(CaptureKind kind, string suffix)

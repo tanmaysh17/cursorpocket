@@ -21,6 +21,36 @@ public interface IRecordingService
     Task<CaptureRecord?> StopAudioAsync(bool discard = false, CancellationToken cancellationToken = default);
 }
 
+public enum RecordingSessionState
+{
+    Idle,
+    Starting,
+    Recording,
+    Finalizing,
+    Completed,
+    Failed,
+    Discarded,
+}
+
+public interface IRecordingSessionCoordinator
+{
+    RecordingSessionState State { get; }
+    bool IsActive { get; }
+    bool IsVideo { get; }
+    event EventHandler<RecordingSessionState>? StateChanged;
+    Task StartVideoAsync(RecordingOptions options, CancellationToken cancellationToken = default);
+    Task StartAudioAsync(string? microphoneId = null, CancellationToken cancellationToken = default);
+    Task<CaptureRecord?> FinishAsync(CancellationToken cancellationToken = default);
+    Task DiscardAsync(CancellationToken cancellationToken = default);
+}
+
+public interface ISettingsUpdateQueue
+{
+    Task<AppSettings> UpdateAsync(
+        Func<AppSettings, AppSettings> update,
+        CancellationToken cancellationToken = default);
+}
+
 public interface ILibraryService
 {
     Task<IReadOnlyList<CaptureRecord>> GetRecentAsync(int limit = 250, CancellationToken cancellationToken = default);

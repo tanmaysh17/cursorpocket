@@ -3,6 +3,7 @@
     x:Class="CursorPocket_App.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:system="using:System"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:CursorPocket_App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -17,7 +18,7 @@
             <Setter Property="Height" Value="30" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="CornerRadius" Value="7" />
-            <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+            <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
             <Setter Property="FontSize" Value="13" />
         </Style>
         <Style x:Key="SettingsRow" TargetType="Grid">
@@ -113,8 +114,8 @@
                         Margin="0,20,0,16"
                         Padding="3"
                         HorizontalAlignment="Left"
-                        Background="{StaticResource PocketSunken}"
-                        BorderBrush="{StaticResource PocketLine}"
+                        Background="{ThemeResource PocketSunken}"
+                        BorderBrush="{ThemeResource PocketLine}"
                         BorderThickness="1"
                         CornerRadius="10">
                         <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
@@ -256,7 +257,7 @@
                                                     <Grid>
                                                         <FontIcon
                                                             FontSize="14"
-                                                            Foreground="{StaticResource PocketGreen}"
+                                                            Foreground="{ThemeResource PocketGreen}"
                                                             Glyph="{x:Bind IconGlyph}" />
                                                         <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="UniformToFill" />
                                                     </Grid>
@@ -404,7 +405,7 @@
                                             <FontIcon
                                                 x:Name="DetailIcon"
                                                 FontSize="24"
-                                                Foreground="{StaticResource PocketMuted}"
+                                                Foreground="{ThemeResource PocketMuted}"
                                                 Glyph="&#xE7C3;" />
                                             <TextBlock
                                                 x:Name="DetailText"
@@ -430,7 +431,7 @@
                                     </Grid>
                                     <Grid
                                         Padding="0,7"
-                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderBrush="{ThemeResource PocketLine}"
                                         BorderThickness="0,1,0,0"
                                         ColumnSpacing="12">
                                         <TextBlock Style="{StaticResource PocketMetaText}" Text="Size" />
@@ -442,7 +443,7 @@
                                     </Grid>
                                     <Grid
                                         Padding="0,7"
-                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderBrush="{ThemeResource PocketLine}"
                                         BorderThickness="0,1,0,0"
                                         ColumnSpacing="12">
                                         <TextBlock Style="{StaticResource PocketMetaText}" Text="Saved" />
@@ -454,7 +455,7 @@
                                     </Grid>
                                     <Grid
                                         Padding="0,7"
-                                        BorderBrush="{StaticResource PocketLine}"
+                                        BorderBrush="{ThemeResource PocketLine}"
                                         BorderThickness="0,1,0,0"
                                         ColumnSpacing="12">
                                         <TextBlock Style="{StaticResource PocketMetaText}" Text="File" />
@@ -519,7 +520,7 @@
                                 Width="6"
                                 Height="6"
                                 VerticalAlignment="Center"
-                                Fill="{StaticResource PocketGreen}" />
+                                Fill="{ThemeResource PocketGreen}" />
                             <TextBlock
                                 VerticalAlignment="Center"
                                 Style="{StaticResource PocketMetaText}"
@@ -547,12 +548,13 @@
                                 MaxWidth="580"
                                 HorizontalAlignment="Left"
                                 Style="{StaticResource PocketCaptionText}"
-                                Text="Every capture is one key. The same keys work inside command mode, so what you learn here works everywhere."
+                                Text="The complete command catalogue is available here and in command mode, with the same mnemonic keys."
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
                         <Grid ColumnSpacing="12" RowSpacing="12">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
                                 <ColumnDefinition />
                                 <ColumnDefinition />
                                 <ColumnDefinition />
@@ -563,6 +565,7 @@
                             </Grid.RowDefinitions>
 
                             <Button
+                                x:Name="ScreenshotTile"
                                 MinHeight="132"
                                 Click="ScreenshotTile_Click"
                                 Style="{StaticResource PocketTileButton}">
@@ -590,6 +593,7 @@
                             </Button>
 
                             <Button
+                                x:Name="VideoTile"
                                 Grid.Column="1"
                                 MinHeight="132"
                                 Click="VideoTile_Click"
@@ -618,7 +622,8 @@
                             </Button>
 
                             <Button
-                                Grid.Column="2"
+                                x:Name="AudioTile"
+                                Grid.Column="3"
                                 MinHeight="132"
                                 Click="AudioTile_Click"
                                 Style="{StaticResource PocketTileButton}">
@@ -640,6 +645,37 @@
                                             Margin="0,4,0,0"
                                             Style="{StaticResource PocketCaptionText}"
                                             Text="Starts on your remembered microphone"
+                                            TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <Button
+                                x:Name="RepeatVideoTile"
+                                Grid.Column="2"
+                                MinHeight="132"
+                                Click="RepeatVideoTile_Click"
+                                Style="{StaticResource PocketTileButton}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Border
+                                        MinWidth="56"
+                                        Height="40"
+                                        Padding="9,0"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource PocketTagBorder}">
+                                        <TextBlock VerticalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="Shift+V" />
+                                    </Border>
+                                    <StackPanel Grid.Row="2" Margin="0,16,0,0">
+                                        <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Repeat video" />
+                                        <TextBlock
+                                            Margin="0,4,0,0"
+                                            Style="{StaticResource PocketCaptionText}"
+                                            Text="Uses the previous source and recording choices"
                                             TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Grid>
@@ -691,8 +727,9 @@
                             </Button>
 
                             <Button
+                                x:Name="LibraryTile"
                                 Grid.Row="1"
-                                Grid.Column="2"
+                                Grid.Column="3"
                                 Padding="16,14"
                                 Click="LibraryTile_Click"
                                 Style="{StaticResource PocketTileButton}">
@@ -716,7 +753,7 @@
                         </Grid>
 
                         <StackPanel Spacing="10">
-                            <TextBlock Style="{StaticResource PocketLabelText}" Text="REACHING THESE WITHOUT THIS WINDOW" />
+                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Open capture without this window" />
                             <Border Style="{StaticResource PocketCard}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -745,7 +782,7 @@
                                     <Rectangle
                                         Grid.Column="1"
                                         Width="1"
-                                        Fill="{StaticResource PocketLine}" />
+                                        Fill="{ThemeResource PocketLine}" />
                                     <StackPanel
                                         Grid.Column="2"
                                         Padding="18,16"
@@ -765,7 +802,7 @@
                                     <Rectangle
                                         Grid.Column="3"
                                         Width="1"
-                                        Fill="{StaticResource PocketLine}" />
+                                        Fill="{ThemeResource PocketLine}" />
                                     <StackPanel
                                         Grid.Column="4"
                                         Padding="18,16"
@@ -793,24 +830,55 @@
 
                 <!--  ============================ SETTINGS ============================  -->
                 <Grid x:Name="SettingsPanel" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
                     <ScrollViewer>
                         <StackPanel
                             MaxWidth="880"
                             Padding="28,22,28,28"
                             HorizontalAlignment="Left"
                             Spacing="6">
-                            <TextBlock Style="{StaticResource PocketDisplayText}" Text="Settings" />
-                            <TextBlock Style="{StaticResource PocketCaptionText}" Text="Nothing here leaves this PC." />
+                            <Grid>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource PocketDisplayText}" Text="Settings" />
+                                    <TextBlock Style="{StaticResource PocketCaptionText}" Text="Changes save automatically. Nothing here leaves this PC." />
+                                </StackPanel>
+                                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource PocketMetaText}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                            </Grid>
 
                             <TextBlock
                                 Margin="0,22,0,10"
-                                Style="{StaticResource PocketLabelText}"
-                                Text="STORAGE" />
-                            <Border Style="{StaticResource PocketCard}">
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Appearance" />
+                            <Border Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
+                                <Grid Style="{StaticResource SettingsRow}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource PocketChipLarge}">
+                                        <FontIcon Glyph="&#xE790;" Style="{StaticResource PocketChipIcon}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="App theme" />
+                                        <TextBlock Margin="0,3,0,0" Style="{StaticResource PocketCaptionText}" Text="System follows Windows. Light and Dark override every CursorPocket surface." TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <RadioButtons
+                                        Grid.Column="2"
+                                        MaxColumns="3"
+                                        SelectedIndex="{x:Bind ViewModel.ThemeModeIndex, Mode=TwoWay}"
+                                        AutomationProperties.Name="App theme">
+                                        <system:String>System</system:String>
+                                        <system:String>Light</system:String>
+                                        <system:String>Dark</system:String>
+                                    </RadioButtons>
+                                </Grid>
+                            </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Storage" />
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <Grid Style="{StaticResource SettingsRow}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -829,6 +897,7 @@
                                             TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                     <Button
+                                        x:Name="ChooseCaptureFolderButton"
                                         Grid.Column="2"
                                         Click="ChooseCaptureFolder_Click"
                                         Content="Change"
@@ -838,9 +907,9 @@
 
                             <TextBlock
                                 Margin="0,22,0,10"
-                                Style="{StaticResource PocketLabelText}"
-                                Text="ACTIVATION" />
-                            <Border Style="{StaticResource PocketCard}">
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Activation" />
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <StackPanel>
                                     <Grid Style="{StaticResource SettingsRow}">
                                         <Grid.ColumnDefinitions>
@@ -866,7 +935,7 @@
                                             FontFamily="Cascadia Mono"
                                             Text="{x:Bind ViewModel.ActivationShortcut, Mode=TwoWay}" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -891,7 +960,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Two quick mouse circles" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -916,7 +985,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Hold both mouse buttons" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -946,7 +1015,7 @@
                                             <ComboBoxItem Content="Always visible" Tag="always" />
                                         </ComboBox>
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -971,9 +1040,9 @@
 
                             <TextBlock
                                 Margin="0,22,0,10"
-                                Style="{StaticResource PocketLabelText}"
-                                Text="RECORDING DEFAULTS" />
-                            <Border Style="{StaticResource PocketCard}">
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Recording defaults" />
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <StackPanel>
                                     <Grid Style="{StaticResource SettingsRow}">
                                         <Grid.ColumnDefinitions>
@@ -995,7 +1064,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Microphone on in preflight" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -1015,7 +1084,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Camera on in preflight" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -1040,7 +1109,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Noise suppression" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -1065,7 +1134,7 @@
                                             OnContent=""
                                             AutomationProperties.Name="Auto-level volume" />
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -1092,7 +1161,7 @@
                                             <ComboBoxItem Content="60 fps · smoother" Tag="60" />
                                         </ComboBox>
                                     </Grid>
-                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{StaticResource PocketLine}" BorderThickness="0,1,0,0">
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -1125,9 +1194,9 @@
 
                             <TextBlock
                                 Margin="0,22,0,10"
-                                Style="{StaticResource PocketLabelText}"
-                                Text="PRIVACY" />
-                            <Border Style="{StaticResource PocketCard}">
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Privacy" />
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <StackPanel Padding="16,14" Spacing="6">
                                     <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="No account, no analytics, no upload" />
                                     <TextBlock
@@ -1139,26 +1208,9 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <Border
-                        Grid.Row="1"
-                        Padding="28,12"
-                        Background="{StaticResource PocketSunken}"
-                        BorderBrush="{StaticResource PocketLine}"
-                        BorderThickness="0,1,0,0">
-                        <Grid>
-                            <TextBlock
-                                VerticalAlignment="Center"
-                                Style="{StaticResource PocketMetaText}"
-                                Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
-                            <Button
-                                HorizontalAlignment="Right"
-                                Command="{x:Bind ViewModel.SaveSettingsCommand}"
-                                Content="Save settings"
-                                Style="{StaticResource PocketPrimaryButton}" />
-                        </Grid>
-                    </Border>
                 </Grid>
             </Grid>
         </NavigationView>
     </Grid>
 </Page>
+

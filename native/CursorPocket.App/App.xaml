@@ -10,43 +10,74 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!--  Neutrals. Surfaces sit over Mica, so they carry alpha.  -->
-            <Color x:Key="PocketInkColor">#FFF2F7F4</Color>
-            <Color x:Key="PocketInkDimColor">#FFC2CFC9</Color>
-            <Color x:Key="PocketMutedColor">#FF8FA09A</Color>
-            <Color x:Key="PocketBaseColor">#FF0B100F</Color>
-            <Color x:Key="PocketSunkenColor">#66070C0B</Color>
-            <Color x:Key="PocketSurfaceColor">#CC101815</Color>
-            <Color x:Key="PocketRaisedColor">#E0161F1C</Color>
-            <Color x:Key="PocketLineColor">#24FFFFFF</Color>
-            <Color x:Key="PocketLineStrongColor">#40FFFFFF</Color>
-            <Color x:Key="PocketOverlayColor">#14FFFFFF</Color>
-
-            <!--  Accents. Green means ready, live-and-safe, or the one primary action.  -->
-            <!--  Red is only recording, discard, and delete. Blue only marks text and links.  -->
-            <Color x:Key="PocketGreenColor">#FF45E08C</Color>
-            <Color x:Key="PocketGreenSoftColor">#2645E08C</Color>
-            <Color x:Key="PocketOnGreenColor">#FF06120C</Color>
-            <Color x:Key="PocketRedColor">#FFFF5F6B</Color>
-            <Color x:Key="PocketRedSoftColor">#29FF5F6B</Color>
-            <Color x:Key="PocketBlueColor">#FF7FBBFF</Color>
-
-            <SolidColorBrush x:Key="PocketInk" Color="{StaticResource PocketInkColor}" />
-            <SolidColorBrush x:Key="PocketInkDim" Color="{StaticResource PocketInkDimColor}" />
-            <SolidColorBrush x:Key="PocketMuted" Color="{StaticResource PocketMutedColor}" />
-            <SolidColorBrush x:Key="PocketBase" Color="{StaticResource PocketBaseColor}" />
-            <SolidColorBrush x:Key="PocketSunken" Color="{StaticResource PocketSunkenColor}" />
-            <SolidColorBrush x:Key="PocketSurface" Color="{StaticResource PocketSurfaceColor}" />
-            <SolidColorBrush x:Key="PocketRaised" Color="{StaticResource PocketRaisedColor}" />
-            <SolidColorBrush x:Key="PocketLine" Color="{StaticResource PocketLineColor}" />
-            <SolidColorBrush x:Key="PocketLineStrong" Color="{StaticResource PocketLineStrongColor}" />
-            <SolidColorBrush x:Key="PocketOverlay" Color="{StaticResource PocketOverlayColor}" />
-            <SolidColorBrush x:Key="PocketGreen" Color="{StaticResource PocketGreenColor}" />
-            <SolidColorBrush x:Key="PocketGreenSoft" Color="{StaticResource PocketGreenSoftColor}" />
-            <SolidColorBrush x:Key="PocketOnGreen" Color="{StaticResource PocketOnGreenColor}" />
-            <SolidColorBrush x:Key="PocketRed" Color="{StaticResource PocketRedColor}" />
-            <SolidColorBrush x:Key="PocketRedSoft" Color="{StaticResource PocketRedSoftColor}" />
-            <SolidColorBrush x:Key="PocketBlue" Color="{StaticResource PocketBlueColor}" />
+            <!-- Theme dictionaries are the only source of app chrome colours. The
+                 default dictionary is dark because WinUI resolves "Default" for the
+                 dark theme; Light and HighContrast replace the same semantic keys. -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="PocketInk" Color="#FFF2F7F4" />
+                    <SolidColorBrush x:Key="PocketInkDim" Color="#FFC2CFC9" />
+                    <SolidColorBrush x:Key="PocketMuted" Color="#FF8FA09A" />
+                    <SolidColorBrush x:Key="PocketBase" Color="#FF0B100F" />
+                    <SolidColorBrush x:Key="PocketSunken" Color="#A6070C0B" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="#B5101815" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="#D9161F1C" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#E6141E1A" />
+                    <SolidColorBrush x:Key="PocketLine" Color="#24FFFFFF" />
+                    <SolidColorBrush x:Key="PocketLineStrong" Color="#40FFFFFF" />
+                    <SolidColorBrush x:Key="PocketOverlay" Color="#14FFFFFF" />
+                    <SolidColorBrush x:Key="PocketGreen" Color="#FF45E08C" />
+                    <SolidColorBrush x:Key="PocketGreenSoft" Color="#2645E08C" />
+                    <SolidColorBrush x:Key="PocketOnGreen" Color="#FF06120C" />
+                    <SolidColorBrush x:Key="PocketRed" Color="#FFFF5F6B" />
+                    <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5F6B" />
+                    <SolidColorBrush x:Key="PocketBlue" Color="#FF7FBBFF" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.68" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.78" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="PocketInk" Color="#FF15201C" />
+                    <SolidColorBrush x:Key="PocketInkDim" Color="#FF35443E" />
+                    <SolidColorBrush x:Key="PocketMuted" Color="#FF5F6E68" />
+                    <SolidColorBrush x:Key="PocketBase" Color="#FFF5F9F7" />
+                    <SolidColorBrush x:Key="PocketSunken" Color="#B8E4ECE8" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="#BDF8FCFA" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="#E8FFFFFF" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#EDF7FBF9" />
+                    <SolidColorBrush x:Key="PocketLine" Color="#29111D18" />
+                    <SolidColorBrush x:Key="PocketLineStrong" Color="#47111D18" />
+                    <SolidColorBrush x:Key="PocketOverlay" Color="#10111D18" />
+                    <SolidColorBrush x:Key="PocketGreen" Color="#FF168B52" />
+                    <SolidColorBrush x:Key="PocketGreenSoft" Color="#26168B52" />
+                    <SolidColorBrush x:Key="PocketOnGreen" Color="#FFFFFFFF" />
+                    <SolidColorBrush x:Key="PocketRed" Color="#FFD73546" />
+                    <SolidColorBrush x:Key="PocketRedSoft" Color="#24D73546" />
+                    <SolidColorBrush x:Key="PocketBlue" Color="#FF276EA8" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF5FAF7" TintOpacity="0.70" TintLuminosityOpacity="0.82" FallbackColor="#FFF5FAF7" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFFFFFF" TintOpacity="0.82" TintLuminosityOpacity="0.78" FallbackColor="#FFFFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="PocketInk" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketInkDim" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketMuted" Color="{ThemeResource SystemColorGrayTextColor}" />
+                    <SolidColorBrush x:Key="PocketBase" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketSunken" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketLine" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketLineStrong" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketOverlay" Color="Transparent" />
+                    <SolidColorBrush x:Key="PocketGreen" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="PocketGreenSoft" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketOnGreen" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="PocketRed" Color="{ThemeResource SystemColorHotlightColor}" />
+                    <SolidColorBrush x:Key="PocketRedSoft" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketBlue" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="PocketGlassPanel" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketGlassRaised" Color="{ThemeResource SystemColorWindowColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
             <SolidColorBrush x:Key="PocketTransparent" Color="Transparent" />
 
             <!--  Annotation ink. These are the user's marks, not app state, and that is
@@ -74,7 +105,7 @@
                   reach Path.Data untyped and fail at load.  -->
             <Style x:Key="PocketCursorMark" TargetType="Path">
                 <Setter Property="Data" Value="M0,0 L0,26.5 L7.2,20.1 L11.6,30.6 L16.4,28.6 L12.1,18.3 L21.4,17.6 Z" />
-                <Setter Property="Fill" Value="{StaticResource PocketGreen}" />
+                <Setter Property="Fill" Value="{ThemeResource PocketGreen}" />
                 <Setter Property="Stretch" Value="Uniform" />
             </Style>
 
@@ -88,7 +119,7 @@
                 <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
                 <Setter Property="FontSize" Value="32" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInk}" />
                 <Setter Property="CharacterSpacing" Value="-21" />
                 <Setter Property="LineHeight" Value="38" />
             </Style>
@@ -96,19 +127,19 @@
                 <Setter Property="FontFamily" Value="Segoe UI Variable Display" />
                 <Setter Property="FontSize" Value="22" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInk}" />
                 <Setter Property="CharacterSpacing" Value="-12" />
             </Style>
             <Style x:Key="PocketSubtitleText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
                 <Setter Property="FontSize" Value="16" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInk}" />
             </Style>
             <Style x:Key="PocketBodyText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
                 <Setter Property="FontSize" Value="14" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInk}" />
             </Style>
             <Style x:Key="PocketBodyStrongText" TargetType="TextBlock" BasedOn="{StaticResource PocketBodyText}">
                 <Setter Property="FontWeight" Value="SemiBold" />
@@ -116,38 +147,39 @@
             <Style x:Key="PocketCaptionText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
                 <Setter Property="FontSize" Value="13" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInkDim}" />
                 <Setter Property="LineHeight" Value="18" />
             </Style>
             <Style x:Key="PocketMetaText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Small" />
                 <Setter Property="FontSize" Value="13" />
-                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
             </Style>
             <Style x:Key="PocketNumericText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Cascadia Mono" />
                 <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
                 <Setter Property="IsTextScaleFactorEnabled" Value="False" />
             </Style>
             <Style x:Key="PocketLabelText" TargetType="TextBlock">
-                <Setter Property="FontFamily" Value="Cascadia Mono" />
-                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+                <Setter Property="FontSize" Value="12" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="CharacterSpacing" Value="110" />
-                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="CharacterSpacing" Value="0" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
             </Style>
 
             <!--  Buttons. One template, four roles, so height, radius, and the hover and
                   pressed response are identical wherever a button appears.  -->
             <Style x:Key="PocketButtonBase" TargetType="Button">
                 <Setter Property="MinHeight" Value="36" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
                 <Setter Property="Padding" Value="14,0" />
                 <Setter Property="CornerRadius" Value="{StaticResource PocketControlCorner}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="BorderBrush" Value="Transparent" />
                 <Setter Property="Background" Value="Transparent" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInk}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInk}" />
                 <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
                 <Setter Property="FontSize" Value="14" />
                 <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -161,8 +193,8 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="{TemplateBinding CornerRadius}">
-                                <Border x:Name="Overlay" Background="{StaticResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
-                                <Border x:Name="PressOverlay" Background="{StaticResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
+                                <Border x:Name="Overlay" Background="{ThemeResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
+                                <Border x:Name="PressOverlay" Background="{ThemeResource PocketOverlay}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" />
                                 <ContentPresenter
                                     x:Name="Presenter"
                                     Padding="{TemplateBinding Padding}"
@@ -219,22 +251,28 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+            <Style x:Key="PocketProminentButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="MinHeight" Value="40" />
+            </Style>
+            <Style x:Key="PocketTouchButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+                <Setter Property="MinHeight" Value="44" />
+            </Style>
 
             <Style x:Key="PocketPrimaryButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Background" Value="{StaticResource PocketGreen}" />
-                <Setter Property="Foreground" Value="{StaticResource PocketOnGreen}" />
+                <Setter Property="Background" Value="{ThemeResource PocketGreen}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketOnGreen}" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="Padding" Value="16,0" />
             </Style>
             <Style x:Key="PocketQuietButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Background" Value="{StaticResource PocketRaised}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="Background" Value="{ThemeResource PocketRaised}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
             </Style>
             <Style x:Key="PocketGhostButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInkDim}" />
             </Style>
             <Style x:Key="PocketDangerButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Foreground" Value="{StaticResource PocketRed}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketRed}" />
             </Style>
             <Style x:Key="PocketIconButton" TargetType="Button" BasedOn="{StaticResource PocketGhostButton}">
                 <Setter Property="Width" Value="36" />
@@ -245,8 +283,8 @@
                 <Setter Property="Padding" Value="0" />
             </Style>
             <Style x:Key="PocketTileButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-                <Setter Property="Background" Value="{StaticResource PocketSurface}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="Background" Value="{ThemeResource PocketSurface}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
                 <Setter Property="CornerRadius" Value="{StaticResource PocketCardCorner}" />
                 <Setter Property="Padding" Value="18" />
                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -267,8 +305,8 @@
                 <Setter Property="CornerRadius" Value="7" />
                 <Setter Property="FontFamily" Value="Cascadia Mono" />
                 <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Background" Value="{StaticResource PocketRaised}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLineStrong}" />
+                <Setter Property="Background" Value="{ThemeResource PocketRaised}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLineStrong}" />
                 <Setter Property="BorderThickness" Value="1,1,1,2" />
                 <Setter Property="IsTextScaleFactorEnabled" Value="False" />
             </Style>
@@ -316,7 +354,7 @@
                 <Setter Property="StrokeLineJoin" Value="Round" />
                 <Setter Property="StrokeStartLineCap" Value="Round" />
                 <Setter Property="StrokeEndLineCap" Value="Round" />
-                <Setter Property="Stroke" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="Stroke" Value="{ThemeResource PocketInkDim}" />
             </Style>
             <!--  The highlighter icon is drawn with a highlighter's own nib width.  -->
             <Style x:Key="PocketToolIconStrokeHeavy" TargetType="Path" BasedOn="{StaticResource PocketToolIconStroke}">
@@ -333,7 +371,7 @@
                 <Setter Property="Stretch" Value="None" />
                 <Setter Property="HorizontalAlignment" Value="Center" />
                 <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Fill" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="Fill" Value="{ThemeResource PocketInkDim}" />
             </Style>
 
 
@@ -344,7 +382,7 @@
             <Style x:Key="ToolKeyText" TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Cascadia Mono" />
                 <Setter Property="FontSize" Value="11" />
-                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
                 <Setter Property="IsTextScaleFactorEnabled" Value="False" />
                 <Setter Property="VerticalAlignment" Value="Center" />
                 <Setter Property="Margin" Value="0,0,7,0" />
@@ -354,7 +392,7 @@
                 <Setter Property="Height" Value="24" />
                 <Setter Property="Margin" Value="8,0" />
                 <Setter Property="VerticalAlignment" Value="Center" />
-                <Setter Property="Fill" Value="{StaticResource PocketLine}" />
+                <Setter Property="Fill" Value="{ThemeResource PocketLine}" />
             </Style>
 
             <!--  Icon geometry is written inline as Path.Data at each use site, not held
@@ -367,14 +405,14 @@
 
             <!--  Containers  -->
             <Style x:Key="PocketCard" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource PocketSurface}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="Background" Value="{ThemeResource PocketSurface}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="{StaticResource PocketCardCorner}" />
             </Style>
             <Style x:Key="PocketWell" TargetType="Border">
-                <Setter Property="Background" Value="{StaticResource PocketSunken}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="Background" Value="{ThemeResource PocketSunken}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="{StaticResource PocketWellCorner}" />
             </Style>
@@ -383,8 +421,8 @@
             <Style x:Key="PocketChip" TargetType="Border">
                 <Setter Property="Width" Value="28" />
                 <Setter Property="Height" Value="28" />
-                <Setter Property="Background" Value="{StaticResource PocketSunken}" />
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="Background" Value="{ThemeResource PocketSunken}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="{StaticResource PocketControlCorner}" />
             </Style>
@@ -393,7 +431,7 @@
                 <Setter Property="Height" Value="32" />
             </Style>
             <Style x:Key="PocketTagBorder" TargetType="Border">
-                <Setter Property="BorderBrush" Value="{StaticResource PocketLine}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="CornerRadius" Value="5" />
                 <Setter Property="Padding" Value="6,3" />
@@ -403,14 +441,15 @@
                 <Setter Property="FontSize" Value="11" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="CharacterSpacing" Value="80" />
-                <Setter Property="Foreground" Value="{StaticResource PocketMuted}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
                 <Setter Property="IsTextScaleFactorEnabled" Value="False" />
             </Style>
 
             <Style x:Key="PocketChipIcon" TargetType="FontIcon">
                 <Setter Property="FontSize" Value="13" />
-                <Setter Property="Foreground" Value="{StaticResource PocketInkDim}" />
+                <Setter Property="Foreground" Value="{ThemeResource PocketInkDim}" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
+

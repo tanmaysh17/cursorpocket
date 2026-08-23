@@ -10,7 +10,7 @@
           this is a window the user drags.  -->
     <Grid
         x:Name="Root"
-        Background="{StaticResource PocketBase}"
+        Background="{ThemeResource PocketBase}"
         PointerEntered="Root_PointerEntered"
         PointerExited="Root_PointerExited"
         PointerMoved="Root_PointerMoved"
@@ -43,8 +43,8 @@
             VerticalAlignment="Bottom"
             Opacity="0">
             <Border
-                Background="{StaticResource PocketRaised}"
-                BorderBrush="{StaticResource PocketLine}"
+                Background="{ThemeResource PocketRaised}"
+                BorderBrush="{ThemeResource PocketLine}"
                 BorderThickness="1"
                 CornerRadius="10" />
             <Grid Padding="6,0">
@@ -65,7 +65,7 @@
                         Height="24"
                         Data="M6,9 H18 M6,12 H18 M6,15 H18"
                         Stretch="None"
-                        Stroke="{StaticResource PocketMuted}"
+                        Stroke="{ThemeResource PocketMuted}"
                         StrokeEndLineCap="Round"
                         StrokeStartLineCap="Round"
                         StrokeThickness="2" />
@@ -107,3 +107,4 @@
         </Grid>
     </Grid>
 </Window>
+

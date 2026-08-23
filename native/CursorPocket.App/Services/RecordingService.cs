@@ -83,8 +83,19 @@ public sealed class RecordingService : IRecordingService, IDisposable
             startInfo.ArgumentList.Add(argument);
         }
         using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The video component did not start.");
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(4));
+        var errorTask = process.StandardError.ReadToEndAsync(timeout.Token);
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            try { if (!process.HasExited) process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            if (cancellationToken.IsCancellationRequested) throw;
+            throw new TimeoutException("Recording-device discovery did not finish in time.");
+        }
         var output = await errorTask;
         var ffmpegDevices = FfmpegDeviceParser.Parse(output);
         var audio = GetMicrophones().ToList();
@@ -177,9 +188,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
             return null;
         }
         var appliedCleanup = await TryCleanupAudioNoteAsync(reservation.AbsolutePath, cancellationToken);
-        var record = await _store.RegisterExistingAsync(
-            CaptureKind.Audio,
-            reservation.AbsolutePath,
+        var record = await _store.RegisterReservationAsync(
+            reservation,
             $"Audio · {FormatDuration(duration)}",
             new Dictionary<string, object?>
             {
@@ -296,7 +306,6 @@ public sealed class RecordingService : IRecordingService, IDisposable
         {
             return null;
         }
-        SetState(RecordingState.Finalizing);
         var duration = StopClock();
         var process = _videoProcess;
         var reservation = _videoReservation;
@@ -306,29 +315,51 @@ public sealed class RecordingService : IRecordingService, IDisposable
         var muxPath = _videoMuxPath;
         try
         {
-            if (!process.HasExited)
+            try
             {
-                await process.StandardInput.WriteLineAsync("q");
-                await process.StandardInput.FlushAsync(cancellationToken);
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                if (!process.HasExited)
+                {
+                    await process.StandardInput.WriteLineAsync("q");
+                    await process.StandardInput.FlushAsync(cancellationToken);
+                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    timeout.CancelAfter(TimeSpan.FromSeconds(15));
+                    try
+                    {
+                        await process.WaitForExitAsync(timeout.Token);
+                    }
+                    catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                        process.Kill(true);
+                        await process.WaitForExitAsync(cancellationToken);
+                    }
+                }
+            }
+            finally
+            {
                 try
                 {
-                    await process.WaitForExitAsync(timeout.Token);
+                    await StopVideoMicrophoneAsync(cancellationToken);
                 }
-                catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+                finally
                 {
-                    process.Kill(true);
-                    await process.WaitForExitAsync(cancellationToken);
+                    process.Dispose();
+                    _videoProcess = null;
                 }
             }
         }
-        finally
+        catch
         {
-            await StopVideoMicrophoneAsync(cancellationToken);
-            process.Dispose();
-            _videoProcess = null;
+            // Publish failure only after the capture process and microphone input
+            // have been torn down, so camera dismissal can never remove the inset
+            // from frames FFmpeg might still accept.
+            SetState(RecordingState.Failed);
+            throw;
         }
+
+        // Finalizing begins only after FFmpeg has stopped accepting frames. The
+        // camera self-view must remain visible through the last captured frame, but
+        // it must not stay engaged while audio is muxed or the record is indexed.
+        SetState(RecordingState.Finalizing);
 
         if (discard)
         {
@@ -363,9 +394,8 @@ public sealed class RecordingService : IRecordingService, IDisposable
             SetState(RecordingState.Idle);
             return null;
         }
-        var record = await _store.RegisterExistingAsync(
-            CaptureKind.Video,
-            reservation.AbsolutePath,
+        var record = await _store.RegisterReservationAsync(
+            reservation,
             microphoneWarning is null
                 ? $"Video · {FormatDuration(duration)}"
                 : $"Video · {FormatDuration(duration)} · microphone was not saved",
@@ -394,6 +424,18 @@ public sealed class RecordingService : IRecordingService, IDisposable
 
     public void Dispose()
     {
+        if (_videoProcess is { HasExited: false } process)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(2000);
+            }
+            catch (Exception)
+            {
+                // Dispose is the last-resort path after coordinated shutdown.
+            }
+        }
         CleanupAudio(deleteFile: false);
         CleanupVideo(deleteFile: false);
         _elapsedTimer.Dispose();

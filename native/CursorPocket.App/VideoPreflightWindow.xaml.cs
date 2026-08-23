@@ -43,6 +43,7 @@ public sealed partial class VideoPreflightWindow : Window
     /// </summary>
     private readonly SemaphoreSlim _cameraGate = new(1, 1);
     private bool _closing;
+    private bool _closeReady;
 
     public VideoPreflightWindow(long sourceWindow, CaptureBounds displayBounds, int? displayOutputIndex)
     {
@@ -50,7 +51,19 @@ public sealed partial class VideoPreflightWindow : Window
         _displayBounds = displayBounds;
         _displayOutputIndex = displayOutputIndex;
         InitializeComponent();
-        WindowPlacement.ResizeInDips(this, 940, 720);
+        App.Theme.Register(this, Root, SurfaceRole.Transient);
+        var work = WindowPlacement.MonitorUnderPointer(true);
+        var layout = TransientWindowLayoutPolicy.Resolve(
+            new CaptureBounds(work.Left, work.Top, work.Right, work.Bottom),
+            940,
+            720,
+            WindowPlacement.ScaleFor(this),
+            16);
+        AppWindow.MoveAndResize(new RectInt32(
+            layout.Bounds.Left,
+            layout.Bounds.Top,
+            layout.Bounds.Width,
+            layout.Bounds.Height));
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = true;
@@ -80,7 +93,13 @@ public sealed partial class VideoPreflightWindow : Window
         FrameRateBox.SelectionChanged += Summary_SelectionChanged;
         CountdownBox.SelectionChanged += Summary_SelectionChanged;
         Activated += OnActivated;
-        Closed += (_, _) => CleanupDevices();
+        AppWindow.Closing += AppWindow_Closing;
+        App.Services.MediaDevices.Changed += MediaDevices_Changed;
+        Closed += (_, _) =>
+        {
+            App.Services.MediaDevices.Changed -= MediaDevices_Changed;
+            EmergencyCleanupDevices();
+        };
     }
 
     public event EventHandler<RecordingOptions>? RecordingRequested;
@@ -89,44 +108,71 @@ public sealed partial class VideoPreflightWindow : Window
     {
         Activated -= OnActivated;
         Root.Focus(FocusState.Programmatic);
-        await LoadDevicesAsync();
+        ApplyDeviceSnapshot(App.Services.MediaDevices.Current);
+        await App.Services.MediaDevices.RefreshAsync();
     }
 
-    private async Task LoadDevicesAsync()
+    private void MediaDevices_Changed(object? sender, MediaDeviceSnapshot snapshot) =>
+        DispatcherQueue.TryEnqueue(() => ApplyDeviceSnapshot(snapshot));
+
+    private void ApplyDeviceSnapshot(MediaDeviceSnapshot snapshot)
     {
-        try
+        var devicesAvailable = snapshot.State is MediaDeviceCatalogState.Fresh or MediaDeviceCatalogState.Stale or MediaDeviceCatalogState.Empty;
+        MicrophoneBox.ItemsSource = snapshot.Audio;
+        CameraBox.ItemsSource = snapshot.Video;
+        MicrophoneBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(snapshot.Audio, App.Services.Settings.VideoMicrophoneName);
+        _seeding = true;
+        CameraBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(snapshot.Video, App.Services.Settings.VideoCameraName);
+        _seeding = false;
+        MicrophoneToggle.IsEnabled = snapshot.Audio.Count > 0;
+        CameraToggle.IsEnabled = snapshot.Video.Count > 0;
+        if (snapshot.Audio.Count == 0) MicrophoneToggle.IsOn = false;
+        if (snapshot.Video.Count == 0) CameraToggle.IsOn = false;
+
+        var ffmpegReady = File.Exists(App.Services.FfmpegPath);
+        StartButton.IsEnabled = ffmpegReady;
+        var diskStatus = GetDiskSpaceStatus();
+        switch (snapshot.State)
         {
-            var devices = await App.Services.Recording.GetVideoDevicesAsync();
-            MicrophoneBox.ItemsSource = devices.Audio;
-            CameraBox.ItemsSource = devices.Video;
-            MicrophoneBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(devices.Audio, App.Services.Settings.VideoMicrophoneName);
-            // Seeding fires SelectionChanged synchronously, which would start the
-            // preview here and race the explicit start below.
-            _seeding = true;
-            CameraBox.SelectedItem = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(devices.Video, App.Services.Settings.VideoCameraName);
-            _seeding = false;
-            MicrophoneToggle.IsEnabled = devices.Audio.Count > 0;
-            CameraToggle.IsEnabled = devices.Video.Count > 0;
-            ReadinessTitle.Text = "Ready when you are";
-            ReadinessDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketGreen"];
-            var diskStatus = GetDiskSpaceStatus();
-            ReadinessDetail.Text = File.Exists(App.Services.FfmpegPath)
-                ? $"Recording stays local · {diskStatus}"
-                : "FFmpeg is missing; rebuild or repair CursorPocket before recording.";
-            StartButton.IsEnabled = File.Exists(App.Services.FfmpegPath);
+            case MediaDeviceCatalogState.Loading:
+                ReadinessTitle.Text = "Setting up recording…";
+                ReadinessDetail.Text = ffmpegReady ? "The recording shell is ready while devices load." : "FFmpeg is missing; repair CursorPocket before recording.";
+                ReadinessDot.Fill = App.Theme.Brush("PocketMuted");
+                break;
+            case MediaDeviceCatalogState.Stale:
+                ReadinessTitle.Text = "Ready with cached devices";
+                ReadinessDetail.Text = $"{snapshot.Error ?? "Refreshing device names in the background."} · {diskStatus}";
+                ReadinessDot.Fill = App.Theme.Brush("PocketGreen");
+                break;
+            case MediaDeviceCatalogState.Empty:
+                ReadinessTitle.Text = "Screen recording is ready";
+                ReadinessDetail.Text = $"No camera or microphone is available; video will contain the screen only · {diskStatus}";
+                ReadinessDot.Fill = App.Theme.Brush("PocketGreen");
+                break;
+            case MediaDeviceCatalogState.Error:
+                ReadinessTitle.Text = "Screen recording is still available";
+                ReadinessDetail.Text = $"{snapshot.Error} Turn camera and microphone off, or retry from this screen.";
+                ReadinessDot.Fill = App.Theme.Brush("PocketRed");
+                break;
+            default:
+                ReadinessTitle.Text = "Ready when you are";
+                ReadinessDetail.Text = ffmpegReady ? $"Recording stays local · {diskStatus}" : "FFmpeg is missing; repair CursorPocket before recording.";
+                ReadinessDot.Fill = App.Theme.Brush("PocketGreen");
+                break;
+        }
+
+        if (!ffmpegReady)
+        {
+            ReadinessDot.Fill = App.Theme.Brush("PocketRed");
+        }
+        if (devicesAvailable)
+        {
             StartMicrophoneMeter();
             UpdateCameraSourceNotice();
             if (CameraToggle.IsOn)
             {
-                await StartCameraPreviewAsync();
+                _ = StartCameraPreviewAsync();
             }
-        }
-        catch (Exception error)
-        {
-            ReadinessTitle.Text = "Recording devices need attention";
-            ReadinessDot.Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketRed"];
-            ReadinessDetail.Text = error.Message;
-            StartButton.IsEnabled = false;
         }
     }
 
@@ -205,12 +251,19 @@ public sealed partial class VideoPreflightWindow : Window
     private async Task StartCameraPreviewCoreAsync()
     {
         await StopCameraPreviewCoreAsync();
-        if (!CameraToggle.IsOn || CameraBox.SelectedItem is not MediaDeviceDescriptor selected)
+        if (_closing || !CameraToggle.IsOn || CameraBox.SelectedItem is not MediaDeviceDescriptor selected)
         {
-            ShowCameraSlot(false, CameraToggle.IsOn ? "no camera" : "camera off");
-            CameraStatus.Text = CameraToggle.IsOn ? "No camera is available" : "Off · no camera device is opened";
+            if (!_closing)
+            {
+                ShowCameraSlot(false, CameraToggle.IsOn ? "no camera" : "camera off");
+                CameraStatus.Text = CameraToggle.IsOn ? "No camera is available" : "Off · no camera device is opened";
+            }
             return;
         }
+        MediaCapture? capture = null;
+        CameraEffectRenderer? renderer = null;
+        MediaPlayer? player = null;
+        var published = false;
         try
         {
             var devices = await DeviceInformation.FindAllAsync(DeviceClass.VideoCapture);
@@ -219,48 +272,78 @@ public sealed partial class VideoPreflightWindow : Window
             {
                 throw new InvalidOperationException("Windows did not expose this camera for preview.");
             }
-            _mediaCapture = new MediaCapture();
-            await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings
+            capture = new MediaCapture();
+            await capture.InitializeAsync(new MediaCaptureInitializationSettings
             {
                 VideoDeviceId = device.Id,
                 StreamingCaptureMode = StreamingCaptureMode.Video,
                 MemoryPreference = MediaCaptureMemoryPreference.Cpu,
             });
-            var source = _mediaCapture.FrameSources.Values.FirstOrDefault(frame => frame.Info.SourceKind == MediaFrameSourceKind.Color);
+            if (_closing)
+            {
+                return;
+            }
+            var source = capture.FrameSources.Values.FirstOrDefault(frame => frame.Info.SourceKind == MediaFrameSourceKind.Color);
             if (source is null)
             {
                 throw new InvalidOperationException("This camera did not provide a color preview.");
             }
             // The preview always goes through the effect renderer so the slot
             // shows exactly the frames the recording self-view will render.
-            var started = await CameraEffectRenderer.StartAsync(
-                _mediaCapture,
+            renderer = await CameraEffectRenderer.StartAsync(
+                capture,
                 source,
                 ReadEffectSettings(),
                 CameraSlotEffectView,
                 DispatcherQueue,
                 PreviewAspect());
-            // Belt and braces against the race above: if anything did slip through
-            // and leave a renderer behind, it goes down rather than being stranded.
-            if (_previewRenderer is not null)
+            if (_closing)
             {
-                await _previewRenderer.DisposeAsync().ConfigureAwait(true);
+                return;
             }
-            _previewRenderer = started;
-            if (_previewRenderer is null)
+            if (renderer is null)
             {
-                _cameraPlayer = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
-                _cameraPlayer.Source = MediaSource.CreateFromMediaFrameSource(source);
+                player = new MediaPlayer { AutoPlay = true, IsLoopingEnabled = true };
+                player.Source = MediaSource.CreateFromMediaFrameSource(source);
+            }
+
+            // Publish only after the entire start succeeds. A close that begins at
+            // any await above leaves ownership in these locals, which the finally
+            // block tears down before releasing the serialization gate.
+            _mediaCapture = capture;
+            capture = null;
+            _previewRenderer = renderer;
+            renderer = null;
+            _cameraPlayer = player;
+            player = null;
+            if (_cameraPlayer is not null)
+            {
                 CameraPreview.SetMediaPlayer(_cameraPlayer);
             }
+            published = true;
             ShowCameraSlot(true, string.Empty);
             UpdateEffectAssetsNotice();
             ReportPreviewHealth();
         }
         catch (Exception error)
         {
-            ShowCameraSlot(false, "camera error");
-            CameraStatus.Text = error.Message;
+            if (!_closing)
+            {
+                ShowCameraSlot(false, "camera error");
+                CameraStatus.Text = error.Message;
+            }
+        }
+        finally
+        {
+            if (!published)
+            {
+                if (renderer is not null)
+                {
+                    await renderer.DisposeAsync();
+                }
+                player?.Dispose();
+                capture?.Dispose();
+            }
         }
     }
 
@@ -594,6 +677,7 @@ public sealed partial class VideoPreflightWindow : Window
             DrawCursor = PointerToggle.IsOn,
         };
         RecordingRequested?.Invoke(this, options);
+        _closeReady = true;
         Close();
     }
 
@@ -665,14 +749,6 @@ public sealed partial class VideoPreflightWindow : Window
         }
     }
 
-    private async void MoreOptions_Expanding(Expander sender, ExpanderExpandingEventArgs eventArgs)
-    {
-        // Let the expanded content participate in layout, then reveal it so
-        // opening More never looks like an empty, clipped panel.
-        await Task.Delay(80);
-        OptionsScroll.ChangeView(null, OptionsScroll.ScrollableHeight, null, false);
-    }
-
     private async void CameraBox_SelectionChanged(object sender, SelectionChangedEventArgs eventArgs)
     {
         if (_seeding)
@@ -688,11 +764,45 @@ public sealed partial class VideoPreflightWindow : Window
     private async void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
     {
         if (eventArgs.Key == VirtualKey.Enter) { eventArgs.Handled = true; await StartAsync(); }
-        else if (eventArgs.Key == VirtualKey.Escape) { eventArgs.Handled = true; Cancel(); }
+        else if (eventArgs.Key == VirtualKey.Escape) { eventArgs.Handled = true; await CancelAsync(); }
     }
 
-    private void Cancel_Click(object sender, RoutedEventArgs eventArgs) => Cancel();
-    private void Cancel() { _closing = true; CleanupDevices(); Close(); }
+    private async void Cancel_Click(object sender, RoutedEventArgs eventArgs) => await CancelAsync();
+
+    private async Task CancelAsync()
+    {
+        if (_closing)
+        {
+            return;
+        }
+        _closing = true;
+        StopMicrophoneMeter();
+        await StopCameraPreviewAsync();
+        _closeReady = true;
+        Close();
+    }
+
+    private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs eventArgs)
+    {
+        if (_closeReady)
+        {
+            return;
+        }
+        eventArgs.Cancel = true;
+        if (!_closing)
+        {
+            _closing = true;
+            _ = CloseAfterCleanupAsync();
+        }
+    }
+
+    private async Task CloseAfterCleanupAsync()
+    {
+        StopMicrophoneMeter();
+        await StopCameraPreviewAsync();
+        _closeReady = true;
+        Close();
+    }
     /// <summary>
     /// Releases both devices as the window goes away. The camera is torn down twice
     /// on purpose: the orderly async path first, then a direct dispose of the
@@ -701,19 +811,23 @@ public sealed partial class VideoPreflightWindow : Window
     /// camera open after its window closed is the one outcome worth being blunt
     /// about — the capture light stays on and the next preview finds the device busy.
     /// </summary>
-    private void CleanupDevices()
+    private void EmergencyCleanupDevices()
     {
         StopMicrophoneMeter();
-        var capture = _mediaCapture;
-        _ = StopCameraPreviewAsync();
+        _previewRenderer?.Dispose();
+        _previewRenderer = null;
+        CameraPreview.SetMediaPlayer(null);
+        _cameraPlayer?.Dispose();
+        _cameraPlayer = null;
         try
         {
-            capture?.Dispose();
+            _mediaCapture?.Dispose();
         }
         catch (Exception)
         {
-            // Already being disposed by the async path; nothing further to do.
+            // The orderly async path may already be disposing the same capture.
         }
+        _mediaCapture = null;
     }
 
     private static string GetDiskSpaceStatus()
@@ -730,3 +844,4 @@ public sealed partial class VideoPreflightWindow : Window
         }
     }
 }
+

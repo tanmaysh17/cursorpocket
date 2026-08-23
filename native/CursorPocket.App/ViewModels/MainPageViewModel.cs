@@ -2,11 +2,21 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
+using System.ComponentModel;
 
 namespace CursorPocket_App.ViewModels;
 
 public partial class MainPageViewModel(AppServices services) : ObservableObject
 {
+    private static readonly HashSet<string> SettingsProperties =
+    [
+        nameof(CaptureDirectory), nameof(ThemeModeIndex), nameof(StartWithWindows), nameof(MouseGestureEnabled),
+        nameof(MouseChordEnabled), nameof(CursorCompanionMode), nameof(ActivationShortcut),
+        nameof(VideoMicrophoneEnabled), nameof(VideoCameraEnabled), nameof(VideoFramesPerSecond),
+        nameof(VideoCountdownSeconds), nameof(AudioNoiseSuppression), nameof(AudioAutoLevel),
+    ];
+    private CancellationTokenSource? _settingsSaveDebounce;
+    private bool _applyingSettings;
     private readonly List<CaptureItemViewModel> _allItems = [];
 
     public BulkObservableCollection<CaptureItemViewModel> Items { get; } = [];
@@ -17,6 +27,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusMessage = "Ready";
     [ObservableProperty] private string _captureDirectory = services.Settings.CaptureDirectory;
+    [ObservableProperty] private int _themeModeIndex = services.Settings.ThemeMode switch
+    {
+        AppThemeMode.Light => 1,
+        AppThemeMode.Dark => 2,
+        _ => 0,
+    };
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
     [ObservableProperty] private bool _mouseChordEnabled = services.Settings.MouseChordEnabled;
@@ -200,11 +216,51 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     }
 
     [RelayCommand]
-    private async Task SaveSettingsAsync()
+    private Task SaveSettingsAsync() => SaveSettingsCoreAsync();
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    {
+        base.OnPropertyChanged(eventArgs);
+        if (!_applyingSettings && eventArgs.PropertyName is { } name && SettingsProperties.Contains(name))
+        {
+            QueueSettingsSave();
+        }
+    }
+
+    private void QueueSettingsSave()
+    {
+        _settingsSaveDebounce?.Cancel();
+        _settingsSaveDebounce?.Dispose();
+        var cancellation = _settingsSaveDebounce = new CancellationTokenSource();
+        StatusMessage = "Saving…";
+        _ = SaveAfterDelayAsync(cancellation);
+    }
+
+    private async Task SaveAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(350, cancellation.Token);
+            await SaveSettingsCoreAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer change owns the save status.
+        }
+    }
+
+    private async Task SaveSettingsCoreAsync(CancellationToken cancellationToken = default)
     {
         var requestedShortcut = ActivationShortcut;
+        var folderChanged = !string.Equals(services.Settings.CaptureDirectory, CaptureDirectory, StringComparison.OrdinalIgnoreCase);
         var updated = services.Settings with
         {
+            ThemeMode = ThemeModeIndex switch
+            {
+                1 => AppThemeMode.Light,
+                2 => AppThemeMode.Dark,
+                _ => AppThemeMode.System,
+            },
             CaptureDirectory = CaptureDirectory,
             StartWithWindows = StartWithWindows,
             MouseGestureEnabled = MouseGestureEnabled,
@@ -218,13 +274,23 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             AudioNoiseSuppression = AudioNoiseSuppression,
             AudioAutoLevel = AudioAutoLevel,
         };
-        await services.UpdateSettingsAsync(updated);
-        ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
-        OnPropertyChanged(nameof(ActivationHint));
-        await InitializeAsync();
-        StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
-            ? "Settings saved"
-            : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+        try
+        {
+            await services.UpdateSettingsAsync(updated, cancellationToken);
+            _applyingSettings = true;
+            ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
+            _applyingSettings = false;
+            OnPropertyChanged(nameof(ActivationHint));
+            if (folderChanged) await InitializeAsync();
+            StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
+                ? "Saved"
+                : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _applyingSettings = false;
+            StatusMessage = error.Message;
+        }
     }
 
     private void ApplyFilter()

@@ -3,8 +3,19 @@ using CursorPocket.Core.Services;
 
 namespace CursorPocket.Core.Models;
 
+public enum AppThemeMode
+{
+    System,
+    Light,
+    Dark,
+}
+
 public sealed record AppSettings
 {
+    [JsonPropertyName("theme_mode")]
+    [JsonConverter(typeof(JsonStringEnumConverter<AppThemeMode>))]
+    public AppThemeMode ThemeMode { get; init; } = AppThemeMode.System;
+
     [JsonPropertyName("capture_dir")]
     public string CaptureDirectory { get; init; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),

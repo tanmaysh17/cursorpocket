@@ -1,6 +1,7 @@
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.System;
 
@@ -8,52 +9,36 @@ namespace CursorPocket_App;
 
 public sealed partial class ReceiptWindow : Window
 {
-    private const int Width = 430;
-    private const int Height = 150;
-
+    private const int Width = 500;
+    private const int Height = 136;
     private readonly CaptureRecord? _record;
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(12) };
-    // A receipt never takes focus, so its actions are reachable only through global
-    // keys. They are modified combinations on purpose: the receipt stays up while the
-    // user carries on working, and bare keys would swallow their typing.
-    private readonly PaletteHotkeyService _keys = new(
-        [
-            new(VirtualKey.O, Control: true, Alt: true),
-            new(VirtualKey.E, Control: true, Alt: true),
-            new(VirtualKey.R, Control: true, Alt: true),
-            new(VirtualKey.L, Control: true, Alt: true),
-            new(VirtualKey.X, Control: true, Alt: true),
-        ],
-        "CursorPocket.ReceiptKeys");
+    private readonly DispatcherTimer _timer;
+    private TimeSpan _remaining;
+    private DateTimeOffset _timerStartedAt;
+    private bool _pointerInside;
+    private bool _focused;
 
-    public ReceiptWindow(CaptureRecord? record, string title, string? detail = null)
+    public ReceiptWindow(CaptureRecord? record, string title, string? detail, TimeSpan lifetime)
     {
         _record = record;
+        _remaining = lifetime;
+        _timer = new DispatcherTimer { Interval = lifetime };
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.Receipt);
         WindowPlacement.ConfigureUtilityWindow(this);
         WindowPlacement.PlaceBottomRight(this, Width, Height);
         WindowPlacement.ClipToRoundedRegion(this, Width, Height, 16);
-        _keys.Invoked += Keys_Invoked;
-        _keys.SetEnabled(true);
-        Closed += (_, _) =>
+        Activated += (_, eventArgs) =>
         {
-            _keys.SetEnabled(false);
-            _keys.Invoked -= Keys_Invoked;
-            _keys.Dispose();
+            _focused = eventArgs.WindowActivationState != WindowActivationState.Deactivated;
+            UpdateTimer();
         };
         ReceiptTitle.Text = title;
         ReceiptDetail.Text = detail ?? record?.Preview ?? "Nothing was saved";
         OpenButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
         RevealButton.Visibility = record is null ? Visibility.Collapsed : Visibility.Visible;
-        // The receipt's twelve seconds are exactly when the user is asking "did that come
-        // out right?", which makes this the most useful way back into the editor.
-        EditButton.Visibility = record?.CaptureKind == CaptureKind.Screenshot
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        if (record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio)
-        {
-            OpenButton.Content = "Play";
-        }
+        EditButton.Visibility = record?.CaptureKind == CaptureKind.Screenshot ? Visibility.Visible : Visibility.Collapsed;
+        if (record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio) OpenButton.Content = "Play";
         ReceiptIcon.Glyph = record?.CaptureKind switch
         {
             CaptureKind.Screenshot => "\uE91B",
@@ -63,12 +48,14 @@ public sealed partial class ReceiptWindow : Window
             CaptureKind.Link => "\uE71B",
             _ => "\uEA39",
         };
-        ReceiptIcon.Foreground = record is null ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketRed"] : (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["PocketGreen"];
+        ReceiptIcon.Foreground = record is null
+            ? App.Theme.Brush("PocketRed")
+            : App.Theme.Brush("PocketGreen");
         _timer.Tick += (_, _) => Close();
         DispatcherQueue.TryEnqueue(async () =>
         {
             await LoadPreviewAsync();
-            _timer.Start();
+            UpdateTimer();
         });
     }
 
@@ -76,15 +63,9 @@ public sealed partial class ReceiptWindow : Window
 
     private async Task LoadPreviewAsync()
     {
-        if (_record is null)
-        {
-            return;
-        }
+        if (_record is null) return;
         var preview = await App.Services.Previews.GetPreviewAsync(_record);
-        if (preview is null)
-        {
-            return;
-        }
+        if (preview is null) return;
         PreviewImage.Source = new BitmapImage(new Uri(preview));
         PreviewImage.Visibility = Visibility.Visible;
         ReceiptIcon.Visibility = Visibility.Collapsed;
@@ -114,38 +95,36 @@ public sealed partial class ReceiptWindow : Window
 
     private void Edit_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (_record is not null)
-        {
-            (App.Window as MainWindow)?.AnnotateExisting(_record);
-        }
-
+        if (_record is not null) (App.Window as MainWindow)?.AnnotateExisting(_record);
         Close();
     }
 
-    private void Keys_Invoked(object? sender, PaletteHotkeyEventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
+    private void Root_KeyDown(object sender, KeyRoutedEventArgs eventArgs)
     {
-        switch (eventArgs.Key)
-        {
-            case VirtualKey.O when _record is not null:
-                Open_Click(this, new RoutedEventArgs());
-                break;
-            case VirtualKey.E when _record?.CaptureKind == CaptureKind.Screenshot:
-                Edit_Click(this, new RoutedEventArgs());
-                break;
-            case VirtualKey.R when _record is not null:
-                Reveal_Click(this, new RoutedEventArgs());
-                break;
-            case VirtualKey.L:
-                Library_Click(this, new RoutedEventArgs());
-                break;
-            case VirtualKey.X:
-                Dismiss_Click(this, new RoutedEventArgs());
-                break;
-        }
-    });
+        if (eventArgs.Key != VirtualKey.Escape) return;
+        eventArgs.Handled = true;
+        Close();
+    }
 
-    private void Library_Click(object sender, RoutedEventArgs eventArgs) { OpenLibraryRequested?.Invoke(this, EventArgs.Empty); Close(); }
-    private void Dismiss_Click(object sender, RoutedEventArgs eventArgs) { _timer.Stop(); Close(); }
-    private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _timer.Stop();
-    private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _timer.Start();
+    private void Dismiss_Click(object sender, RoutedEventArgs eventArgs) => Close();
+    private void Root_PointerEntered(object sender, PointerRoutedEventArgs eventArgs) { _pointerInside = true; UpdateTimer(); }
+    private void Root_PointerExited(object sender, PointerRoutedEventArgs eventArgs) { _pointerInside = false; UpdateTimer(); }
+    private void UpdateTimer()
+    {
+        if (_timer.IsEnabled)
+        {
+            _remaining -= DateTimeOffset.UtcNow - _timerStartedAt;
+            _timer.Stop();
+        }
+        if (_pointerInside || _focused) return;
+        if (_remaining <= TimeSpan.Zero)
+        {
+            Close();
+            return;
+        }
+        _timer.Interval = _remaining;
+        _timerStartedAt = DateTimeOffset.UtcNow;
+        _timer.Start();
+    }
 }
+

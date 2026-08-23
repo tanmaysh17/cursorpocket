@@ -4,8 +4,9 @@ using CursorPocket.Core.Storage;
 
 namespace CursorPocket_App.Services;
 
-public sealed class AppServices : IDisposable
+public sealed class AppServices : IDisposable, ISettingsUpdateQueue
 {
+    private readonly SemaphoreSlim _settingsGate = new(1, 1);
     private AppServices(SettingsStore settingsStore, AppSettings settings, CaptureStore captureStore, string ffmpegPath)
     {
         SettingsStore = settingsStore;
@@ -15,6 +16,8 @@ public sealed class AppServices : IDisposable
         Library = new LibraryService(captureStore);
         Screenshots = new ScreenshotCaptureService(captureStore);
         Recording = new RecordingService(captureStore, ffmpegPath, () => (Settings.AudioNoiseSuppression, Settings.AudioAutoLevel));
+        MediaDevices = new MediaDeviceCatalog(cancellationToken => Recording.GetVideoDevicesAsync(cancellationToken));
+        RecordingSession = new RecordingSessionCoordinator(Recording);
         Context = new WindowContextService();
         Hotkey = new GlobalHotkeyService();
         EscapeHotkey = new ScopedEscapeHotkeyService();
@@ -29,6 +32,8 @@ public sealed class AppServices : IDisposable
     public LibraryService Library { get; private set; }
     public ScreenshotCaptureService Screenshots { get; private set; }
     public RecordingService Recording { get; private set; }
+    public IMediaDeviceCatalog MediaDevices { get; }
+    public RecordingSessionCoordinator RecordingSession { get; private set; }
     public WindowContextService Context { get; }
     public GlobalHotkeyService Hotkey { get; }
     public ScopedEscapeHotkeyService EscapeHotkey { get; }
@@ -78,8 +83,42 @@ public sealed class AppServices : IDisposable
 
     public async Task UpdateSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ApplySettingsAsync(settings, cancellationToken);
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
+    }
+
+    public async Task<AppSettings> UpdateAsync(
+        Func<AppSettings, AppSettings> update,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            await ApplySettingsAsync(update(Settings), cancellationToken);
+            return Settings;
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
+    }
+
+    private async Task ApplySettingsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
         var normalized = SettingsStore.Normalize(settings);
         var folderChanged = !string.Equals(Settings.CaptureDirectory, normalized.CaptureDirectory, StringComparison.OrdinalIgnoreCase);
+        if (folderChanged && RecordingSession.IsActive)
+        {
+            throw new InvalidOperationException("Finish the current recording before changing the capture folder.");
+        }
         Settings = normalized;
         await SettingsStore.SaveAsync(normalized, cancellationToken);
         Startup.SetEnabled(normalized.StartWithWindows);
@@ -87,6 +126,7 @@ public sealed class AppServices : IDisposable
 
         if (folderChanged)
         {
+            RecordingSession.Dispose();
             Recording.Dispose();
             CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
             var replacementStore = new CaptureStore(normalized.CaptureDirectory);
@@ -95,6 +135,7 @@ public sealed class AppServices : IDisposable
             Library = new LibraryService(CaptureStore);
             Screenshots = new ScreenshotCaptureService(CaptureStore);
             Recording = new RecordingService(CaptureStore, FfmpegPath, () => (Settings.AudioNoiseSuppression, Settings.AudioAutoLevel));
+            RecordingSession = new RecordingSessionCoordinator(Recording);
             Previews = new PreviewService(CaptureStore, FfmpegPath);
             StartOrphanRecovery();
         }
@@ -103,16 +144,32 @@ public sealed class AppServices : IDisposable
 
     public async Task UpdateRecordingDefaultsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
-        var normalized = SettingsStore.Normalize(settings);
-        Settings = normalized;
-        await SettingsStore.SaveAsync(normalized, cancellationToken);
-        SettingsChanged?.Invoke(this, normalized);
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            var normalized = SettingsStore.Normalize(settings);
+            Settings = normalized;
+            await SettingsStore.SaveAsync(normalized, cancellationToken);
+            SettingsChanged?.Invoke(this, normalized);
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 
     public async Task UpdateLibraryWindowGeometryAsync(string geometry, CancellationToken cancellationToken = default)
     {
-        Settings = Settings with { LibraryWindowGeometry = geometry };
-        await SettingsStore.SaveAsync(Settings, cancellationToken);
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            Settings = Settings with { LibraryWindowGeometry = geometry };
+            await SettingsStore.SaveAsync(Settings, cancellationToken);
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 
     /// <summary>
@@ -121,8 +178,16 @@ public sealed class AppServices : IDisposable
     /// </summary>
     public async Task UpdateCommandPanelAnchorAsync(double anchorX, double anchorY, CancellationToken cancellationToken = default)
     {
-        Settings = SettingsStore.Normalize(Settings with { CommandPanelAnchorX = anchorX, CommandPanelAnchorY = anchorY });
-        await SettingsStore.SaveAsync(Settings, cancellationToken);
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            Settings = SettingsStore.Normalize(Settings with { CommandPanelAnchorX = anchorX, CommandPanelAnchorY = anchorY });
+            await SettingsStore.SaveAsync(Settings, cancellationToken);
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 
     public void Dispose()
@@ -130,6 +195,7 @@ public sealed class AppServices : IDisposable
         CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
         Hotkey.Dispose();
         EscapeHotkey.Dispose();
+        RecordingSession.Dispose();
         Recording.Dispose();
     }
 
