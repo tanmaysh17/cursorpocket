@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using CursorPocket.Core.Models;
 
@@ -10,6 +11,14 @@ public sealed class CaptureStore
     {
         PropertyNameCaseInsensitive = true,
     };
+
+    // Recoverable media only ever lands in these two per-day folders. Walking the
+    // whole tree also visited every screenshot, text file, and cached preview.
+    private static readonly (string Category, string Extension)[] MediaCategories =
+    [
+        ("videos", ".mp4"),
+        ("audio", ".wav"),
+    ];
 
     public CaptureStore(string rootDirectory)
     {
@@ -35,7 +44,7 @@ public sealed class CaptureStore
         string[] lines;
         try
         {
-            lines = await File.ReadAllLinesAsync(ManifestPath, cancellationToken);
+            lines = await ReadRecentLinesAsync(limit, cancellationToken);
         }
         catch (IOException)
         {
@@ -64,6 +73,29 @@ public sealed class CaptureStore
             }
         }
         return records;
+    }
+
+    /// <summary>
+    /// Reads only as much of the tail of the manifest as the requested record count
+    /// can need, so opening the Library stays flat as history grows. A tail read can
+    /// begin mid-line; that fragment fails to parse and is skipped like any corrupt
+    /// line. An unbounded request still reads the whole file.
+    /// </summary>
+    private async Task<string[]> ReadRecentLinesAsync(int limit, CancellationToken cancellationToken)
+    {
+        await using var stream = new FileStream(
+            ManifestPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite);
+        var wanted = limit == int.MaxValue ? long.MaxValue : Math.Max(64L * 1024, (long)limit * 2048);
+        if (wanted < stream.Length)
+        {
+            stream.Seek(stream.Length - wanted, SeekOrigin.Begin);
+        }
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var text = await reader.ReadToEndAsync(cancellationToken);
+        return text.Split('\n');
     }
 
     public async Task<CaptureRecord> SaveTextAsync(string text, CancellationToken cancellationToken = default)
@@ -200,6 +232,14 @@ public sealed class CaptureStore
 
     public async Task<IReadOnlyList<CaptureRecord>> RecoverOrphanedMediaAsync(CancellationToken cancellationToken = default)
     {
+        var candidates = EnumerateMediaCandidates().OrderBy(File.GetLastWriteTimeUtc).ToList();
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        // Reading the whole manifest is only worth it once something could actually
+        // be orphaned.
         var indexed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var record in await RecentAsync(int.MaxValue, cancellationToken))
         {
@@ -207,16 +247,6 @@ public sealed class CaptureStore
         }
 
         var recovered = new List<CaptureRecord>();
-        var candidates = Directory.EnumerateFiles(RootDirectory, "*", SearchOption.AllDirectories)
-            .Where(path =>
-            {
-                var category = Path.GetFileName(Path.GetDirectoryName(path));
-                var extension = Path.GetExtension(path);
-                return (string.Equals(category, "videos", StringComparison.OrdinalIgnoreCase) && extension.Equals(".mp4", StringComparison.OrdinalIgnoreCase))
-                    || (string.Equals(category, "audio", StringComparison.OrdinalIgnoreCase) && extension.Equals(".wav", StringComparison.OrdinalIgnoreCase));
-            })
-            .OrderBy(File.GetLastWriteTimeUtc);
-
         foreach (var path in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -241,6 +271,31 @@ public sealed class CaptureStore
             recovered.Add(record);
         }
         return recovered;
+    }
+
+    private IEnumerable<string> EnumerateMediaCandidates()
+    {
+        foreach (var dayDirectory in Directory.EnumerateDirectories(RootDirectory))
+        {
+            // .cursorpocket holds generated previews and in-flight mux files, never
+            // captures, and it is by far the largest folder in a busy library.
+            if (Path.GetFileName(dayDirectory).StartsWith('.'))
+            {
+                continue;
+            }
+            foreach (var (category, extension) in MediaCategories)
+            {
+                var categoryDirectory = Path.Combine(dayDirectory, category);
+                if (!Directory.Exists(categoryDirectory))
+                {
+                    continue;
+                }
+                foreach (var path in Directory.EnumerateFiles(categoryDirectory, "*" + extension))
+                {
+                    yield return path;
+                }
+            }
+        }
     }
 
     private async Task<CaptureRecord> AppendAsync(CaptureRecord record, CancellationToken cancellationToken)

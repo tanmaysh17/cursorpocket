@@ -57,4 +57,4 @@ The editor cannot be signed off from XAML inspection. On the **installed** build
 6. Pin a capture, drag it out to Explorer, confirm it appears in a subsequent screenshot, and confirm `Escape` in another application still does that application's job and `Escape` during a recording still stops and saves.
 7. Confirm `Escape` never loses the original, in one press or two.
 
-Note that `build-native.ps1` overrides the csproj publish flags, so nothing that ships is trimmed and a csproj-only change never reaches the artifact.
+Note that `build-native.ps1` sets the publish flags itself, so nothing that ships is trimmed and a csproj-only change never reaches the artifact.

@@ -44,7 +44,6 @@ public sealed class AppServices : IDisposable
         var settings = await settingsStore.LoadAsync(cancellationToken);
         var ffmpegPath = ResolveFfmpegPath();
         var captureStore = new CaptureStore(settings.CaptureDirectory);
-        await captureStore.RecoverOrphanedMediaAsync(cancellationToken);
         var services = new AppServices(settingsStore, settings, captureStore, ffmpegPath);
         // Keep the saved preference authoritative and rewrite the command on
         // every launch. This heals a development/portable path after the app
@@ -53,6 +52,28 @@ public sealed class AppServices : IDisposable
         services.Startup.SetEnabled(settings.StartWithWindows);
         services.RegisterAvailableHotkey(settings.ActivationShortcut);
         return services;
+    }
+
+    /// <summary>
+    /// Sweeps for recordings a crash left behind. This used to be awaited before the
+    /// first window existed, so a large capture folder delayed every launch. Anything
+    /// it finds reaches the Library through <see cref="CaptureCompleted"/>, exactly
+    /// like a fresh capture, so nothing has to wait for it.
+    /// </summary>
+    public void StartOrphanRecovery()
+    {
+        var store = CaptureStore;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await store.RecoverOrphanedMediaAsync();
+            }
+            catch (Exception)
+            {
+                // Recovery is best effort; a fresh session must still start clean.
+            }
+        });
     }
 
     public async Task UpdateSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -69,13 +90,13 @@ public sealed class AppServices : IDisposable
             Recording.Dispose();
             CaptureStore.CaptureCompleted -= CaptureStore_CaptureCompleted;
             var replacementStore = new CaptureStore(normalized.CaptureDirectory);
-            await replacementStore.RecoverOrphanedMediaAsync(cancellationToken);
             CaptureStore = replacementStore;
             CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
             Library = new LibraryService(CaptureStore);
             Screenshots = new ScreenshotCaptureService(CaptureStore);
             Recording = new RecordingService(CaptureStore, FfmpegPath, () => (Settings.AudioNoiseSuppression, Settings.AudioAutoLevel));
             Previews = new PreviewService(CaptureStore, FfmpegPath);
+            StartOrphanRecovery();
         }
         SettingsChanged?.Invoke(this, normalized);
     }

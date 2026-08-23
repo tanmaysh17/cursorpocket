@@ -55,14 +55,18 @@ public sealed partial class MainWindow : Window
     public void ShowLibrary()
     {
         AppWindow.Show(true);
-        (RootFrame.Content as MainPage)?.NavigateTo("library");
+        var page = RootFrame.Content as MainPage;
+        page?.NavigateTo("library");
+        _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
     }
 
     public void ShowSettings()
     {
         AppWindow.Show(true);
-        (RootFrame.Content as MainPage)?.NavigateTo("settings");
+        var page = RootFrame.Content as MainPage;
+        page?.NavigateTo("settings");
+        _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
     }
 
@@ -695,6 +699,10 @@ public sealed partial class MainWindow : Window
         {
             SubscribeToRecordingState();
             _companion?.SetMode(settings.CursorCompanionMode);
+            if (_mouseActivity is not null)
+            {
+                _mouseActivity.GestureEnabled = settings.MouseGestureEnabled;
+            }
             if (_companionTrayItem is not null)
             {
                 _companionTrayItem.Text = settings.CursorCompanionMode == "off" ? "Show cursor companion" : "Hide cursor companion";
@@ -705,14 +713,9 @@ public sealed partial class MainWindow : Window
     {
         _companion = new NativeCompanionWindow(App.Services.Settings.CursorCompanionMode);
         _companion.OpenRequested += (_, _) => ShowCommandPalette();
-        _mouseActivity = new MouseActivityService();
-        _mouseActivity.Moved += (_, point) => App.DispatcherQueue.TryEnqueue(() => _companion?.Follow(point.X, point.Y));
-        _mouseActivity.DoubleCircle += (_, _) =>
+        _mouseActivity = new MouseActivityService
         {
-            if (App.Services.Settings.MouseGestureEnabled)
-            {
-                App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
-            }
+            GestureEnabled = App.Services.Settings.MouseGestureEnabled,
         };
         // Raised from a timer thread, so it has to marshal like the others.
         _mouseActivity.ChordHold += (_, _) =>
@@ -722,6 +725,21 @@ public sealed partial class MainWindow : Window
                 App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
             }
         };
+        // Moved is a coalesced signal: at most one dispatcher item is in flight and
+        // it reads the newest pointer position, rather than queueing one closure per
+        // mouse event.
+        _mouseActivity.Moved += (_, _) => App.DispatcherQueue.TryEnqueue(FollowPointer);
+        _mouseActivity.DoubleCircle += (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
+        // The hook goes live only now that every handler is attached.
+        _mouseActivity.Start();
+    }
+
+    private void FollowPointer()
+    {
+        if (_mouseActivity?.TryConsumeLatestPosition(out var x, out var y) == true)
+        {
+            _companion?.Follow(x, y);
+        }
     }
 
     private void InitializeTray()

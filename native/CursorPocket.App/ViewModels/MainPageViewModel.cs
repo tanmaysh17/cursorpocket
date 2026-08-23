@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CursorPocket.Core.Models;
@@ -10,7 +9,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
 {
     private readonly List<CaptureItemViewModel> _allItems = [];
 
-    public ObservableCollection<CaptureItemViewModel> Items { get; } = [];
+    public BulkObservableCollection<CaptureItemViewModel> Items { get; } = [];
     public IReadOnlyList<string> Filters { get; } = ["All", "Screenshots", "Video", "Audio", "Text", "Links"];
 
     [ObservableProperty] private CaptureItemViewModel? _selectedItem;
@@ -121,7 +120,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     {
         var item = new CaptureItemViewModel(record, services.Library.GetAbsolutePath(record));
         _allItems.Insert(0, item);
-        ApplyFilter();
+        // Inserting the one new row leaves every existing container in place. A full
+        // rebuild here made the list flicker on each completed capture.
+        if (Matches(item))
+        {
+            Items.Insert(0, item);
+        }
         SelectedItem = item;
         RaiseCounts();
         StatusMessage = $"Saved {item.KindLabel.ToLowerInvariant()}";
@@ -151,6 +155,9 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             {
                 await services.Library.DeleteAsync(item.Record);
                 _allItems.Remove(item);
+                // Dropping the deleted rows keeps the surviving containers alive; a
+                // full rebuild here regenerated every visible row.
+                Items.Remove(item);
                 deleted++;
             }
             catch (Exception)
@@ -158,8 +165,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
                 failed++;
             }
         }
-        SelectedItem = null;
-        ApplyFilter();
+        SelectedItem = Items.FirstOrDefault();
         StatusMessage = failed == 0
             ? deleted == 1
                 ? "Moved capture to the Recycle Bin"
@@ -223,20 +229,17 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
 
     private void ApplyFilter()
     {
-        var filtered = _allItems.Where(item => SelectedFilter switch
-        {
-            "Screenshots" => item.Record.CaptureKind == CaptureKind.Screenshot,
-            "Video" => item.Record.CaptureKind == CaptureKind.Video,
-            "Audio" => item.Record.CaptureKind == CaptureKind.Audio,
-            "Text" => item.Record.CaptureKind == CaptureKind.Text,
-            "Links" => item.Record.CaptureKind == CaptureKind.Link,
-            _ => true,
-        }).ToList();
-        Items.Clear();
-        foreach (var item in filtered)
-        {
-            Items.Add(item);
-        }
+        Items.ReplaceAll(_allItems.Where(Matches));
         SelectedItem = Items.FirstOrDefault();
     }
+
+    private bool Matches(CaptureItemViewModel item) => SelectedFilter switch
+    {
+        "Screenshots" => item.Record.CaptureKind == CaptureKind.Screenshot,
+        "Video" => item.Record.CaptureKind == CaptureKind.Video,
+        "Audio" => item.Record.CaptureKind == CaptureKind.Audio,
+        "Text" => item.Record.CaptureKind == CaptureKind.Text,
+        "Links" => item.Record.CaptureKind == CaptureKind.Link,
+        _ => true,
+    };
 }

@@ -29,6 +29,18 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private const int SmoothingPasses = 2;
 
+    /// <summary>
+    /// Smallest pointer movement, in source pixels, that is worth appending to a live
+    /// freehand stroke.
+    /// </summary>
+    /// <remarks>
+    /// Carried over from the performance pass on main. A Polyline re-tessellates its whole
+    /// geometry every frame, so appending every pointer sample makes a long stroke get
+    /// slower the longer it gets. Decimating at commit time (which this still does, through
+    /// AnnotationGeometry.Decimate) does nothing for the drag itself.
+    /// </remarks>
+    private const double MinimumStrokeStep = 2.5;
+
     /// <summary>Corner-radius step and ceiling for a box, in source pixels.</summary>
     private const double CornerRadiusStep = 2;
 
@@ -101,6 +113,7 @@ public sealed partial class AnnotationWindow : Window
     private Point _current;
     private List<AnnPoint>? _strokePoints;
     private Polyline? _strokeVisual;
+    private Point _lastStrokePoint;
 
     public AnnotationWindow(CaptureRecord record, string path)
         : this(record, path, AnnotationOrigin.FreshCapture)
@@ -690,6 +703,7 @@ public sealed partial class AnnotationWindow : Window
         if (_tool is AnnotationTool.Pen or AnnotationTool.Highlight)
         {
             _strokePoints = [ToAnn(_press)];
+            _lastStrokePoint = _press;
             var highlighting = _tool == AnnotationTool.Highlight;
             _strokeVisual = new Polyline
             {
@@ -723,9 +737,18 @@ public sealed partial class AnnotationWindow : Window
         if (_strokeVisual is not null && _strokePoints is not null)
         {
             // A stroke appends rather than rebuilding: rebuilding a growing polyline on
-            // every pointer move would be quadratic over a long stroke.
-            _strokePoints.Add(ToAnn(_current));
-            _strokeVisual.Points.Add(_current);
+            // every pointer move would be quadratic over a long stroke. Samples closer
+            // than one step are dropped for the same reason — the Polyline re-tessellates
+            // everything it holds on every frame, so a long stroke would otherwise get
+            // slower the longer it got. The commit-time smoothing pass reads the same
+            // point list, so the saved shape is unaffected.
+            if (SquaredDistance(_current, _lastStrokePoint) >= MinimumStrokeStep * MinimumStrokeStep)
+            {
+                _lastStrokePoint = _current;
+                _strokePoints.Add(ToAnn(_current));
+                _strokeVisual.Points.Add(_current);
+            }
+
             return;
         }
 
@@ -2309,6 +2332,13 @@ public sealed partial class AnnotationWindow : Window
     }
 
     // ------------------------------------------------------------------- conversions
+
+    private static double SquaredDistance(Point first, Point second)
+    {
+        var dx = first.X - second.X;
+        var dy = first.Y - second.Y;
+        return (dx * dx) + (dy * dy);
+    }
 
     private static AnnPoint ToAnn(Point point) => new(point.X, point.Y);
 
