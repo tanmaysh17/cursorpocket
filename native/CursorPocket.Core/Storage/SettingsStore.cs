@@ -76,7 +76,7 @@ public sealed class SettingsStore(string? settingsPath = null)
 
             if (File.Exists(SettingsPath))
             {
-                File.Replace(temporaryPath, SettingsPath, SettingsPath + ".bak", ignoreMetadataErrors: true);
+                await ReplaceWithRetryAsync(temporaryPath, SettingsPath, SettingsPath + ".bak", cancellationToken);
             }
             else
             {
@@ -165,4 +165,27 @@ public sealed class SettingsStore(string? settingsPath = null)
         double.IsFinite(value) ? Math.Clamp(value, 0, 1) : fallback;
 
     private static int ClampAdjustment(int value) => Math.Clamp(value, -100, 100);
+
+    private static async Task ReplaceWithRetryAsync(
+        string source,
+        string destination,
+        string backup,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.Replace(source, destination, backup, ignoreMetadataErrors: true);
+                return;
+            }
+            catch (IOException) when (attempt < 5)
+            {
+                // Search indexers and anti-malware scanners can briefly open the old
+                // settings or backup between close and replace. The write remains
+                // serialized and atomic; this only waits for that transient lease.
+                await Task.Delay(TimeSpan.FromMilliseconds(20 * (attempt + 1)), cancellationToken);
+            }
+        }
+    }
 }

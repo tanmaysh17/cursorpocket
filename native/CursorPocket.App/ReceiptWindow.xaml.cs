@@ -25,9 +25,9 @@ public sealed partial class ReceiptWindow : Window
         _timer = new DispatcherTimer { Interval = lifetime };
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.Receipt);
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         WindowPlacement.ConfigureUtilityWindow(this);
         WindowPlacement.PlaceBottomRight(this, Width, Height);
-        WindowPlacement.ClipToRoundedRegion(this, Width, Height, 16);
         Activated += (_, eventArgs) =>
         {
             _focused = eventArgs.WindowActivationState != WindowActivationState.Deactivated;
@@ -51,6 +51,7 @@ public sealed partial class ReceiptWindow : Window
         ReceiptIcon.Foreground = record is null
             ? App.Theme.Brush("PocketRed")
             : App.Theme.Brush("PocketGreen");
+        Closed += (_, _) => App.Theme.ThemeChanged -= Theme_ThemeChanged;
         _timer.Tick += (_, _) => Close();
         DispatcherQueue.TryEnqueue(async () =>
         {
@@ -60,6 +61,9 @@ public sealed partial class ReceiptWindow : Window
     }
 
     public event EventHandler? OpenLibraryRequested;
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
+        ReceiptIcon.Foreground = _record is null ? App.Theme.Brush("PocketRed") : App.Theme.Brush("PocketGreen"));
 
     private async Task LoadPreviewAsync()
     {

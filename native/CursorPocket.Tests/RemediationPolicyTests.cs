@@ -2,6 +2,7 @@ using System.Text.Json;
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket.Core.Storage;
+using CursorPocket_App.Services;
 
 namespace CursorPocket.Tests;
 
@@ -28,6 +29,19 @@ public sealed class RemediationPolicyTests : IDisposable
         Assert.Equal(16, CursorPocket.Core.Annotations.AnnotationToolCatalog.All.Select(tool => tool.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         Assert.DoesNotContain(CursorPocket.Core.Annotations.AnnotationTool.Loupe, CursorPocket.Core.Annotations.AnnotationToolCatalog.All.Select(tool => tool.Tool));
     }
+
+    [Theory]
+    [InlineData(CaptureKind.Screenshot, 3)]
+    [InlineData(CaptureKind.Text, 3)]
+    [InlineData(CaptureKind.Link, 3)]
+    [InlineData(CaptureKind.Video, 6)]
+    [InlineData(CaptureKind.Audio, 6)]
+    public void Receipt_lifetimes_match_output_kind(CaptureKind kind, int seconds) =>
+        Assert.Equal(TimeSpan.FromSeconds(seconds), ReceiptLifetimePolicy.For(kind));
+
+    [Fact]
+    public void Error_receipts_stay_long_enough_to_read() =>
+        Assert.Equal(TimeSpan.FromSeconds(6), ReceiptLifetimePolicy.For(null));
 
     [Theory]
     [InlineData(1920, 1080, 1.25, TransientLayoutMode.Regular)]
@@ -69,6 +83,55 @@ public sealed class RemediationPolicyTests : IDisposable
         var recovered = await store.LoadAsync();
 
         Assert.Equal(30, recovered.VideoFramesPerSecond);
+    }
+
+    [Fact]
+    public async Task Theme_mode_round_trips_and_invalid_values_migrate_to_system()
+    {
+        var path = Path.Combine(_root, "theme.json");
+        var store = new SettingsStore(path);
+        await store.SaveAsync(new AppSettings { ThemeMode = AppThemeMode.Dark });
+        Assert.Equal(AppThemeMode.Dark, (await store.LoadAsync()).ThemeMode);
+
+        await File.WriteAllTextAsync(path, "{\"theme_mode\":999}");
+        Assert.Equal(AppThemeMode.System, (await store.LoadAsync()).ThemeMode);
+    }
+
+    [Fact]
+    public async Task Media_catalog_reuses_fresh_results_without_blocking_on_enumeration()
+    {
+        var calls = 0;
+        var expected = new MediaDeviceDescriptor("camera", "Camera", "video", true);
+        var catalog = new MediaDeviceCatalog(_ =>
+        {
+            calls++;
+            return Task.FromResult<(IReadOnlyList<MediaDeviceDescriptor>, IReadOnlyList<MediaDeviceDescriptor>)>(([], [expected]));
+        });
+
+        var first = await catalog.RefreshAsync();
+        var second = await catalog.RefreshAsync();
+
+        Assert.Equal(MediaDeviceCatalogState.Fresh, first.State);
+        Assert.Same(first, second);
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task Media_catalog_retains_stale_devices_when_refresh_fails()
+    {
+        var fail = false;
+        var microphone = new MediaDeviceDescriptor("mic", "Microphone", "audio", true);
+        var catalog = new MediaDeviceCatalog(_ => fail
+            ? throw new InvalidOperationException("privacy denied")
+            : Task.FromResult<(IReadOnlyList<MediaDeviceDescriptor>, IReadOnlyList<MediaDeviceDescriptor>)>(([microphone], [])));
+        await catalog.RefreshAsync();
+        fail = true;
+
+        var stale = await catalog.RefreshAsync(force: true);
+
+        Assert.Equal(MediaDeviceCatalogState.Stale, stale.State);
+        Assert.Equal("privacy denied", stale.Error);
+        Assert.Equal(microphone, Assert.Single(stale.Audio));
     }
 
     [Fact]

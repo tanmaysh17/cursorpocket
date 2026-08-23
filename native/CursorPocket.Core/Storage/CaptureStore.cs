@@ -14,10 +14,13 @@ public sealed class CaptureStore
 
     // Recoverable media only ever lands in these two per-day folders. Walking the
     // whole tree also visited every screenshot, text file, and cached preview.
-    private static readonly (string Category, string Extension)[] MediaCategories =
+    private static readonly (CaptureKind Kind, string Category, string Extension, long MinimumBytes)[] CaptureCategories =
     [
-        ("videos", ".mp4"),
-        ("audio", ".wav"),
+        (CaptureKind.Screenshot, "screenshots", ".png", 8),
+        (CaptureKind.Video, "videos", ".mp4", 1024),
+        (CaptureKind.Audio, "audio", ".wav", 44),
+        (CaptureKind.Text, "text", ".txt", 1),
+        (CaptureKind.Link, "links", ".url", 1),
     ];
 
     public CaptureStore(string rootDirectory)
@@ -250,8 +253,11 @@ public sealed class CaptureStore
     }
 
     public async Task<IReadOnlyList<CaptureRecord>> RecoverOrphanedMediaAsync(CancellationToken cancellationToken = default)
+        => await ReconcileUnindexedCapturesAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CaptureRecord>> ReconcileUnindexedCapturesAsync(CancellationToken cancellationToken = default)
     {
-        var candidates = EnumerateMediaCandidates().OrderBy(File.GetLastWriteTimeUtc).ToList();
+        var candidates = EnumerateCaptureCandidates().OrderBy(candidate => File.GetLastWriteTimeUtc(candidate.Path)).ToList();
         if (candidates.Count == 0)
         {
             return [];
@@ -266,24 +272,22 @@ public sealed class CaptureStore
         }
 
         var recovered = new List<CaptureRecord>();
-        foreach (var path in candidates)
+        foreach (var candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var fullPath = Path.GetFullPath(path);
+            var fullPath = Path.GetFullPath(candidate.Path);
             if (indexed.Contains(fullPath))
             {
                 continue;
             }
-            var kind = Path.GetExtension(fullPath).Equals(".mp4", StringComparison.OrdinalIgnoreCase) ? CaptureKind.Video : CaptureKind.Audio;
-            var minimumBytes = kind == CaptureKind.Video ? 1024 : 44;
-            if (new FileInfo(fullPath).Length < minimumBytes)
+            if (new FileInfo(fullPath).Length < candidate.MinimumBytes)
             {
                 continue;
             }
             var record = await RegisterExistingAsync(
-                kind,
+                candidate.Kind,
                 fullPath,
-                kind == CaptureKind.Video ? "Recovered video" : "Recovered audio note",
+                $"Recovered {candidate.Kind.ToStorageValue()}",
                 new Dictionary<string, object?> { ["recovered"] = true },
                 cancellationToken);
             indexed.Add(fullPath);
@@ -292,7 +296,7 @@ public sealed class CaptureStore
         return recovered;
     }
 
-    private IEnumerable<string> EnumerateMediaCandidates()
+    private IEnumerable<(string Path, CaptureKind Kind, long MinimumBytes)> EnumerateCaptureCandidates()
     {
         foreach (var dayDirectory in Directory.EnumerateDirectories(RootDirectory))
         {
@@ -302,7 +306,7 @@ public sealed class CaptureStore
             {
                 continue;
             }
-            foreach (var (category, extension) in MediaCategories)
+            foreach (var (kind, category, extension, minimumBytes) in CaptureCategories)
             {
                 var categoryDirectory = Path.Combine(dayDirectory, category);
                 if (!Directory.Exists(categoryDirectory))
@@ -311,7 +315,7 @@ public sealed class CaptureStore
                 }
                 foreach (var path in Directory.EnumerateFiles(categoryDirectory, "*" + extension))
                 {
-                    yield return path;
+                    yield return (path, kind, minimumBytes);
                 }
             }
         }

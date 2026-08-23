@@ -13,6 +13,7 @@ public interface ICaptureService
 public interface IRecordingService
 {
     RecordingState State { get; }
+    bool IsVideo { get; }
     event EventHandler<RecordingState>? StateChanged;
     event EventHandler<TimeSpan>? ElapsedChanged;
     Task StartVideoAsync(RecordingOptions options, CancellationToken cancellationToken = default);

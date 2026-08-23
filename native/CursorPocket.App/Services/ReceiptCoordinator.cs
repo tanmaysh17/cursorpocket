@@ -1,14 +1,11 @@
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 
 namespace CursorPocket_App.Services;
 
 public sealed record ReceiptRequest(CaptureRecord? Record, string Title, string? Detail = null)
 {
-    public TimeSpan Lifetime => Record?.CaptureKind == CaptureKind.Screenshot
-        ? TimeSpan.FromSeconds(3)
-        : Record?.CaptureKind is CaptureKind.Video or CaptureKind.Audio
-            ? TimeSpan.FromSeconds(6)
-            : TimeSpan.FromSeconds(5);
+    public TimeSpan Lifetime => ReceiptLifetimePolicy.For(Record?.CaptureKind);
 }
 
 public interface IReceiptCoordinator : IDisposable

@@ -94,6 +94,13 @@ public sealed partial class PinnedCaptureWindow : Window
         }
     }
 
+    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) => ControlStrip.Opacity = 1;
+
+    private void Root_LostFocus(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!_dragging) ControlStrip.Opacity = 0;
+    }
+
     // ------------------------------------------------------------------------ dragging
 
     private void Root_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)

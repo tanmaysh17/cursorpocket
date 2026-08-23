@@ -309,11 +309,12 @@ public sealed class AnnotationContractTests
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
         Assert.Contains("x:Name=\"ToolRail\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"MoreToolsButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ToolbarScroller\"", xaml, StringComparison.Ordinal);
-        var scroller = Slice(xaml, "x:Name=\"ToolbarScroller\"", "x:Name=\"ToolbarLeft\"");
-        Assert.DoesNotContain("ScrollBarVisibility", scroller, StringComparison.Ordinal);
-        Assert.DoesNotContain("ScrollMode", scroller, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PropertyPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ToolContextHost\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"OutputHost\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("MoreToolsButton", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("AnnotationToolCatalog.Get", code, StringComparison.Ordinal);
 
         // No width state machine, and nothing collapses a key.
         Assert.DoesNotContain("CompactToolbarWidth", code, StringComparison.Ordinal);

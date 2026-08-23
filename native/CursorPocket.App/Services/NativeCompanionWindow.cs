@@ -84,6 +84,7 @@ internal sealed class NativeCompanionWindow : IDisposable
 
         NativeMethods.SetWindowDisplayAffinity(_hwnd, NativeMethods.WdaExcludeFromCapture);
         BuildFrames();
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         _idleTimer.Tick += IdleTimer_Tick;
         _pulseTimer.Tick += PulseTimer_Tick;
         _moveTimer.Tick += MoveTimer_Tick;
@@ -180,6 +181,7 @@ internal sealed class NativeCompanionWindow : IDisposable
         }
 
         _disposed = true;
+        App.Theme.ThemeChanged -= Theme_ThemeChanged;
         _idleTimer.Stop();
         _pulseTimer.Stop();
         _moveTimer.Stop();
@@ -279,7 +281,7 @@ internal sealed class NativeCompanionWindow : IDisposable
             NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate | NativeMethods.SwpShowWindow);
         _visible = true;
         Present();
-        if (!_disposed)
+        if (!_disposed && App.AnimationsEnabled)
         {
             _pulseTimer.Start();
         }
@@ -334,15 +336,21 @@ internal sealed class NativeCompanionWindow : IDisposable
             NativeMethods.ReleaseDC(0, screenDc);
         }
 
+        var palette = App.Theme.Palette;
+        var ready = palette.Selection;
+        var recording = App.Theme.IsHighContrast
+            ? palette.Selection
+            : ColorTranslator.FromHtml(palette.IsDark ? "#FF5F6B" : "#D73546");
+        var outline = palette.IsDark ? Color.FromArgb(220, 255, 255, 255) : Color.FromArgb(190, 0, 0, 0);
         for (var index = 0; index < PulseFrames; index++)
         {
             var phase = index * (Math.PI * 2 / PulseFrames);
-            _readyFrames[index] = RenderFrame(phase, Color.FromArgb(255, 67, 224, 141));
-            _recordingFrames[index] = RenderFrame(phase, Color.FromArgb(255, 255, 90, 103));
+            _readyFrames[index] = RenderFrame(phase, ready, outline);
+            _recordingFrames[index] = RenderFrame(phase, recording, outline);
         }
     }
 
-    private static nint RenderFrame(double phase, Color ready)
+    private static nint RenderFrame(double phase, Color ready, Color outline)
     {
         using var bitmap = new Bitmap(WindowSize, WindowSize, PixelFormat.Format32bppPArgb);
         using (var graphics = Graphics.FromImage(bitmap))
@@ -355,8 +363,18 @@ internal sealed class NativeCompanionWindow : IDisposable
             graphics.FillEllipse(glow, 5.5f - glowSize / 2, 5.5f - glowSize / 2, glowSize, glowSize);
             using var dot = new SolidBrush(ready);
             graphics.FillEllipse(dot, 3.5f, 3.5f, 4f, 4f);
+            using var edge = new Pen(outline, 1f);
+            graphics.DrawEllipse(edge, 3.5f, 3.5f, 4f, 4f);
         }
         return bitmap.GetHbitmap(Color.FromArgb(0));
+    }
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs)
+    {
+        if (_disposed) return;
+        ReleaseFrames();
+        BuildFrames();
+        Present();
     }
 
     private void ReleaseFrames()

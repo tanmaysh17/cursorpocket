@@ -5,6 +5,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI.ViewManagement;
+using Windows.System.Power;
 using Color = System.Drawing.Color;
 
 namespace CursorPocket_App.Services;
@@ -41,18 +42,72 @@ public sealed class ThemeCoordinator : IDisposable
     private readonly List<Registration> _registrations = [];
     private readonly UISettings _uiSettings = new();
     private readonly AccessibilitySettings _accessibility = new();
+    private bool _uiSettingsSubscribed;
+    private bool _accessibilitySubscribed;
+    private bool _powerSubscribed;
     private AppThemeMode _mode;
 
     public ThemeCoordinator(AppThemeMode mode)
     {
         _mode = mode;
-        _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
-        _accessibility.HighContrastChanged += Accessibility_HighContrastChanged;
+        // These projections are OS-version and session dependent. A missing optional
+        // notification must not prevent the app from starting; the current value is
+        // still read whenever another supported signal or an app override applies.
+        try
+        {
+            _uiSettings.ColorValuesChanged += UiSettings_ColorValuesChanged;
+            _uiSettingsSubscribed = true;
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
+        {
+            _uiSettingsSubscribed = false;
+        }
+        try
+        {
+            _accessibility.HighContrastChanged += Accessibility_HighContrastChanged;
+            _accessibilitySubscribed = true;
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
+        {
+            _accessibilitySubscribed = false;
+        }
+        try
+        {
+            PowerManager.EnergySaverStatusChanged += PowerManager_EnergySaverStatusChanged;
+            _powerSubscribed = true;
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
+        {
+            _powerSubscribed = false;
+        }
     }
 
     public event EventHandler? ThemeChanged;
     public AppThemeMode Mode => _mode;
-    public bool IsHighContrast => _accessibility.HighContrast;
+    public bool IsHighContrast
+    {
+        get
+        {
+            try { return _accessibility.HighContrast; }
+            catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException) { return false; }
+        }
+    }
+    public bool TransparencyAllowed
+    {
+        get
+        {
+            if (IsHighContrast) return false;
+            try
+            {
+                return _uiSettings.AdvancedEffectsEnabled
+                    && PowerManager.EnergySaverStatus != EnergySaverStatus.On;
+            }
+            catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
+            {
+                return false;
+            }
+        }
+    }
     public bool IsDark => _mode switch
     {
         AppThemeMode.Dark => true,
@@ -140,7 +195,7 @@ public sealed class ThemeCoordinator : IDisposable
             _ => ElementTheme.Default,
         };
 
-        registration.Window.SystemBackdrop = registration.Role switch
+        registration.Window.SystemBackdrop = !TransparencyAllowed ? null : registration.Role switch
         {
             SurfaceRole.Persistent or SurfaceRole.Workspace => new MicaBackdrop
             {
@@ -170,6 +225,7 @@ public sealed class ThemeCoordinator : IDisposable
 
     private void UiSettings_ColorValuesChanged(UISettings sender, object args) => QueueApply();
     private void Accessibility_HighContrastChanged(AccessibilitySettings sender, object args) => QueueApply();
+    private void PowerManager_EnergySaverStatusChanged(object? sender, object args) => QueueApply();
 
     private void QueueApply()
     {
@@ -179,8 +235,15 @@ public sealed class ThemeCoordinator : IDisposable
 
     private bool IsSystemDark()
     {
-        var background = _uiSettings.GetColorValue(UIColorType.Background);
-        return ((background.R * 299) + (background.G * 587) + (background.B * 114)) / 1000 < 128;
+        try
+        {
+            var background = _uiSettings.GetColorValue(UIColorType.Background);
+            return ((background.R * 299) + (background.G * 587) + (background.B * 114)) / 1000 < 128;
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
+        {
+            return false;
+        }
     }
 
     private ThemePalette HighContrastPalette()
@@ -206,8 +269,9 @@ public sealed class ThemeCoordinator : IDisposable
 
     public void Dispose()
     {
-        _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged;
-        _accessibility.HighContrastChanged -= Accessibility_HighContrastChanged;
+        try { if (_uiSettingsSubscribed) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged; } catch { }
+        try { if (_accessibilitySubscribed) _accessibility.HighContrastChanged -= Accessibility_HighContrastChanged; } catch { }
+        try { if (_powerSubscribed) PowerManager.EnergySaverStatusChanged -= PowerManager_EnergySaverStatusChanged; } catch { }
         _registrations.Clear();
     }
 }

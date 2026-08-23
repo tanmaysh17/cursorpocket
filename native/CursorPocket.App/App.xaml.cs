@@ -87,6 +87,19 @@ public partial class App : Microsoft.UI.Xaml.Application
                     Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                     async () => await ((MainWindow)Window).AnnotateFileAsync(path));
             }
+
+            // Deterministic installed-build review entry point. It is deliberately
+            // command-line only and never appears in product navigation.
+            var qaAt = Array.FindIndex(
+                commandLine,
+                argument => argument.Equals("--qa-surface", StringComparison.OrdinalIgnoreCase));
+            if (qaAt >= 0 && qaAt + 1 < commandLine.Length)
+            {
+                var surface = commandLine[qaAt + 1];
+                DispatcherQueue.TryEnqueue(
+                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                    async () => await ((MainWindow)Window).ShowQaSurfaceAsync(surface));
+            }
         }
         catch (Exception error)
         {

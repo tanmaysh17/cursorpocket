@@ -5,10 +5,10 @@ namespace CursorPocket_App.Services;
 
 public sealed class RecordingSessionCoordinator : IRecordingSessionCoordinator, IDisposable
 {
-    private readonly RecordingService _recording;
+    private readonly IRecordingService _recording;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public RecordingSessionCoordinator(RecordingService recording)
+    public RecordingSessionCoordinator(IRecordingService recording)
     {
         _recording = recording;
         _recording.StateChanged += Recording_StateChanged;

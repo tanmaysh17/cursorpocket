@@ -136,6 +136,98 @@ public sealed partial class MainWindow : Window
         _preflight.Activate();
     }
 
+    /// <summary>
+    /// Opens one deterministic surface for installed-build visual and accessibility
+    /// review. Normal activation never calls this path.
+    /// </summary>
+    public async Task ShowQaSurfaceAsync(string surface)
+    {
+        var scenario = surface.Trim().ToLowerInvariant();
+        var page = RootFrame.Content as MainPage;
+        switch (scenario)
+        {
+            case "library":
+                ShowLibrary();
+                break;
+            case "capture":
+                AppWindow.Show(true);
+                page?.NavigateTo("capture");
+                ActivateMainWindow();
+                break;
+            case "settings":
+                ShowSettings();
+                break;
+            case "command":
+            case "command-root":
+                AppWindow.Hide();
+                ShowCommandPalette();
+                break;
+            case "screenshot":
+            case "screenshot-chooser":
+                AppWindow.Hide();
+                ShowCommandPalette("screenshot");
+                break;
+            case "video":
+            case "video-preflight":
+                AppWindow.Hide();
+                ShowVideoPreflight();
+                break;
+            case "annotation":
+                AppWindow.Hide();
+                await AnnotateFileAsync(CreateQaFixture());
+                break;
+            case "receipt":
+                AppWindow.Hide();
+                _receipts.Show(new ReceiptRequest(CreateQaRecord(CreateQaFixture()), "Screenshot saved", "Copied to the clipboard"));
+                break;
+            case "error-receipt":
+                AppWindow.Hide();
+                ShowError("Camera is unavailable", "Screen recording is still available without the camera.");
+                break;
+            case "pin":
+                AppWindow.Hide();
+                var fixture = CreateQaFixture();
+                PinCapture(CreateQaRecord(fixture), fixture);
+                break;
+            case "hud":
+                AppWindow.Hide();
+                RecordingHudWindow.ShowForAudio("QA microphone", _ => Task.CompletedTask);
+                break;
+            default:
+                ShowLibrary();
+                break;
+        }
+    }
+
+    private static string CreateQaFixture()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "CursorPocket-surface-fixture.png");
+        if (File.Exists(path)) return path;
+        using var bitmap = new Bitmap(1280, 720);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.FromArgb(238, 241, 236));
+        using var line = new Pen(Color.FromArgb(39, 179, 106), 6);
+        graphics.DrawRectangle(line, 72, 72, 1136, 576);
+        using var heading = new Font("Segoe UI Variable Display", 42, FontStyle.Bold);
+        using var body = new Font("Segoe UI Variable Text", 22, FontStyle.Regular);
+        using var ink = new SolidBrush(Color.FromArgb(24, 31, 27));
+        graphics.DrawString("CursorPocket review fixture", heading, ink, 112, 128);
+        graphics.DrawString("A deterministic canvas for annotation, pin, and receipt states.", body, ink, 116, 210);
+        graphics.DrawLine(line, 116, 310, 560, 520);
+        graphics.DrawEllipse(line, 690, 300, 300, 210);
+        bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        return path;
+    }
+
+    private static CaptureRecord CreateQaRecord(string path) => new()
+    {
+        Id = "qa-surface",
+        Kind = "screenshot",
+        CreatedAt = DateTimeOffset.Now.ToString("O"),
+        RelativePath = path,
+        Preview = "CursorPocket review fixture",
+    };
+
     public async Task ToggleAudioRecordingAsync()
     {
         try
@@ -258,7 +350,8 @@ public sealed partial class MainWindow : Window
             var copied = await CopyImageToClipboardAsync(path);
             OpenEditor(record, path, AnnotationOrigin.FreshCapture, cancelled: () => ShowReceipt(
                 record,
-                copied ? "Screenshot saved · copied" : "Screenshot saved without annotation"));
+                copied ? "Screenshot saved · copied" : "Screenshot saved",
+                copied ? null : "The clipboard was busy. The saved capture is safe."));
         }
         catch (Exception error)
         {
@@ -421,7 +514,13 @@ public sealed partial class MainWindow : Window
 
         editor.CopyRequested += async (_, temporary) =>
         {
-            try { await CopyImageToClipboardAsync(temporary); }
+            try
+            {
+                if (!await CopyImageToClipboardAsync(temporary))
+                {
+                    ShowError("Copy did not finish", "The clipboard was busy. The original capture is unchanged.");
+                }
+            }
             finally { try { File.Delete(temporary); } catch (IOException) { } }
         };
         editor.SavedAsNewCapture += async (_, temporary) => await RegisterEditedCopyAsync(temporary);
@@ -430,7 +529,8 @@ public sealed partial class MainWindow : Window
         editor.Saved += async (_, _) =>
         {
             var copied = await CopyImageToClipboardAsync(path);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied));
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
+                copied ? null : "Saved successfully, but the clipboard was busy.");
         };
 
         if (origin == AnnotationOrigin.FreshCapture)
@@ -494,7 +594,8 @@ public sealed partial class MainWindow : Window
                 new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
 
             var copied = await CopyImageToClipboardAsync(reservation.AbsolutePath);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied));
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied),
+                copied ? null : "Saved successfully, but the clipboard was busy.");
         }
         catch (Exception error)
         {
@@ -655,8 +756,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ShowReceipt(CaptureRecord record, string title)
-        => _receipts.Show(new ReceiptRequest(record, title));
+    private void ShowReceipt(CaptureRecord record, string title, string? detail = null)
+        => _receipts.Show(new ReceiptRequest(record, title, detail));
 
     private void ShowError(string title, string detail)
         => _receipts.Show(new ReceiptRequest(null, title, detail));
@@ -766,6 +867,7 @@ public sealed partial class MainWindow : Window
         if (_mouseActivity?.TryConsumeLatestPosition(out var x, out var y) == true)
         {
             _companion?.Follow(x, y);
+            RecordingHudWindow.NotifyPointerMoved(x, y);
         }
     }
 
@@ -787,7 +889,10 @@ public sealed partial class MainWindow : Window
         menu.Items.Add("Open command mode", null, (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette()));
         menu.Items.Add("Screenshot…", null, (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette("screenshot")));
         menu.Items.Add("Video…", null, (_, _) => App.DispatcherQueue.TryEnqueue(ShowVideoPreflight));
+        menu.Items.Add("Repeat video", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await RepeatVideoRecordingAsync()));
         menu.Items.Add("Audio note", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await ToggleAudioRecordingAsync()));
+        menu.Items.Add("Highlighted text", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await CaptureTextAsync()));
+        menu.Items.Add("Current link", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await CaptureLinkAsync()));
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         // Two ways into the editor for an image CursorPocket did not take. On the tray
         // rather than in command mode, so neither costs a bare key that would then have to
@@ -828,6 +933,8 @@ public sealed partial class MainWindow : Window
     {
         if (App.Services.RecordingSession.IsActive)
         {
+            AppWindow.Show();
+            Activate();
             var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
             {
                 Title = "A recording is still running",

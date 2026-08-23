@@ -98,6 +98,23 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.Single(await store.RecentAsync());
     }
 
+    [Fact]
+    public async Task Reconciles_unindexed_non_media_capture_files()
+    {
+        var screenshotDirectory = Path.Combine(_root, "2026-08-18", "screenshots");
+        var textDirectory = Path.Combine(_root, "2026-08-18", "text");
+        Directory.CreateDirectory(screenshotDirectory);
+        Directory.CreateDirectory(textDirectory);
+        await File.WriteAllBytesAsync(Path.Combine(screenshotDirectory, "shot.png"), new byte[32]);
+        await File.WriteAllTextAsync(Path.Combine(textDirectory, "note.txt"), "saved note");
+
+        var recovered = await new CaptureStore(_root).ReconcileUnindexedCapturesAsync();
+
+        Assert.Equal(2, recovered.Count);
+        Assert.Contains(recovered, record => record.CaptureKind == CaptureKind.Screenshot);
+        Assert.Contains(recovered, record => record.CaptureKind == CaptureKind.Text);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

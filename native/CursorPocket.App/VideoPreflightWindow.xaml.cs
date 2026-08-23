@@ -52,6 +52,7 @@ public sealed partial class VideoPreflightWindow : Window
         _displayOutputIndex = displayOutputIndex;
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.Transient);
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         var work = WindowPlacement.MonitorUnderPointer(true);
         var layout = TransientWindowLayoutPolicy.Resolve(
             new CaptureBounds(work.Left, work.Top, work.Right, work.Bottom),
@@ -97,12 +98,16 @@ public sealed partial class VideoPreflightWindow : Window
         App.Services.MediaDevices.Changed += MediaDevices_Changed;
         Closed += (_, _) =>
         {
+            App.Theme.ThemeChanged -= Theme_ThemeChanged;
             App.Services.MediaDevices.Changed -= MediaDevices_Changed;
             EmergencyCleanupDevices();
         };
     }
 
     public event EventHandler<RecordingOptions>? RecordingRequested;
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) =>
+        DispatcherQueue.TryEnqueue(() => ApplyDeviceSnapshot(App.Services.MediaDevices.Current));
 
     private async void OnActivated(object sender, WindowActivatedEventArgs eventArgs)
     {
@@ -372,14 +377,14 @@ public sealed partial class VideoPreflightWindow : Window
             return;
         }
         FrameRateTag.Text = (FrameRateBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "60" ? "60 FPS" : "30 FPS";
-        MicrophoneTag.Text = MicrophoneToggle.IsOn ? "MIC ON" : "MIC OFF";
+        MicrophoneTag.Text = MicrophoneToggle.IsOn ? "Mic on" : "Mic off";
         var countdown = (CountdownBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "3";
-        CountdownTag.Text = countdown == "0" ? "NO COUNTDOWN" : $"{countdown} S";
+        CountdownTag.Text = countdown == "0" ? "No countdown" : $"{countdown} s";
         FramingLabel.Text = ((SourceBox.SelectedItem as ComboBoxItem)?.Tag?.ToString()) switch
         {
-            "region" => "SELECTED REGION",
-            "window" => "PREVIOUS WINDOW",
-            _ => "FULL DISPLAY",
+            "region" => "Selected region",
+            "window" => "Previous window",
+            _ => "Full display",
         };
     }
 
@@ -547,9 +552,9 @@ public sealed partial class VideoPreflightWindow : Window
             : "ROUNDED 16:9";
         var source = ((SourceBox?.SelectedItem as ComboBoxItem)?.Tag?.ToString()) switch
         {
-            "region" => "SELECTED REGION",
-            "window" => "PREVIOUS WINDOW",
-            _ => "FULL DISPLAY",
+            "region" => "Selected region",
+            "window" => "Previous window",
+            _ => "Full display",
         };
         var position = (CameraPositionBox?.SelectedItem as ComboBoxItem)?.Content?.ToString()?.ToUpperInvariant() ?? string.Empty;
         FramingLabel.Text = string.IsNullOrEmpty(position)

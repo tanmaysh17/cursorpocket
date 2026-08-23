@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
 using System.ComponentModel;
+using Microsoft.UI.Xaml;
 
 namespace CursorPocket_App.ViewModels;
 
@@ -25,7 +26,9 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private CaptureItemViewModel? _selectedItem;
     [ObservableProperty] private string _selectedFilter = "All";
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private string? _libraryErrorMessage;
     [ObservableProperty] private string _statusMessage = "Ready";
+    [ObservableProperty] private Visibility _settingsRetryVisibility = Visibility.Collapsed;
     [ObservableProperty] private string _captureDirectory = services.Settings.CaptureDirectory;
     [ObservableProperty] private int _themeModeIndex = services.Settings.ThemeMode switch
     {
@@ -109,6 +112,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     public async Task InitializeAsync()
     {
         IsBusy = true;
+        LibraryErrorMessage = null;
         try
         {
             var records = await services.Library.GetRecentAsync();
@@ -119,6 +123,11 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             StatusMessage = services.Hotkey.RegisteredShortcut is null
                 ? "Choose an available activation shortcut in Settings"
                 : $"Press {services.Hotkey.RegisteredShortcut} anywhere to capture";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            LibraryErrorMessage = "CursorPocket could not read the capture index. Your capture files have not been changed.";
+            StatusMessage = "Library unavailable";
         }
         finally
         {
@@ -223,6 +232,15 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
         base.OnPropertyChanged(eventArgs);
         if (!_applyingSettings && eventArgs.PropertyName is { } name && SettingsProperties.Contains(name))
         {
+            if (name == nameof(ThemeModeIndex))
+            {
+                App.Theme.SetMode(ThemeModeIndex switch
+                {
+                    1 => AppThemeMode.Light,
+                    2 => AppThemeMode.Dark,
+                    _ => AppThemeMode.System,
+                });
+            }
             QueueSettingsSave();
         }
     }
@@ -233,6 +251,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
         _settingsSaveDebounce?.Dispose();
         var cancellation = _settingsSaveDebounce = new CancellationTokenSource();
         StatusMessage = "Saving…";
+        SettingsRetryVisibility = Visibility.Collapsed;
         _ = SaveAfterDelayAsync(cancellation);
     }
 
@@ -285,11 +304,13 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
                 ? "Saved"
                 : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+            SettingsRetryVisibility = Visibility.Collapsed;
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             _applyingSettings = false;
             StatusMessage = error.Message;
+            SettingsRetryVisibility = Visibility.Visible;
         }
     }
 

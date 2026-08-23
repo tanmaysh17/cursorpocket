@@ -72,7 +72,7 @@ public sealed class AppServices : IDisposable, ISettingsUpdateQueue
         {
             try
             {
-                await store.RecoverOrphanedMediaAsync();
+                await store.ReconcileUnindexedCapturesAsync();
             }
             catch (Exception)
             {

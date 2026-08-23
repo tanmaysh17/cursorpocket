@@ -73,6 +73,7 @@ public sealed partial class AnnotationWindow : Window
     private bool _boxFilled;
     private bool _ellipseFilled;
     private bool _finished;
+    private bool _constrainedLayout;
 
     /// <summary>
     /// Solid first, deliberately. Pixelation and blur both derive their output from the
@@ -128,22 +129,29 @@ public sealed partial class AnnotationWindow : Window
         _origin = origin;
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.Workspace);
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AnnotationTitleBar);
 
         var bounds = WindowPlacement.MonitorUnderPointer(true);
+        var scale = WindowPlacement.ScaleFor(this);
+        var availableWidth = Math.Max(1, bounds.Right - bounds.Left - 40);
+        var availableHeight = Math.Max(1, bounds.Bottom - bounds.Top - 40);
+        _constrainedLayout = availableWidth / Math.Max(1, scale) < 860
+            || availableHeight / Math.Max(1, scale) < 520;
         AppWindow.MoveAndResize(new RectInt32(
             bounds.Left + 20,
             bounds.Top + 20,
-            Math.Max(760, bounds.Right - bounds.Left - 40),
-            Math.Max(560, bounds.Bottom - bounds.Top - 40)));
+            availableWidth,
+            availableHeight));
 
         _source = LoadSource(path, out var displaySource);
         _sourceWidth = _source.Width;
         _sourceHeight = _source.Height;
 
         BuildToolRail();
+        if (_constrainedLayout) ApplyConstrainedLayout();
 
         // The stage is sized to the source bitmap, so a canvas coordinate is an image
         // pixel. Nudging, the native-pixel readout, and a faithful export all rest on
@@ -189,6 +197,7 @@ public sealed partial class AnnotationWindow : Window
         };
         Closed += (_, _) =>
         {
+            App.Theme.ThemeChanged -= Theme_ThemeChanged;
             _escapeLease.Dispose();
             _source.Dispose();
             if (!_finished)
@@ -197,6 +206,12 @@ public sealed partial class AnnotationWindow : Window
             }
         };
     }
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
+    {
+        ApplyToolState();
+        RefreshGeometry();
+    });
 
     public event EventHandler? Saved;
 
@@ -446,6 +461,17 @@ public sealed partial class AnnotationWindow : Window
             AnnotationSizeStep.Small => "S",
             AnnotationSizeStep.Large => "L",
             _ => "M",
+        };
+
+        var properties = AnnotationToolCatalog.Get(_tool).Properties;
+        SwatchStrip.Visibility = properties.HasFlag(AnnotationToolProperties.Ink) ? Visibility.Visible : Visibility.Collapsed;
+        SizeButton.Visibility = properties.HasFlag(AnnotationToolProperties.Size) ? Visibility.Visible : Visibility.Collapsed;
+        PropertyHintText.Text = properties switch
+        {
+            AnnotationToolProperties.None => "This tool has no adjustable properties.",
+            _ when properties.HasFlag(AnnotationToolProperties.Variant) => "Press the tool key again to cycle its variant.",
+            _ when properties.HasFlag(AnnotationToolProperties.Results) => "OCR results replace this inspector after recognition.",
+            _ => "Choose an ink colour and mark size.",
         };
 
         StatusToolText.Text = ToSentenceCase(DescribeTool());
@@ -1741,6 +1767,7 @@ public sealed partial class AnnotationWindow : Window
             ? $"no text found · {reading.Language}"
             : $"{reading.WordCount} words · {reading.Language}";
         OcrPanel.Visibility = Visibility.Visible;
+        PropertyPanel.Visibility = Visibility.Collapsed;
 
         // Faint boxes over each word, so it is obvious which part of the image the text
         // came from. Informational blue is reserved for text and link captures, and this
@@ -1772,6 +1799,7 @@ public sealed partial class AnnotationWindow : Window
     private void HideOcr()
     {
         OcrPanel.Visibility = Visibility.Collapsed;
+        PropertyPanel.Visibility = Visibility.Visible;
         OcrOverlay.Children.Clear();
         OcrText.Text = string.Empty;
     }
@@ -1985,11 +2013,16 @@ public sealed partial class AnnotationWindow : Window
             foreach (var (key, meaning) in rows)
             {
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
-                row.Children.Add(new Button
+                row.Children.Add(new Border
                 {
-                    Style = (Style)Application.Current.Resources["KeyCapButton"],
-                    Content = key,
-                    IsHitTestVisible = false,
+                    Style = (Style)Application.Current.Resources["PocketKeycap"],
+                    Child = new TextBlock
+                    {
+                        Text = key,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Style = (Style)Application.Current.Resources["PocketNumericText"],
+                    },
                 });
                 row.Children.Add(new TextBlock
                 {
@@ -2232,9 +2265,12 @@ public sealed partial class AnnotationWindow : Window
 
     private void BuildToolRail()
     {
-        ToolRail.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        ToolRail.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        for (var row = 0; row < 8; row++)
+        var columns = _constrainedLayout ? 3 : 2;
+        for (var column = 0; column < columns; column++)
+        {
+            ToolRail.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        }
+        for (var row = 0; row < (int)Math.Ceiling(16d / columns); row++)
         {
             ToolRail.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         }
@@ -2255,11 +2291,11 @@ public sealed partial class AnnotationWindow : Window
         {
             var (button, tool) = visibleTools[index];
             ToolbarLeft.Children.Remove(button);
-            button.Width = 116;
-            button.Height = 40;
-            AddToolLabel(button, AnnotationToolCatalog.Get(tool).Label);
-            Grid.SetColumn(button, index % 2);
-            Grid.SetRow(button, index / 2);
+            button.Width = _constrainedLayout ? 48 : 116;
+            button.Height = _constrainedLayout ? 36 : 40;
+            if (!_constrainedLayout) AddToolLabel(button, AnnotationToolCatalog.Get(tool).Label);
+            Grid.SetColumn(button, index % columns);
+            Grid.SetRow(button, index / columns);
             ToolRail.Children.Add(button);
         }
 
@@ -2271,12 +2307,34 @@ public sealed partial class AnnotationWindow : Window
         MoveToPanel(UndoButton, ToolbarLeft, HistoryHost);
         MoveToPanel(RedoButton, ToolbarLeft, HistoryHost);
 
-        MoreToolsButton.Visibility = Visibility.Collapsed;
         MoveOutput(PinButton, "Pin");
         MoveOutput(CopyButton, "Copy");
         MoveOutput(KeepOriginalButton);
         MoveOutput(SaveButton);
         ToolbarRow.Visibility = Visibility.Collapsed;
+    }
+
+    private void ApplyConstrainedLayout()
+    {
+        AnnotationTitleBar.Height = 32;
+        EditorBody.Padding = new Thickness(4);
+        EditorBody.RowSpacing = 0;
+        WorkspaceGrid.ColumnSpacing = 4;
+        ToolRail.RowSpacing = 0;
+        ToolRail.ColumnSpacing = 2;
+        ToolRailBorder.Padding = new Thickness(0);
+        PropertyPanel.Width = 160;
+        PropertyPanel.Padding = new Thickness(6);
+        OcrPanel.Width = 160;
+        OcrPanel.Padding = new Thickness(8);
+        OcrActions.Orientation = Orientation.Vertical;
+        PropertiesLabel.Visibility = Visibility.Collapsed;
+        PropertyHintText.Visibility = Visibility.Collapsed;
+        OutputLabel.Visibility = Visibility.Collapsed;
+        ToolContextHost.Spacing = 2;
+        OutputHost.Spacing = 2;
+        StatusRow.Visibility = Visibility.Collapsed;
+        foreach (var button in OutputHost.Children.OfType<Button>()) button.MinHeight = 36;
     }
 
     private static void AddToolLabel(Button button, string label)
@@ -2327,17 +2385,6 @@ public sealed partial class AnnotationWindow : Window
         }
         OutputHost.Children.Add(button);
     }
-
-    private void MoreTool_Click(object sender, RoutedEventArgs eventArgs)
-    {
-        if (sender is FrameworkElement { Tag: string tag } && Enum.TryParse<AnnotationTool>(tag, out var tool))
-        {
-            SelectTool_(tool);
-            CanvasHost.Focus(FocusState.Programmatic);
-        }
-    }
-
-    private void MoreBackdrop_Click(object sender, RoutedEventArgs eventArgs) => Backdrop_Click(sender, eventArgs);
 
     private static string ToSentenceCase(string value) => value.Length == 0
         ? value

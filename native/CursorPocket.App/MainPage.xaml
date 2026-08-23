@@ -3,7 +3,6 @@
     x:Class="CursorPocket_App.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:system="using:System"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:CursorPocket_App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -14,8 +13,8 @@
     <Page.Resources>
         <!--  Filter pills read as one segmented control, so the selected one is unmistakable.  -->
         <Style x:Key="FilterPill" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="Height" Value="30" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="12,0" />
             <Setter Property="CornerRadius" Value="7" />
             <Setter Property="Foreground" Value="{ThemeResource PocketMuted}" />
@@ -252,7 +251,7 @@
                                                 <Border
                                                     Width="52"
                                                     Height="34"
-                                                    Background="#66070D0B"
+                                                    Background="{ThemeResource PocketSunken}"
                                                     CornerRadius="7">
                                                     <Grid>
                                                         <FontIcon
@@ -283,6 +282,18 @@
                                         </DataTemplate>
                                     </ListView.ItemTemplate>
                                 </ListView>
+
+                                <StackPanel x:Name="LoadingLibrary" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" Visibility="Collapsed">
+                                    <ProgressRing Width="28" Height="28" HorizontalAlignment="Center" IsActive="True" />
+                                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource PocketCaptionText}" Text="Loading your captures…" />
+                                </StackPanel>
+
+                                <StackPanel x:Name="LibraryError" MaxWidth="360" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" Visibility="Collapsed">
+                                    <FontIcon HorizontalAlignment="Center" FontSize="26" Foreground="{ThemeResource PocketRed}" Glyph="&#xE783;" />
+                                    <TextBlock HorizontalAlignment="Center" Style="{StaticResource PocketTitleText}" Text="The library could not open" />
+                                    <TextBlock MaxWidth="340" HorizontalAlignment="Center" Style="{StaticResource PocketCaptionText}" Text="Your capture index could not be read. Your capture files have not been changed." TextAlignment="Center" TextWrapping="Wrap" />
+                                    <Button HorizontalAlignment="Center" Click="RetryLibrary_Click" Content="Try again" Style="{StaticResource PocketPrimaryButton}" />
+                                </StackPanel>
 
                                 <StackPanel
                                     x:Name="EmptyLibrary"
@@ -334,7 +345,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Spacing="6">
-                                        <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="CAPTURE PREVIEW" />
+                                        <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="Capture preview" />
                                         <TextBlock
                                             x:Name="DetailTitle"
                                             MaxLines="2"
@@ -575,12 +586,9 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Left"
-                                        Content="S"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <Border MinWidth="40" Height="40" HorizontalAlignment="Left" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Style="{StaticResource PocketNumericText}" Text="S" />
+                                    </Border>
                                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
                                         <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Screenshot" />
                                         <TextBlock
@@ -604,12 +612,9 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Left"
-                                        Content="V"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <Border MinWidth="40" Height="40" HorizontalAlignment="Left" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Style="{StaticResource PocketNumericText}" Text="V" />
+                                    </Border>
                                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
                                         <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Video" />
                                         <TextBlock
@@ -633,12 +638,9 @@
                                         <RowDefinition Height="*" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <Button
-                                        HorizontalAlignment="Left"
-                                        Content="A"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapLargeButton}" />
+                                    <Border MinWidth="40" Height="40" HorizontalAlignment="Left" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="16" Style="{StaticResource PocketNumericText}" Text="A" />
+                                    </Border>
                                     <StackPanel Grid.Row="2" Margin="0,16,0,0">
                                         <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Audio note" />
                                         <TextBlock
@@ -682,17 +684,15 @@
                             </Button>
 
                             <Button
+                                x:Name="TextCaptureTile"
                                 Grid.Row="1"
                                 Padding="16,14"
                                 Click="TextTile_Click"
                                 Style="{StaticResource PocketTileButton}">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Button
-                                        VerticalAlignment="Center"
-                                        Content="T"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapButton}" />
+                                    <Border VerticalAlignment="Center" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="T" />
+                                    </Border>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Highlighted text" />
                                         <TextBlock
@@ -704,18 +704,16 @@
                             </Button>
 
                             <Button
+                                x:Name="LinkCaptureTile"
                                 Grid.Row="1"
                                 Grid.Column="1"
                                 Padding="16,14"
                                 Click="LinkTile_Click"
                                 Style="{StaticResource PocketTileButton}">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Button
-                                        VerticalAlignment="Center"
-                                        Content="L"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapButton}" />
+                                    <Border VerticalAlignment="Center" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="L" />
+                                    </Border>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Current link" />
                                         <TextBlock
@@ -734,13 +732,9 @@
                                 Click="LibraryTile_Click"
                                 Style="{StaticResource PocketTileButton}">
                                 <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Button
-                                        VerticalAlignment="Center"
-                                        AutomationProperties.Name="Letter O"
-                                        Content="O"
-                                        IsHitTestVisible="False"
-                                        IsTabStop="False"
-                                        Style="{StaticResource KeyCapButton}" />
+                                    <Border VerticalAlignment="Center" AutomationProperties.Name="Letter O" Style="{StaticResource PocketKeycap}">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="O" />
+                                    </Border>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Open Library" />
                                         <TextBlock
@@ -841,14 +835,17 @@
                                     <TextBlock Style="{StaticResource PocketDisplayText}" Text="Settings" />
                                     <TextBlock Style="{StaticResource PocketCaptionText}" Text="Changes save automatically. Nothing here leaves this PC." />
                                 </StackPanel>
-                                <TextBlock HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource PocketMetaText}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock VerticalAlignment="Center" Style="{StaticResource PocketMetaText}" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+                                    <Button Command="{x:Bind ViewModel.SaveSettingsCommand}" Content="Retry" Style="{StaticResource PocketGhostButton}" Visibility="{x:Bind ViewModel.SettingsRetryVisibility, Mode=OneWay}" />
+                                </StackPanel>
                             </Grid>
 
                             <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Appearance" />
-                            <Border Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <Grid Style="{StaticResource SettingsRow}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -862,15 +859,11 @@
                                         <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="App theme" />
                                         <TextBlock Margin="0,3,0,0" Style="{StaticResource PocketCaptionText}" Text="System follows Windows. Light and Dark override every CursorPocket surface." TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <RadioButtons
-                                        Grid.Column="2"
-                                        MaxColumns="3"
-                                        SelectedIndex="{x:Bind ViewModel.ThemeModeIndex, Mode=TwoWay}"
-                                        AutomationProperties.Name="App theme">
-                                        <system:String>System</system:String>
-                                        <system:String>Light</system:String>
-                                        <system:String>Dark</system:String>
-                                    </RadioButtons>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" AutomationProperties.Name="App theme">
+                                        <Button x:Name="ThemeSystemButton" Click="ThemeMode_Click" Content="System" Tag="0" Style="{StaticResource PocketQuietButton}" />
+                                        <Button x:Name="ThemeLightButton" Click="ThemeMode_Click" Content="Light" Tag="1" Style="{StaticResource PocketQuietButton}" />
+                                        <Button x:Name="ThemeDarkButton" Click="ThemeMode_Click" Content="Dark" Tag="2" Style="{StaticResource PocketQuietButton}" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
 

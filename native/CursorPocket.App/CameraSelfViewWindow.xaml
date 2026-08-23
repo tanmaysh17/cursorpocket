@@ -4,11 +4,11 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="CursorPocket camera">
-    <!-- Opaque edge to edge: a transparent WinUI root would show a light gutter,
-         and this surface is deliberately visible in the recording. -->
+    <!-- The camera frame remains unaltered. Only the fallback and status chrome use
+         semantic theme colours, so a denied camera never becomes a black rectangle. -->
     <Grid
         x:Name="Root"
-        Background="#FF09110F"
+        Background="{ThemeResource PocketBase}"
         PointerPressed="Root_PointerPressed"
         PointerMoved="Root_PointerMoved"
         PointerReleased="Root_PointerReleased"

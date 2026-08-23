@@ -78,6 +78,7 @@
         </Grid>
 
         <Grid
+            x:Name="EditorBody"
             Grid.Row="1"
             Padding="18,4,18,18"
             RowSpacing="16">
@@ -87,8 +88,8 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!--  Contextual controls only. Primary tools live in the stable rail beside
-                  the canvas; infrequent tools are in the labelled More menu.  -->
+            <!-- Contextual controls only. Every tool remains visible in the stable
+                 matrix beside the canvas; this row never duplicates tool routing. -->
             <!--  Two columns, not one. Both clusters used to sit in a single cell, one
                   aligned left and one aligned right, so once the tools outgrew the space
                   they drew straight over the output buttons instead of the row adapting.  -->
@@ -496,27 +497,6 @@
                     Orientation="Horizontal"
                     Spacing="8">
                     <Button
-                        x:Name="MoreToolsButton"
-                        Content="More"
-                        Style="{StaticResource PocketQuietButton}"
-                        AutomationProperties.Name="More annotation tools">
-                        <Button.Flyout>
-                            <MenuFlyout>
-                                <MenuFlyoutItem Text="Line" Tag="Line" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Ellipse" Tag="Ellipse" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Step marker" Tag="Step" Click="MoreTool_Click" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Focus" Tag="Focus" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Crop" Tag="Crop" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Cut strip" Tag="Cut" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Read text" Tag="ReadText" Click="MoreTool_Click" />
-                                <MenuFlyoutItem Text="Eyedropper" Tag="Eyedrop" Click="MoreTool_Click" />
-                                <MenuFlyoutSeparator />
-                                <MenuFlyoutItem Text="Change backdrop" Click="MoreBackdrop_Click" />
-                            </MenuFlyout>
-                        </Button.Flyout>
-                    </Button>
-                    <Button
                         x:Name="PinButton"
                         Click="Pin_Click"
                         Style="{StaticResource PocketIconButton}"
@@ -564,13 +544,14 @@
 
             <!--  The canvas well. DESIGN.md assigns 16 to wells; this used to borrow the
                   12 px card radius.  -->
-            <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid x:Name="WorkspaceGrid" Grid.Row="1" ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Border
+                    x:Name="ToolRailBorder"
                     Padding="4"
                     Background="{ThemeResource PocketGlassPanel}"
                     BorderBrush="{ThemeResource PocketLine}"
@@ -643,7 +624,8 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <StackPanel x:Name="ToolContextHost" Spacing="10">
-                            <TextBlock Style="{StaticResource PocketLabelText}" Text="Properties" />
+                            <TextBlock x:Name="PropertiesLabel" Style="{StaticResource PocketLabelText}" Text="Properties" />
+                            <TextBlock x:Name="PropertyHintText" Style="{StaticResource PocketCaptionText}" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel
                             x:Name="HistoryHost"
@@ -652,7 +634,7 @@
                             Orientation="Horizontal"
                             Spacing="8" />
                         <StackPanel x:Name="OutputHost" Grid.Row="2" Spacing="8">
-                            <TextBlock Style="{StaticResource PocketLabelText}" Text="Output" />
+                            <TextBlock x:Name="OutputLabel" Style="{StaticResource PocketLabelText}" Text="Output" />
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -741,6 +723,7 @@
                             Grid.Row="2"
                             Style="{StaticResource PocketNumericText}" />
                         <StackPanel
+                            x:Name="OcrActions"
                             Grid.Row="3"
                             Orientation="Horizontal"
                             Spacing="8">
@@ -762,7 +745,7 @@
             <!--  Status strip. Replaces the prose hint, so it costs no vertical space.
                   Field two is the ruler: the size of the mark being dragged, in the
                   pixels the export will actually contain.  -->
-            <Grid Grid.Row="2" ColumnSpacing="20">
+            <Grid x:Name="StatusRow" Grid.Row="2" ColumnSpacing="20">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -777,7 +760,7 @@
                           the surface from the primary action.  -->
                     <Button
                         x:Name="DiscardButton"
-                        MinHeight="26"
+                        MinHeight="36"
                         Padding="0"
                         Click="Discard_Click"
                         Style="{StaticResource PocketDangerButton}"

@@ -9,8 +9,8 @@ public sealed class UtilitySurfaceContractTests
         var xaml = ReadFixture("CommandPaletteWindow.xaml");
         var main = ReadFixture("MainWindow.xaml.cs.txt");
 
-        Assert.Contains("PanelWidth = 360", code, StringComparison.Ordinal);
-        Assert.Contains("PanelHeight = 354", code, StringComparison.Ordinal);
+        Assert.Contains("RegularWidth = 304", code, StringComparison.Ordinal);
+        Assert.Contains("ShortWidth = 520", code, StringComparison.Ordinal);
         // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
         // per-move realignment are gone along with the keep-away behaviour.
         Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
@@ -18,7 +18,7 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
         // The panel only ever moves because the user dragged it — never on its own.
         Assert.DoesNotContain("NotifyPointerMoved", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("NotifyPointerMoved", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("_palette.NotifyPointerMoved", main, StringComparison.Ordinal);
         Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("CaptureActionCatalog.Primary", code, StringComparison.Ordinal);
@@ -204,8 +204,8 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("_captureArea.Right - width", code, StringComparison.Ordinal);
         Assert.Contains("_captureArea.Bottom - height", code, StringComparison.Ordinal);
         Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
-        // Opaque edge to edge, like every other transient surface.
-        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
+        // The feed remains unaltered while denied-camera fallback follows the theme.
+        Assert.Contains("Background=\"{ThemeResource PocketBase}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         // The camera has to be held before FFmpeg writes frames and released as
         // soon as the recording stops, or the next preflight preview finds it busy.
@@ -533,13 +533,14 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
-    public void Video_preflight_keeps_advanced_controls_collapsed_without_a_scroll_region()
+    public void Video_preflight_has_one_bounded_inspector_scroll_and_a_fixed_start_action()
     {
         var xaml = ReadFixture("VideoPreflightWindow.xaml");
         var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
-        Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(xaml, "<ScrollViewer").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Contains("x:Name=\"OptionsPanel\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Camera appearance", xaml, StringComparison.Ordinal);
-        Assert.Contains("More recording options", xaml, StringComparison.Ordinal);
+        Assert.Contains("Recording options", xaml, StringComparison.Ordinal);
         Assert.Contains("TransientWindowLayoutPolicy.Resolve", code, StringComparison.Ordinal);
     }
 
@@ -548,12 +549,12 @@ public sealed class UtilitySurfaceContractTests
     {
         var xaml = ReadFixture("RecordingHudWindow.xaml");
 
-        Assert.Contains("Background=\"{StaticResource PocketTransientSurface}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketGlassPanel}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"20\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"13\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Stop and save\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Height=\"36\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"40\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ThemeShadow", xaml, StringComparison.Ordinal);
@@ -569,7 +570,7 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("PointerExited=\"Root_PointerExited\"", xaml, StringComparison.Ordinal);
         // Keyboard users must be able to reach the actions without a pointer.
         Assert.Contains("GotFocus=\"Root_GotFocus\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("StripHeight = 36", code, StringComparison.Ordinal);
+        Assert.Contains("StripHeight = 40", code, StringComparison.Ordinal);
         // The window is one fixed size that slides; resizing it or recomputing a window
         // region per frame is what made the travel stutter.
         Assert.Contains("WindowPlacement.MoveTo(this, _panelLeft, top)", code, StringComparison.Ordinal);
@@ -592,7 +593,7 @@ public sealed class UtilitySurfaceContractTests
         var receipt = ReadFixture("ReceiptWindow.xaml");
         var placement = ReadFixture("WindowPlacement.cs.txt");
 
-        Assert.Contains("Background=\"{StaticResource PocketTransientSurface}\"", receipt, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketTransientSurface}\"", receipt, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", receipt, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=", receipt, StringComparison.Ordinal);
         Assert.Contains("DwmSetWindowAttribute", placement, StringComparison.Ordinal);
