@@ -1,8 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 
@@ -22,7 +20,7 @@ namespace CursorPocket_App.Services;
 internal sealed class NativeCompanionWindow : IDisposable
 {
     private const string ClassName = "CursorPocket.NativeCompanion";
-    private const int WindowSize = 28;
+    private const int WindowSize = CompanionFrameRenderer.FrameSize;
     // 29 frames at 80 ms reproduces the original 0.22 rad-per-tick cadence to
     // within 2%, while letting the whole cycle be pre-rendered.
     private const int PulseFrames = 29;
@@ -337,35 +335,21 @@ internal sealed class NativeCompanionWindow : IDisposable
         }
 
         var palette = App.Theme.Palette;
-        var ready = palette.Selection;
-        var recording = App.Theme.IsHighContrast
-            ? palette.Selection
-            : ColorTranslator.FromHtml(palette.IsDark ? "#FF5964" : "#D73546");
-        var outline = palette.IsDark ? Color.FromArgb(220, 255, 255, 255) : Color.FromArgb(190, 0, 0, 0);
+        var colors = CompanionFrameRenderer.ResolvePalette(
+            App.Theme.IsHighContrast,
+            palette.IsDark,
+            palette.Selection);
         for (var index = 0; index < PulseFrames; index++)
         {
             var phase = index * (Math.PI * 2 / PulseFrames);
-            _readyFrames[index] = RenderFrame(phase, ready, outline);
-            _recordingFrames[index] = RenderFrame(phase, recording, outline);
+            _readyFrames[index] = RenderFrame(phase, colors.Ready, colors.Outline);
+            _recordingFrames[index] = RenderFrame(phase, colors.Recording, colors.Outline);
         }
     }
 
-    private static nint RenderFrame(double phase, Color ready, Color outline)
+    private static nint RenderFrame(double phase, Color status, Color outline)
     {
-        using var bitmap = new Bitmap(WindowSize, WindowSize, PixelFormat.Format32bppPArgb);
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.Clear(Color.Transparent);
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            var pulse = (float)((Math.Sin(phase) + 1) / 2);
-            using var glow = new SolidBrush(Color.FromArgb((int)(34 + pulse * 34), ready.R, ready.G, ready.B));
-            var glowSize = 10f + pulse * 3f;
-            graphics.FillEllipse(glow, 5.5f - glowSize / 2, 5.5f - glowSize / 2, glowSize, glowSize);
-            using var dot = new SolidBrush(ready);
-            graphics.FillEllipse(dot, 3.5f, 3.5f, 4f, 4f);
-            using var edge = new Pen(outline, 1f);
-            graphics.DrawEllipse(edge, 3.5f, 3.5f, 4f, 4f);
-        }
+        using var bitmap = CompanionFrameRenderer.Render(phase, status, outline);
         return bitmap.GetHbitmap(Color.FromArgb(0));
     }
 

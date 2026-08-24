@@ -34,6 +34,7 @@
     <Compile Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Render\AnnotationExport.cs" />
     <Compile Include="..\CursorPocket.App\Services\OcrTextService.cs" Link="Render\OcrTextService.cs" />
     <Compile Include="..\CursorPocket.App\Services\AnnotationPatches.cs" Link="Render\AnnotationPatches.cs" />
+    <Compile Include="..\CursorPocket.App\Services\CompanionFrameRenderer.cs" Link="Render\CompanionFrameRenderer.cs" />
     <Compile Include="..\CursorPocket.App\Services\WindowContextService.cs" Link="Interop\WindowContextService.cs" />
     <Compile Include="..\CursorPocket.App\Services\MediaDeviceCatalog.cs" Link="Services\MediaDeviceCatalog.cs" />
     <Compile Include="..\CursorPocket.App\Services\RecordingSessionCoordinator.cs" Link="Services\RecordingSessionCoordinator.cs" />

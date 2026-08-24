@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Drawing;
+using CursorPocket_App.Services;
 
 namespace CursorPocket.Tests;
 
@@ -62,7 +63,6 @@ public sealed class BrandAssetContractTests
     {
         var xaml = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "App.xaml"));
         var coordinator = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "ThemeCoordinator.cs.txt"));
-        var companion = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "NativeCompanionWindow.cs.txt"));
 
         foreach (var hex in new[] { "F6F4EC", "CBD7D1", "8EA099", "07130F", "36E58C", "FF5964", "7AA7FF" })
         {
@@ -72,7 +72,8 @@ public sealed class BrandAssetContractTests
         Assert.Contains("#36E58C", coordinator, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("#FF5964", coordinator, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("#7AA7FF", coordinator, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("#FF5964", companion, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Color.FromArgb(255, 54, 229, 140), CompanionFrameRenderer.ReadyColor);
+        Assert.Equal(Color.FromArgb(255, 255, 89, 100), CompanionFrameRenderer.RecordingColor);
     }
 
     [Fact]
