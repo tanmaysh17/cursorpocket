@@ -60,6 +60,15 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ## Surface contracts
 
+### First-run onboarding
+
+- A first visible launch opens a three-stage field guide before the persistent Library: meet CursorPocket, learn command-mode activation, and rehearse with the real command surface. A `--background` launch never raises or flashes onboarding.
+- The flow has one job: move a new user from install to a confident first capture in under a minute. It explains local storage and recording colour semantics, shows all seven commands from the shared action catalogue, confirms the registered activation shortcut, and makes the real command mode directly launchable.
+- The signature is one changing cursor-field instrument over the persistent Mica backdrop. It is not a marketing carousel and does not introduce a decorative card mosaic, gradients, screenshots of obsolete UI, or permission requests before a relevant action.
+- The rail is a real three-step sequence and may be selected directly. At narrow widths it collapses while Back and Continue preserve the same sequence. The surface may use one document-level vertical scroll under text scaling; it never scrolls horizontally or nests scroll regions.
+- The final step offers two relevant, reversible choices: start at sign-in and show the cursor companion. The installer does not maintain a competing startup preference. Finish and Skip both persist completion atomically; Skip preserves the loaded choices. Settings exposes `Run tour` without clearing completion, so leaving a revisited tour cannot make it appear again at startup.
+- Onboarding inherits live System, Light, Dark, high-contrast, transparency, text-scale, and reduced-motion policies. Every action is at least 36 px, named, keyboard-operable, and visibly focused.
+
 ### Cursor companion
 
 - Rendered by a per-pixel-alpha native window: a 4 px borderless status mark with a 28 px invisible target.
@@ -196,6 +205,8 @@ Four rules above are overridden by explicit product decision on one surface each
 
 The design-consultation gate requires all of the following before release:
 
+- a new profile sees onboarding exactly once on a visible launch, can skip it, can rerun it from Settings, and can open the real command surface from the rehearsal step;
+- onboarding exposes the registered activation shortcut and all seven command actions without horizontal or nested scrolling at required scales;
 - no opaque gray capture surface or black companion rectangle;
 - the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
 - command mode has no scroll region and switches to a drill-down layout before clipping at 100–250% scale;

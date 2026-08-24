@@ -1198,6 +1198,37 @@
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Help" />
+                            <Grid Style="{StaticResource SettingsRow}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource PocketChipLarge}">
+                                    <FontIcon Glyph="&#xE897;" Style="{StaticResource PocketChipIcon}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Welcome tour" />
+                                    <TextBlock
+                                        Margin="0,3,0,0"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Review command mode, mnemonic keys, and the local capture workflow."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button
+                                    Grid.Column="2"
+                                    MinHeight="40"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Run the CursorPocket welcome tour"
+                                    Click="RunWelcomeTour_Click"
+                                    Content="Run tour"
+                                    Style="{StaticResource PocketQuietButton}" />
+                            </Grid>
                         </StackPanel>
                     </ScrollViewer>
 

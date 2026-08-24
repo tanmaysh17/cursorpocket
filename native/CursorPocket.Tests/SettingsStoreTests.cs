@@ -123,6 +123,19 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, "*.tmp"));
     }
 
+    [Fact]
+    public async Task OnboardingCompletionPersistsAcrossLaunches()
+    {
+        var path = Path.Combine(_root, "onboarding", "settings.json");
+        var store = new SettingsStore(path);
+
+        Assert.False((await store.LoadAsync()).OnboardingSeen);
+
+        await store.SaveAsync(new AppSettings { OnboardingSeen = true });
+
+        Assert.True((await store.LoadAsync()).OnboardingSeen);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

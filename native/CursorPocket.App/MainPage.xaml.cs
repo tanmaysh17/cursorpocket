@@ -524,6 +524,9 @@ public sealed partial class MainPage : Page
 
     private void OpenFolder_Click(object sender, RoutedEventArgs eventArgs) => ViewModel.OpenCaptureFolderCommand.Execute(null);
 
+    private void RunWelcomeTour_Click(object sender, RoutedEventArgs eventArgs) =>
+        (App.Window as MainWindow)?.ShowOnboarding();
+
     private void ThemeMode_Click(object sender, RoutedEventArgs eventArgs)
     {
         if (sender is Button { Tag: string value } && int.TryParse(value, out var index))

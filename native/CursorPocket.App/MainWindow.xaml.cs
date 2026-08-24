@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -47,7 +48,12 @@ public sealed partial class MainWindow : Window
         }
         RestoreGeometry();
         AppWindow.Closing += AppWindow_Closing;
-        RootFrame.Navigate(typeof(MainPage));
+        var initialPage = OnboardingFlow.ShouldPresent(
+            App.Services.Settings.OnboardingSeen,
+            App.StartedInBackground)
+            ? typeof(OnboardingPage)
+            : typeof(MainPage);
+        RootFrame.Navigate(initialPage);
         InitializeCommandPalette();
         InitializeCompanion();
         InitializeTray();
@@ -60,7 +66,7 @@ public sealed partial class MainWindow : Window
     public void ShowLibrary()
     {
         AppWindow.Show(true);
-        var page = RootFrame.Content as MainPage;
+        var page = EnsureMainPage();
         page?.NavigateTo("library");
         _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
@@ -69,10 +75,47 @@ public sealed partial class MainWindow : Window
     public void ShowSettings()
     {
         AppWindow.Show(true);
-        var page = RootFrame.Content as MainPage;
+        var page = EnsureMainPage();
         page?.NavigateTo("settings");
         _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
+    }
+
+    public void ShowOnboarding()
+    {
+        AppWindow.Show(true);
+        if (RootFrame.Content is not OnboardingPage)
+        {
+            RootFrame.Navigate(typeof(OnboardingPage));
+        }
+        ActivateMainWindow();
+    }
+
+    public async Task CompleteOnboardingAsync(bool startWithWindows, bool showCompanion)
+    {
+        await App.Services.UpdateAsync(settings => settings with
+        {
+            OnboardingSeen = true,
+            StartWithWindows = startWithWindows,
+            CursorCompanionMode = showCompanion
+                ? settings.CursorCompanionMode == "off" ? "while-moving" : settings.CursorCompanionMode
+                : "off",
+        });
+        RootFrame.Navigate(typeof(MainPage));
+        if (RootFrame.Content is MainPage page)
+        {
+            page.NavigateTo("capture");
+        }
+        ActivateMainWindow();
+    }
+
+    private MainPage? EnsureMainPage()
+    {
+        if (RootFrame.Content is not MainPage)
+        {
+            RootFrame.Navigate(typeof(MainPage));
+        }
+        return RootFrame.Content as MainPage;
     }
 
     private void ActivateMainWindow() => WindowPlacement.ForceForeground(this);
@@ -156,6 +199,10 @@ public sealed partial class MainWindow : Window
                 break;
             case "settings":
                 ShowSettings();
+                break;
+            case "onboarding":
+            case "welcome":
+                ShowOnboarding();
                 break;
             case "command":
             case "command-root":

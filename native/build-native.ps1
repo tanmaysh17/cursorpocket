@@ -87,7 +87,7 @@ $compiledAssets = Join-Path $targetDir "Assets"
 if (Test-Path -LiteralPath $compiledAssets) {
     Copy-Item -LiteralPath $compiledAssets -Destination $publishRoot -Recurse -Force
 }
-$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "AnnotationWindow.xbf", "PinnedCaptureWindow.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\CursorPocketLogo.png", "Assets\Backgrounds\graphite.png", "Assets\Backgrounds\slate.png", "Assets\Backgrounds\moss.png")
+$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "OnboardingPage.xbf", "AnnotationWindow.xbf", "PinnedCaptureWindow.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\CursorPocketLogo.png", "Assets\Backgrounds\graphite.png", "Assets\Backgrounds\slate.png", "Assets\Backgrounds\moss.png")
 foreach ($resource in $requiredWinUiResources) {
     if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $resource))) {
         throw "Published WinUI resource is missing: $resource"

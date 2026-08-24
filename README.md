@@ -113,7 +113,11 @@ Open **Settings** from the top-right of the capture window or from the tray menu
 - choose whether screen walkthroughs start with microphone, webcam, and a countdown.
 - choose the default display/region/window source, 30 or 60 fps, pointer inclusion, and webcam layout.
 
-The installer offers startup at sign-in; portable builds leave it off until you enable it. CursorPocket uses the current Windows user's startup setting and does not require administrator access.
+The final welcome step and Settings both offer startup at sign-in. CursorPocket keeps that choice in one app setting, applies it for the current Windows user, and does not require administrator access.
+
+## First launch
+
+A normal first launch opens a short field guide that explains the cursor companion, confirms the registered global shortcut, shows the seven mnemonic command keys, and opens the real command surface for a rehearsal. It can be skipped and rerun later from **Settings → Help → Run tour**. Background startup stays silent.
 
 ## Native Windows build
 
@@ -125,7 +129,7 @@ powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 
 This creates `artifacts\CursorPocket-portable-win-x64.zip`. With the Windows SDK it also creates `artifacts\CursorPocket-x64.msix`; if Inno Setup 6 is installed it creates `artifacts\CursorPocket-Setup-x64.exe` as well.
 
-Internal builds are currently unsigned, so Windows can display a publisher warning. The GitHub workflow has an optional signing stage for a future certificate.
+For another person, `CursorPocket-Setup-x64.exe` is the recommended artifact: it is a per-user installer, requires no administrator access, and includes the self-contained runtime and FFmpeg. Internal builds are currently unsigned, so Windows SmartScreen can show an **Unknown publisher** warning; the unsigned MSIX cannot be installed normally. A low-friction public build requires an Authenticode code-signing certificate whose subject matches the MSIX publisher (`CN=Tanmay Sharma`, unless the manifest publisher is changed to the certificate subject). The GitHub release workflow signs the app, installer, and MSIX when `WINDOWS_SIGNING_CERTIFICATE` and `WINDOWS_SIGNING_PASSWORD` are configured, and refuses to publish an unsigned `v*` release.
 
 ## Develop locally
 

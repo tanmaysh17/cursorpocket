@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a first-run field guide with live theme support, all seven mnemonic commands, shortcut readiness, a real command-mode rehearsal, persistent completion, and a Settings entry to rerun it.
+- Added a signed tag-release gate so friend-facing GitHub releases cannot silently publish unsigned Windows installers.
+
 - Added camera effects to the self-view: background blur, background replacement (three bundled backgrounds or your own image), face touch-up, and brightness, warmth, and contrast. Everything runs on-device — the person mask comes from a hash-pinned local model, and no frame or derived data leaves the machine.
 - Added a squircle self-view shape — a 1:1 plump square — alongside the existing 16:9 rounded rectangle.
 - Recording preflight now previews the shape and every effect live in the framing slot, so the look is settled before recording rather than discovered afterwards.
