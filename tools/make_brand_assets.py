@@ -269,37 +269,8 @@ def write_ico(frame_paths: dict[int, Path], path: Path) -> None:
     write_bytes_if_changed(path, header + b"".join(entries) + b"".join(payloads))
 
 
-def make_tray_ready(size: int) -> Image.Image:
-    """Rasterize the approved 24 px tray-ready geometry at one exact frame size."""
-    supersample = 8
-    render = size * supersample
-    scale = render / 24
-    canvas = Image.new("RGBA", (render, render))
-    draw = ImageDraw.Draw(canvas)
-
-    def point(x: float, y: float) -> tuple[float, float]:
-        return x * scale, y * scale
-
-    draw.ellipse((*point(6, 3), *point(18, 15)), outline=READY, width=round(3 * scale))
-    lip: list[tuple[float, float]] = []
-    for step in range(25):
-        t = step / 24
-        x = (1 - t) ** 2 * 5 + 2 * (1 - t) * t * 12 + t**2 * 19
-        y = (1 - t) ** 2 * 12 + 2 * (1 - t) * t * 17 + t**2 * 12
-        lip.append(point(x, y))
-    pocket = lip + [point(19, 18.5), point(18.5, 20), point(16.5, 21), point(7.5, 21), point(5.5, 20), point(5, 18.5)]
-    draw.polygon(pocket, fill=FOLD)
-    draw.line(
-        [point(10, 7), point(10, 14), point(12, 12), point(14.2, 16.5)],
-        fill=PINE,
-        width=round(1.8 * scale),
-        joint="curve",
-    )
-    return canvas.resize((size, size), Image.Resampling.LANCZOS)
-
-
-def make_tray_recording(size: int) -> Image.Image:
-    """Rasterize the approved 24 px recording tray geometry with cursor cut-out."""
+def make_tray_primary(size: int) -> Image.Image:
+    """Rasterize brand logo #1 at one exact tray size with a transparent cursor."""
     supersample = 8
     render = size * supersample
     scale = render / 24
@@ -329,7 +300,7 @@ def make_tray_recording(size: int) -> Image.Image:
 
 
 def sync_native_runtime_assets(
-    ready_mark: Image.Image,
+    primary_mark: Image.Image,
     wordmark: Image.Image,
     app_icon: Path,
     recording_app_icon: Path,
@@ -339,15 +310,15 @@ def sync_native_runtime_assets(
     """Stage every image the WinUI build, installer, Start, and tray consume."""
     NATIVE_ASSETS.mkdir(parents=True, exist_ok=True)
     runtime: dict[str, Image.Image] = {
-        "CursorPocketLogo.png": make_unplated(ready_mark, 256),
-        "LockScreenLogo.scale-200.png": make_unplated(ready_mark, 48),
-        "SplashScreen.scale-200.png": make_splash(ready_mark, wordmark),
-        "Square150x150Logo.scale-200.png": make_tile(ready_mark, 300),
-        "Square44x44Logo.scale-200.png": make_tile(ready_mark, 88),
-        "Square44x44Logo.targetsize-24_altform-unplated.png": make_unplated(ready_mark, 24),
-        "Square44x44Logo.targetsize-48_altform-lightunplated.png": make_unplated(ready_mark, 48),
-        "StoreLogo.png": make_tile(ready_mark, 50),
-        "Wide310x150Logo.scale-200.png": make_wide_tile(ready_mark, wordmark),
+        "CursorPocketLogo.png": make_unplated(primary_mark, 256),
+        "LockScreenLogo.scale-200.png": make_unplated(primary_mark, 48),
+        "SplashScreen.scale-200.png": make_splash(primary_mark, wordmark),
+        "Square150x150Logo.scale-200.png": make_unplated(primary_mark, 300),
+        "Square44x44Logo.scale-200.png": make_unplated(primary_mark, 88),
+        "Square44x44Logo.targetsize-24_altform-unplated.png": make_unplated(primary_mark, 24),
+        "Square44x44Logo.targetsize-48_altform-lightunplated.png": make_unplated(primary_mark, 48),
+        "StoreLogo.png": make_unplated(primary_mark, 50),
+        "Wide310x150Logo.scale-200.png": make_wide_tile(primary_mark, wordmark),
     }
     written: list[Path] = []
     for filename, image in runtime.items():
@@ -439,8 +410,10 @@ def main() -> None:
     app_frames: dict[int, Path] = {}
     recording_frames: dict[int, Path] = {}
     for size in APP_SIZES:
-        app = make_tile(ready, size)
-        recording_app = make_tile(primary, size)
+        # Brand logo #1 is the installed application identity in every state.
+        # Preserve its outer field and negative-space cursor as transparency.
+        app = make_unplated(primary, size)
+        recording_app = make_unplated(primary, size)
         app_frames[size] = png(app, f"app-icon-{size}.png")
         recording_frames[size] = png(recording_app, f"app-icon-recording-{size}.png")
 
@@ -454,8 +427,9 @@ def main() -> None:
     tray_ready_frames: dict[int, Path] = {}
     tray_recording_frames: dict[int, Path] = {}
     for size in TRAY_SIZES:
-        tray_ready_frames[size] = png(make_tray_ready(size), f"tray-ready-{size}.png")
-        tray_recording_frames[size] = png(make_tray_recording(size), f"tray-recording-{size}.png")
+        # Tooltips carry state; both resources retain logo #1 as the tray identity.
+        tray_ready_frames[size] = png(make_tray_primary(size), f"tray-ready-{size}.png")
+        tray_recording_frames[size] = png(make_tray_primary(size), f"tray-recording-{size}.png")
 
     tray_ready_ico = EXPORT / "CursorPocket-tray-ready.ico"
     tray_recording_ico = EXPORT / "CursorPocket-tray-recording.ico"
@@ -466,7 +440,7 @@ def main() -> None:
     png(make_brand_board(primary, ready, wordmark_light, hero), "brand-board.png")
 
     runtime = sync_native_runtime_assets(
-        ready,
+        primary,
         wordmark_light,
         cursorpocket_ico,
         recording_ico,

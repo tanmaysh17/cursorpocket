@@ -20,7 +20,7 @@ public sealed class TrayPresentationTests
     [Theory]
     [InlineData(RecordingState.Idle)]
     [InlineData(RecordingState.Failed)]
-    public void Inactive_states_use_the_ready_pocket(RecordingState state)
+    public void Inactive_states_use_the_primary_orbit(RecordingState state)
     {
         var presentation = TrayPresentation.For(state);
 

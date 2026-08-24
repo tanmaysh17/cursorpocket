@@ -192,13 +192,14 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ## Brand mark
 
-The identity is **Pocket + Orbit**: one mark for the quiet ready/saved state and a matched mark for unmistakable live recording. The full rationale, usage rules, glyph system, imagery direction, and export map live in [BRAND.md](BRAND.md).
+The identity is **Pocket + Orbit**, led by one stable application mark. The full rationale, usage rules, glyph system, imagery direction, and export map live in [BRAND.md](BRAND.md).
 
-- **Ready / saved:** the green capture orbit drops into a lighter teal pocket. This is the default application, Start, Library, installer, and wordmark emblem.
-- **Recording:** a green/teal orbit surrounds a coral live disc and carries three coral signal ticks. The cursor is a transparent negative-space cut through the disc and ribbon; it is never filled with a brand colour.
+- **Installed application identity:** brand logo #1—the orbit around a coral focal disc with three signal ticks and a transparent negative-space cursor—is used in the tray, taskbar, Start, installer, title bar, and command surfaces in every state.
+- **Secondary local/saved illustration:** the green capture orbit drops into a lighter teal pocket. Use it where the pocket metaphor itself is being explained, not as the installed application icon.
+- **Recording state:** remains unmistakable through the red cursor companion, tray tooltip, recording HUD, and recording controls rather than swapping the application brand mark.
 - The teal fold is deliberately `#2B6F63`, light enough to remain visible on Pine and black at the active display scale.
 - The motion wordmark carries a two-loop green gesture line ending in a square capture token. Use it for brand signatures, splash/onboarding, documentation, and installer surfaces—not as page decoration inside everyday utility UI.
-- At 16–20 px use the hand-tuned tray assets. Do not downscale the 1024 px application tile and do not add a recording badge.
+- At 16–20 px use the hand-tuned logo #1 tray assets. Do not downscale the 1024 px application image and do not add a badge.
 - Canonical approved raster masters live in `assets/brand/` and `assets/brand/imagery/`; derived PNG/ICO deliverables live in `assets/brand/export/` and are regenerated without redrawing the masters using `python tools/make_brand_assets.py`. The SVGs remain implementation-safe and small-size references rather than the source of the approved full-colour artwork.
 - The product-specific monochrome glyph family lives in `assets/brand/icons/`. Capture kinds remain distinguished by glyph rather than hue.
 

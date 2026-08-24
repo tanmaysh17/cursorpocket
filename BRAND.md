@@ -6,18 +6,18 @@ Status: approved visual direction; canonical raster masters and production expor
 
 CursorPocket is a quiet local capture reflex: catch something without leaving the work, know when recording is live, and always know where the result went. The identity is built around **Pocket + Orbit**.
 
-- The **pocket** is the default mark. A green capture orbit drops into a teal pocket while the cursor stays inside the captured field. It means ready, saved, local, and recoverable.
-- The **orbit** is the recording mark. The structure opens into motion around a coral live disc, with three signal ticks as a non-colour state cue.
-- The cursor in the recording mark is **negative space**. It is never teal, green, white, or coral; the background must show through the whole cursor silhouette.
+- The **orbit** is the primary application mark. The structure opens into motion around a coral focal disc, with three signal ticks and a negative-space cursor. It is the installed identity in the tray, taskbar, Start, package, and application surfaces.
+- The **pocket** is the secondary mark. A green capture orbit drops into a teal pocket while the cursor stays inside the captured field. It means ready, saved, local, and recoverable.
+- The cursor in the primary orbit is **negative space**. It is never teal, green, white, coral, or an opaque dark fill; the background must show through the whole cursor silhouette.
 - The motion line under the wordmark echoes the app's two-circle mouse gesture and ends in a square capture token.
 
 The working brand line is **Catch now. Find it later.** Supporting copy is **Quiet capture, kept on this computer.** These are campaign and onboarding lines, not persistent UI decoration.
 
 ## Logo system
 
-### Primary expressive signature
+### Primary application signature
 
-The canonical expressive brand mark is `assets/brand/main-logo.png`: the green-and-teal capture orbit around a coral focal disc and a fully transparent negative-space cursor, with three coral signal ticks. Use it in brand signatures, launch imagery, and recording-led communication. It is not the idle application-state icon. When the `CursorPocket` name is required beside it, pair it with the existing motion wordmark; prefer the reversed lockup on deep-pine or black surfaces.
+The canonical main application logo is `assets/brand/main-logo.png`: the green-and-teal capture orbit around a coral focal disc and a fully transparent negative-space cursor, with three coral signal ticks. Use it in the tray, taskbar, Start, package, application chrome, brand signatures, and launch imagery. When the `CursorPocket` name is required beside it, pair it with the existing motion wordmark; prefer the reversed lockup on deep-pine or black surfaces.
 
 ### Secondary pocket mark
 
@@ -31,12 +31,10 @@ The canonical expressive brand mark is `assets/brand/main-logo.png`: the green-a
 
 | State | Mark | Required reading |
 | --- | --- | --- |
-| Ready, idle, saved | Pocket mark | Green orbit entering a teal pocket |
-| Starting, recording, finalizing | Recording orbit | Coral live disc, three coral ticks, cursor cut out as background |
+| Application identity in every state | Primary orbit | Coral focal disc, three coral ticks, cursor cut out as background |
+| Local capture / saved illustration | Pocket mark | Green orbit entering a teal pocket |
 
-Do not put a red badge on the ready mark. The recording mark is a distinct silhouette so state survives grayscale and common colour-vision differences.
-
-The ready pocket is the default runtime application icon because an idle app must not imply that recording is live. The expressive orbit becomes the runtime mark only while starting, recording, or finalizing.
+Do not add badges or replace the primary orbit with the pocket in installed application surfaces. Recording state remains explicit through the tray tooltip, red cursor companion, recording HUD, and the rest of the product's state system; the brand mark itself stays stable.
 
 ### Clear space and minimum size
 
@@ -139,6 +137,6 @@ python .\tools\make_brand_assets.py
 
 ## Runtime integration
 
-`python tools/make_brand_assets.py` now stages the approved identity directly into the WinUI runtime assets. The ready pocket supplies the executable, title bar, command-panel header, Start/MSIX, installer, splash, and idle tray mark. The recording orbit supplies the live tray mark while recording is starting, active, or finalizing. `native/build-native.ps1` refuses to publish if either tray-state icon or the application assets are missing.
+`python tools/make_brand_assets.py` now stages the approved identity directly into the WinUI runtime assets. Brand logo #1 supplies the executable, taskbar, title bar, command-panel header, Start/MSIX, installer, splash, and tray mark in every state. The pocket remains available as a secondary brand illustration. `native/build-native.ps1` refuses to publish if either tray-state resource or the application assets are missing.
 
 Verify the ready and recording marks at 16, 20, 24, 32, 48, and 256 px on the active Windows display scale before release.

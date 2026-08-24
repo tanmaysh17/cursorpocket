@@ -694,7 +694,7 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
-    public void Tray_uses_distinct_ready_and_recording_brand_marks()
+    public void Tray_uses_brand_logo_one_with_state_specific_tooltips()
     {
         var code = ReadFixture("MainWindow.xaml.cs.txt");
 

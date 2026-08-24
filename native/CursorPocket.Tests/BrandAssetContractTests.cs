@@ -34,6 +34,14 @@ public sealed class BrandAssetContractTests
     }
 
     [Theory]
+    [InlineData("AppIcon.ico", "AppIconRecording.ico")]
+    [InlineData("TrayReady.ico", "TrayRecording.ico")]
+    public void Brand_logo_one_is_the_stable_installed_identity(string first, string second)
+    {
+        Assert.Equal(File.ReadAllBytes(Fixture(first)), File.ReadAllBytes(Fixture(second)));
+    }
+
+    [Theory]
     [InlineData("CursorPocketLogo.png", 256, 256)]
     [InlineData("SplashScreen.scale-200.png", 1240, 600)]
     [InlineData("Square150x150Logo.scale-200.png", 300, 300)]
