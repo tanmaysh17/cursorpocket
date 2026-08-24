@@ -41,7 +41,7 @@ Do not add badges or replace the primary orbit with the pocket in installed appl
 - Clear space around a standalone mark: at least one quarter of its rendered width.
 - Clear space around a lockup: at least the height of the square endpoint on the motion line.
 - Full-colour mark minimum: 24 px.
-- At 16–20 px, use the dedicated tray exports rather than downscaling the 1024 px application tile.
+- At 16–20 px, use the dedicated tray exports, optically fitted to nearly the full pixel canvas, rather than downscaling the 1024 px application tile.
 - The full wordmark should not be rendered below 150 px wide.
 
 ### Never

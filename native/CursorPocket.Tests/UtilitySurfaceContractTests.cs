@@ -705,6 +705,30 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Primary_logo_fills_command_title_and_taskbar_surfaces()
+    {
+        var command = ReadFixture("CommandPaletteWindow.xaml");
+        var window = ReadFixture("MainWindow.xaml");
+        var code = ReadFixture("MainWindow.xaml.cs.txt");
+        var installer = ReadFixture("CursorPocket.iss.txt");
+        var localInstall = ReadFixture("install.ps1.txt");
+
+        Assert.Contains("<Grid Width=\"40\" Height=\"40\">", command, StringComparison.Ordinal);
+        Assert.Contains("<Image Width=\"40\" Height=\"40\"", command, StringComparison.Ordinal);
+        Assert.Contains("RegularHeight = 438", ReadFixture("CommandPaletteWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("ShortHeight = 308", ReadFixture("CommandPaletteWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("ScreenshotHeight = 294", ReadFixture("CommandPaletteWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"AppTitleBar\" Height=\"48\"", window, StringComparison.Ordinal);
+        Assert.Contains("Width=\"40\"", window, StringComparison.Ordinal);
+        Assert.Contains("Height=\"40\"", window, StringComparison.Ordinal);
+        Assert.Contains("Path.Combine(AppContext.BaseDirectory, \"Assets\", \"AppIcon.ico\")", code, StringComparison.Ordinal);
+        Assert.Contains("AppWindow.SetTaskbarIcon(iconPath)", code, StringComparison.Ordinal);
+        Assert.Contains("AppWindow.SetTitleBarIcon(iconPath)", code, StringComparison.Ordinal);
+        Assert.Contains("IconFilename: \"{app}\\Assets\\AppIcon.ico\"", installer, StringComparison.Ordinal);
+        Assert.Contains("$shortcut.IconLocation = \"$installedIcon,0\"", localInstall, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Native_package_stages_and_verifies_compiled_winui_resources()
     {
         var script = ReadFixture("build-native.ps1.txt");

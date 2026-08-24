@@ -14,6 +14,7 @@ if (-not (Test-Path -LiteralPath $sourceExe) -or -not (Test-Path -LiteralPath (J
 
 $installDir = Join-Path $env:LOCALAPPDATA "Programs\CursorPocket"
 $installedExe = Join-Path $installDir "CursorPocket.exe"
+$installedIcon = Join-Path $installDir "Assets\AppIcon.ico"
 $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $shortcutPath = Join-Path $startMenuDir "CursorPocket.lnk"
 $managedPaths = @($sourceExe, $installedExe)
@@ -50,7 +51,7 @@ $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $installedExe
 $shortcut.WorkingDirectory = $installDir
-$shortcut.IconLocation = "$installedExe,0"
+$shortcut.IconLocation = "$installedIcon,0"
 $shortcut.Description = "Capture screenshots, screen walkthroughs, audio, selected text, and webpages"
 $shortcut.Save()
 
@@ -95,4 +96,4 @@ if ($taskbarPinned) {
     Write-Host "Taskbar shortcut: Windows requires a manual pin" -ForegroundColor Yellow
     Write-Host "Open Start, search CursorPocket, right-click it, and choose Pin to taskbar."
 }
-Write-Host "Windows may initially place the green tray icon under the ^ overflow menu."
+Write-Host "Windows may initially place the CursorPocket tray icon under the ^ overflow menu."

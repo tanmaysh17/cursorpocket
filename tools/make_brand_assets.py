@@ -111,7 +111,9 @@ def make_unplated(mark: Image.Image, size: int) -> Image.Image:
     supersample = 4
     side = size * supersample
     canvas = Image.new("RGBA", (side, side))
-    padding = round(side * 0.06)
+    # Installed identity surfaces should use the full Windows icon canvas. Keep
+    # only a sub-pixel antialiasing guard instead of the old 6% optical inset.
+    padding = max(1, round(side * 0.02))
     paste_center(canvas, mark, (padding, padding, side - padding, side - padding))
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
@@ -296,7 +298,13 @@ def make_tray_primary(size: int) -> Image.Image:
     tick_width = round(1.6 * scale)
     for start, end in [((17, 3), (17, 5)), ((20, 4), (18.6, 5.4)), ((21, 7), (19, 7))]:
         draw.line([point(*start), point(*end)], fill=RECORDING, width=tick_width)
-    return mark.resize((size, size), Image.Resampling.LANCZOS)
+    # The geometry above is authored on a 24 px reference canvas. Crop its
+    # optical bounds and refit them so Windows' 16 px tray slot is fully used.
+    crop = content_crop(mark, max(1, round(scale * 0.2)))
+    fitted = contain(crop, render, render)
+    canvas = Image.new("RGBA", (render, render))
+    canvas.alpha_composite(fitted, ((render - fitted.width) // 2, (render - fitted.height) // 2))
+    return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def sync_native_runtime_assets(

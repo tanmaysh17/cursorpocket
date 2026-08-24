@@ -45,7 +45,10 @@ public sealed partial class MainWindow : Window
         App.Theme.Register(this, Root, SurfaceRole.Persistent);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        AppWindow.SetIcon(iconPath);
+        AppWindow.SetTaskbarIcon(iconPath);
+        AppWindow.SetTitleBarIcon(iconPath);
         WindowPlacement.ResizeInDips(this, 1100, 760);
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {

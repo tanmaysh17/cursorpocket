@@ -28,15 +28,15 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\Assets\AppIcon.ico
 SetupIconFile=..\CursorPocket.App\Assets\AppIcon.ico
 
 [Files]
 Source: "..\..\artifacts\CursorPocket-win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\CursorPocket"; Filename: "{app}\{#MyAppExeName}"
-Name: "{userdesktop}\CursorPocket"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\CursorPocket"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Assets\AppIcon.ico"
+Name: "{userdesktop}\CursorPocket"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Assets\AppIcon.ico"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked

@@ -199,7 +199,7 @@ The identity is **Pocket + Orbit**, led by one stable application mark. The full
 - **Recording state:** remains unmistakable through the red cursor companion, tray tooltip, recording HUD, and recording controls rather than swapping the application brand mark.
 - The teal fold is deliberately `#2B6F63`, light enough to remain visible on Pine and black at the active display scale.
 - The motion wordmark carries a two-loop green gesture line ending in a square capture token. Use it for brand signatures, splash/onboarding, documentation, and installer surfaces—not as page decoration inside everyday utility UI.
-- At 16–20 px use the hand-tuned logo #1 tray assets. Do not downscale the 1024 px application image and do not add a badge.
+- At 16–20 px use the hand-tuned logo #1 tray assets, fitted to nearly the full available canvas. Command mode and the persistent title bar use a 40 px mark. Do not downscale the 1024 px application image and do not add a badge.
 - Canonical approved raster masters live in `assets/brand/` and `assets/brand/imagery/`; derived PNG/ICO deliverables live in `assets/brand/export/` and are regenerated without redrawing the masters using `python tools/make_brand_assets.py`. The SVGs remain implementation-safe and small-size references rather than the source of the approved full-colour artwork.
 - The product-specific monochrome glyph family lives in `assets/brand/icons/`. Capture kinds remain distinguished by glyph rather than hue.
 
