@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.Core;
@@ -18,6 +19,12 @@ public sealed partial class MainPage : Page
     private bool _loaded;
     private bool _libraryLoaded;
     private Services.RecordingService? _recordingStatusSource;
+    private string? _editingTextId;
+    private string? _textBeforeEdit;
+    private bool _savingText;
+    private bool _previewMaximized;
+    private bool _startingTextEdit;
+    private bool _textDetailLoadedFromFile;
 
     public MainPage()
     {
@@ -46,6 +53,12 @@ public sealed partial class MainPage : Page
 
     public void NavigateTo(string destination)
     {
+        if ((_editingTextId is not null || _startingTextEdit) && destination != "library")
+        {
+            SetLibraryStatus("Save or cancel the text edit before leaving the Library");
+            Navigation.SelectedItem = LibraryNav;
+            return;
+        }
         Navigation.SelectedItem = destination switch
         {
             "capture" => CaptureNav,
@@ -156,6 +169,12 @@ public sealed partial class MainPage : Page
             return;
         }
         var tag = (eventArgs.SelectedItemContainer?.Tag as string) ?? "library";
+        if ((_editingTextId is not null || _startingTextEdit) && tag != "library")
+        {
+            Navigation.SelectedItem = LibraryNav;
+            SetLibraryStatus("Save or cancel the text edit before leaving the Library");
+            return;
+        }
         LibraryPanel.Visibility = tag == "library" ? Visibility.Visible : Visibility.Collapsed;
         CapturePanel.Visibility = tag == "capture" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPanel.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
@@ -171,10 +190,23 @@ public sealed partial class MainPage : Page
                 // from the manifest along with the rest.
                 return;
             }
+            var editingId = _editingTextId;
             await ViewModel.CaptureAddedAsync(eventArgs.Record);
+            if (editingId is not null)
+            {
+                var editingItem = ViewModel.Items.FirstOrDefault(item => item.Id == editingId);
+                if (editingItem is not null)
+                {
+                    ViewModel.SelectedItem = editingItem;
+                    CaptureList.SelectedItem = editingItem;
+                }
+            }
             UpdateLibraryVisibility();
             SyncDeleteAffordance();
-            await UpdateDetailAsync();
+            if (editingId is null)
+            {
+                await UpdateDetailAsync();
+            }
             await LoadThumbnailsAsync();
         });
     }
@@ -195,26 +227,51 @@ public sealed partial class MainPage : Page
     /// </summary>
     private bool LibraryKeysActive() =>
         LibraryPanel.Visibility == Visibility.Visible &&
+        _editingTextId is null &&
         FocusManager.GetFocusedElement(XamlRoot) is not TextBox;
 
-    private void OpenAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    private async void OpenAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
         if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
         {
             return;
         }
         eventArgs.Handled = true;
-        ViewModel.OpenSelectedCommand.Execute(null);
+        await OpenSelectedAsync();
     }
 
     private void EditAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
-        if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
+        var focused = FocusManager.GetFocusedElement(XamlRoot);
+        if (LibraryPanel.Visibility != Visibility.Visible ||
+            ViewModel.SelectedItem is null ||
+            _editingTextId is not null ||
+            (focused is TextBox && !ReferenceEquals(focused, DetailTextEditor)))
         {
             return;
         }
         eventArgs.Handled = true;
         Edit_Click(this, new RoutedEventArgs());
+    }
+
+    private void SaveTextAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (_editingTextId is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        SaveText_Click(this, new RoutedEventArgs());
+    }
+
+    private void CancelTextEditAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (_editingTextId is null)
+        {
+            return;
+        }
+        eventArgs.Handled = true;
+        CancelTextEdit();
     }
 
     private void RevealAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
@@ -304,6 +361,10 @@ public sealed partial class MainPage : Page
     {
         // The delete affordance is cheap and must track the selection immediately.
         SyncDeleteAffordance();
+        if (_editingTextId is not null)
+        {
+            return;
+        }
         // Loading the detail is not cheap: arrow-keying down the list would open a
         // media pipeline and generate a waveform for every row passed through.
         // The superseded source is cancelled but deliberately not disposed — the
@@ -346,11 +407,37 @@ public sealed partial class MainPage : Page
     /// </summary>
     private void MaximizePreview_Click(object sender, RoutedEventArgs eventArgs)
     {
-        var maximized = ListColumn.Width.Value > 0;
-        ListColumn.Width = maximized ? new GridLength(0) : new GridLength(4, GridUnitType.Star);
-        ListColumn.MinWidth = maximized ? 0 : 240;
+        SetPreviewMaximized(!_previewMaximized);
+    }
+
+    /// <summary>
+    /// Spans the detail surface across both columns instead of only zeroing the list
+    /// column. The narrow visual state collapses DetailColumn, so changing widths alone
+    /// would leave Enter or a double-tap looking like it opened an empty Library.
+    /// </summary>
+    private void SetPreviewMaximized(bool maximized)
+    {
+        _previewMaximized = maximized;
+        if (maximized)
+        {
+            ListPane.Visibility = Visibility.Collapsed;
+            Grid.SetColumn(DetailPane, 0);
+            Grid.SetColumnSpan(DetailPane, 2);
+            DetailPane.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ListPane.Visibility = Visibility.Visible;
+            Grid.SetColumn(DetailPane, 1);
+            Grid.SetColumnSpan(DetailPane, 1);
+            // Let LibraryNarrow/LibraryWide own this property again after the
+            // explicit preview-only override is removed.
+            DetailPane.ClearValue(VisibilityProperty);
+        }
         MaximizePreviewIcon.Glyph = maximized ? "" : "";
-        ToolTipService.SetToolTip(MaximizePreviewButton, maximized ? "Show the capture list" : "Fill the window with the preview");
+        var maximizeLabel = maximized ? "Show the capture list" : "Fill the window with the preview";
+        ToolTipService.SetToolTip(MaximizePreviewButton, maximizeLabel);
+        AutomationProperties.SetName(MaximizePreviewButton, maximizeLabel);
     }
 
     /// <summary>
@@ -394,8 +481,8 @@ public sealed partial class MainPage : Page
 
     /// <summary>Opening from the row keeps the primary action reachable when the
     /// detail pane has given way to the list at narrow widths.</summary>
-    private void CaptureList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs eventArgs)
-        => ViewModel.OpenSelectedCommand.Execute(null);
+    private async void CaptureList_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs eventArgs)
+        => await OpenSelectedAsync();
 
     private async Task DebounceDetailAsync(CancellationToken cancellationToken)
     {
@@ -412,12 +499,19 @@ public sealed partial class MainPage : Page
 
     private async Task UpdateDetailAsync(CancellationToken cancellationToken = default)
     {
+        if (_editingTextId is not null)
+        {
+            return;
+        }
         DetailPlayer.Source = null;
         DetailPlayer.Visibility = Visibility.Collapsed;
         DetailPlayer.Height = double.NaN;
         DetailPlayer.VerticalAlignment = VerticalAlignment.Stretch;
         DetailImage.Source = null;
         DetailImage.Visibility = Visibility.Collapsed;
+        DetailTextEditor.Visibility = Visibility.Collapsed;
+        DetailTextEditor.IsReadOnly = true;
+        _textDetailLoadedFromFile = false;
         DetailTextPanel.Visibility = Visibility.Visible;
 
         var item = ViewModel.SelectedItem;
@@ -440,9 +534,34 @@ public sealed partial class MainPage : Page
         FactFile.Text = item.FileName;
         DetailIcon.Glyph = item.IconGlyph;
         DetailText.Text = item.AbsolutePath;
+        var editable = item.Record.CaptureKind is CaptureKind.Screenshot or CaptureKind.Text;
+        EditButton.Visibility = editable ? Visibility.Visible : Visibility.Collapsed;
+        EditButton.Content = item.Record.CaptureKind == CaptureKind.Text ? "Edit" : "Mark up";
+        ToolTipService.SetToolTip(
+            EditButton,
+            item.Record.CaptureKind == CaptureKind.Text
+                ? "Edit this text inside the Library · Ctrl+E"
+                : "Ctrl+E — saves an edited copy and leaves this one alone");
+        OpenButton.Content = item.Record.CaptureKind == CaptureKind.Text ? "Open here" : "Open";
         if (!File.Exists(item.AbsolutePath))
         {
             DetailText.Text = "This file is no longer in the capture folder.";
+            return;
+        }
+
+        if (item.Record.CaptureKind == CaptureKind.Text)
+        {
+            DetailTextPanel.Visibility = Visibility.Collapsed;
+            try
+            {
+                DetailTextEditor.Text = await File.ReadAllTextAsync(item.AbsolutePath, cancellationToken);
+                _textDetailLoadedFromFile = true;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                DetailTextEditor.Text = item.Preview;
+            }
+            DetailTextEditor.Visibility = Visibility.Visible;
             return;
         }
 
@@ -481,17 +600,6 @@ public sealed partial class MainPage : Page
             return;
         }
 
-        if (item.Record.CaptureKind == CaptureKind.Text)
-        {
-            try
-            {
-                DetailText.Text = await File.ReadAllTextAsync(item.AbsolutePath, cancellationToken);
-            }
-            catch (IOException)
-            {
-                DetailText.Text = item.Preview;
-            }
-        }
     }
 
     private void UpdateLibraryVisibility()
@@ -561,16 +669,213 @@ public sealed partial class MainPage : Page
     }
 
     /// <summary>
-    /// Opens the annotation editor on the selected screenshot. Saving there writes an
-    /// edited copy: a capture the user kept is an artifact they chose, and rewriting it
-    /// silently would be destructive in a way overwriting a fresh shot is not.
+    /// Opens the annotation editor for a screenshot, or turns the Library's own text
+    /// viewer into an editor. Text never needs a second application.
     /// </summary>
-    private void Edit_Click(object sender, RoutedEventArgs eventArgs)
+    private async void Edit_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (ViewModel.SelectedItem?.Record is { } record)
+        if (ViewModel.SelectedItem is not { } item)
         {
-            (App.Window as MainWindow)?.AnnotateExisting(record);
+            return;
         }
+        if (item.Record.CaptureKind == CaptureKind.Text)
+        {
+            await BeginTextEditAsync(item);
+        }
+        else if (item.Record.CaptureKind == CaptureKind.Screenshot)
+        {
+            (App.Window as MainWindow)?.AnnotateExisting(item.Record);
+        }
+    }
+
+    private async void Open_Click(object sender, RoutedEventArgs eventArgs) => await OpenSelectedAsync();
+
+    private async Task OpenSelectedAsync()
+    {
+        var item = ViewModel.SelectedItem;
+        if (item?.Record.CaptureKind != CaptureKind.Text)
+        {
+            ViewModel.OpenSelectedCommand.Execute(null);
+            return;
+        }
+        if (!await EnsureTextDetailReadyAsync(item))
+        {
+            return;
+        }
+        DetailTextEditor.Focus(FocusState.Programmatic);
+        SetLibraryStatus(
+            _textDetailLoadedFromFile
+                ? "Text opened in Library · Ctrl+E to edit"
+                : "Full text could not be loaded · showing the Library preview",
+            isError: !_textDetailLoadedFromFile);
+    }
+
+    private async Task BeginTextEditAsync(CaptureItemViewModel item)
+    {
+        if (_editingTextId is not null || _startingTextEdit)
+        {
+            return;
+        }
+        _startingTextEdit = true;
+        _detailLoad?.Cancel();
+        SetTextEditSurroundingsEnabled(false);
+        try
+        {
+            if (!await EnsureTextDetailReadyAsync(item, requireFullText: true) || ViewModel.SelectedItem?.Id != item.Id)
+            {
+                return;
+            }
+
+            _editingTextId = item.Id;
+            _textBeforeEdit = DetailTextEditor.Text;
+            DetailTextEditor.IsReadOnly = false;
+            DefaultActions.Visibility = Visibility.Collapsed;
+            TextEditActions.Visibility = Visibility.Visible;
+            DeleteButton.Visibility = Visibility.Collapsed;
+            DetailKind.Text = "Editing text";
+            DetailTextEditor.Focus(FocusState.Programmatic);
+            DetailTextEditor.SelectionStart = DetailTextEditor.Text.Length;
+            SetLibraryStatus("Editing text in Library · Ctrl+S to save · Escape to cancel");
+        }
+        finally
+        {
+            _startingTextEdit = false;
+            if (_editingTextId is null)
+            {
+                SetTextEditSurroundingsEnabled(true);
+            }
+        }
+    }
+
+    private async Task<bool> EnsureTextDetailReadyAsync(CaptureItemViewModel item, bool requireFullText = false)
+    {
+        if (!File.Exists(item.AbsolutePath))
+        {
+            SetLibraryStatus("This text capture is missing", isError: true);
+            return false;
+        }
+        if (DetailTextEditor.Visibility != Visibility.Visible)
+        {
+            await UpdateDetailAsync();
+        }
+        if (ViewModel.SelectedItem?.Id != item.Id)
+        {
+            return false;
+        }
+        if (!_previewMaximized)
+        {
+            SetPreviewMaximized(true);
+        }
+        if (requireFullText && !_textDetailLoadedFromFile)
+        {
+            SetLibraryStatus("Full text could not be loaded · retry before editing", isError: true);
+            return false;
+        }
+        return DetailTextEditor.Visibility == Visibility.Visible;
+    }
+
+    private async void SaveText_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (_savingText)
+        {
+            return;
+        }
+        var item = ViewModel.Items.FirstOrDefault(candidate => candidate.Id == _editingTextId);
+        if (item is null)
+        {
+            CancelTextEdit();
+            return;
+        }
+
+        try
+        {
+            _savingText = true;
+            SaveTextButton.IsEnabled = false;
+            await App.Services.CaptureStore.UpdateTextAsync(item.Record, DetailTextEditor.Text);
+            EndTextEdit();
+            await ViewModel.InitializeAsync();
+            var refreshed = ViewModel.Items.FirstOrDefault(candidate => candidate.Id == item.Id);
+            if (refreshed is not null)
+            {
+                ViewModel.SelectedItem = refreshed;
+                CaptureList.SelectedItem = refreshed;
+            }
+            SyncDeleteAffordance();
+            await UpdateDetailAsync();
+            SetLibraryStatus("Text changes saved");
+        }
+        catch (ArgumentException)
+        {
+            SetLibraryStatus("Text cannot be empty", isError: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            SetLibraryStatus($"Text could not be saved · {exception.Message}", isError: true);
+        }
+        catch (Exception exception)
+        {
+            SetLibraryStatus(
+                $"Text could not be saved safely · {exception.Message} · keep this editor open and inspect the capture folder",
+                isError: true);
+        }
+        finally
+        {
+            _savingText = false;
+            SaveTextButton.IsEnabled = true;
+        }
+    }
+
+    private void CancelTextEdit_Click(object sender, RoutedEventArgs eventArgs) => CancelTextEdit();
+
+    private void CancelTextEdit()
+    {
+        if (_savingText)
+        {
+            return;
+        }
+        if (_textBeforeEdit is not null)
+        {
+            DetailTextEditor.Text = _textBeforeEdit;
+        }
+        EndTextEdit();
+        if (ViewModel.SelectedItem is { } item)
+        {
+            DetailKind.Text = item.KindLabel;
+        }
+        SetLibraryStatus("Text changes discarded");
+    }
+
+    private void EndTextEdit()
+    {
+        _editingTextId = null;
+        _textBeforeEdit = null;
+        DetailTextEditor.IsReadOnly = true;
+        DefaultActions.Visibility = Visibility.Visible;
+        TextEditActions.Visibility = Visibility.Collapsed;
+        DeleteButton.Visibility = Visibility.Visible;
+        SetTextEditSurroundingsEnabled(true);
+    }
+
+    private void SetTextEditSurroundingsEnabled(bool enabled)
+    {
+        foreach (var button in FilterBar.Children.OfType<Button>())
+        {
+            button.IsEnabled = enabled;
+        }
+        CaptureList.IsEnabled = enabled;
+        CaptureNav.IsEnabled = enabled;
+        SettingsNav.IsEnabled = enabled;
+        MaximizePreviewButton.IsEnabled = enabled;
+    }
+
+    private void SetLibraryStatus(string message, bool isError = false)
+    {
+        ViewModel.StatusMessage = message;
+        LibraryStatusDot.Visibility = isError ? Visibility.Collapsed : Visibility.Visible;
+        LibraryStatusText.Foreground = App.Theme.Brush(isError ? "PocketRed" : "PocketMuted");
+        AutomationProperties.SetLiveSetting(
+            LibraryStatusText,
+            isError ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
     }
 
     private void CopyPath_Click(object sender, RoutedEventArgs eventArgs)

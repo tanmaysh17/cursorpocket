@@ -27,15 +27,17 @@
     </Page.Resources>
 
     <Grid Background="Transparent">
-        <!-- The Library is fully keyboard-drivable. These are page accelerators, so
-             they never affect other applications, and every handler stands down while
-             a text box has focus or the Library is not the visible panel. -->
+        <!-- The Library is fully keyboard-drivable. These page accelerators never
+             affect other applications. General Library actions stand down in text
+             boxes; the inline viewer/editor keeps only its own Edit, Save, and Cancel. -->
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Key="Enter" Invoked="OpenAccelerator_Invoked" />
             <KeyboardAccelerator Key="Space" Invoked="PlayAccelerator_Invoked" />
             <KeyboardAccelerator Key="Delete" Invoked="DeleteAccelerator_Invoked" />
             <KeyboardAccelerator Key="R" Modifiers="Control" Invoked="RevealAccelerator_Invoked" />
             <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="EditAccelerator_Invoked" />
+            <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveTextAccelerator_Invoked" />
+            <KeyboardAccelerator Key="Escape" Invoked="CancelTextEditAccelerator_Invoked" />
             <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyPathAccelerator_Invoked" />
             <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="MaximizeAccelerator_Invoked" />
             <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
@@ -212,10 +214,9 @@
                         <Grid.ColumnDefinitions>
                             <!--  The preview takes the larger share: at 4*/6* a screenshot is
                                   big enough to judge, which is the point of having a preview.
-                                  Both columns are named because each collapses independently —
-                                  DetailColumn by the narrow-window state, ListColumn by the
-                                  maximize-preview toggle in code-behind.  -->
-                            <ColumnDefinition x:Name="ListColumn" Width="4*" MinWidth="240" />
+                                  DetailColumn collapses in the narrow state; preview-only mode
+                                  instead spans DetailPane across both columns so Open still works.  -->
+                            <ColumnDefinition Width="4*" MinWidth="240" />
                             <ColumnDefinition x:Name="DetailColumn" Width="6*" MinWidth="308" />
                         </Grid.ColumnDefinitions>
 
@@ -428,6 +429,24 @@
                                                 TextTrimming="CharacterEllipsis"
                                                 TextWrapping="Wrap" />
                                         </StackPanel>
+                                        <!--  Text is content, not a file-shaped placeholder. Keep it selectable
+                                              and scrollable here; Edit changes this same control in place.  -->
+                                        <TextBox
+                                            x:Name="DetailTextEditor"
+                                            Margin="8"
+                                            Padding="16"
+                                            AcceptsReturn="True"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            FontFamily="Segoe UI Variable Text"
+                                            FontSize="14"
+                                            Foreground="{ThemeResource PocketInk}"
+                                            IsReadOnly="True"
+                                            ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                            ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                            TextWrapping="Wrap"
+                                            Visibility="Collapsed"
+                                            AutomationProperties.Name="Text capture contents" />
                                     </Grid>
                                 </Border>
 
@@ -480,9 +499,10 @@
                                 </StackPanel>
 
                                 <Grid Grid.Row="3" Margin="0,14,0,0">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <StackPanel x:Name="DefaultActions" Orientation="Horizontal" Spacing="8">
                                         <Button
-                                            Command="{x:Bind ViewModel.OpenSelectedCommand}"
+                                            x:Name="OpenButton"
+                                            Click="Open_Click"
                                             Content="Open"
                                             Style="{StaticResource PocketPrimaryButton}" />
                                         <Button
@@ -501,6 +521,23 @@
                                             ToolTipService.ToolTip="Copy file path">
                                             <FontIcon FontSize="14" Glyph="&#xE8C8;" />
                                         </Button>
+                                    </StackPanel>
+                                    <StackPanel
+                                        x:Name="TextEditActions"
+                                        Orientation="Horizontal"
+                                        Spacing="8"
+                                        Visibility="Collapsed">
+                                        <Button
+                                            x:Name="SaveTextButton"
+                                            Click="SaveText_Click"
+                                            Content="Save"
+                                            Style="{StaticResource PocketPrimaryButton}"
+                                            ToolTipService.ToolTip="Save text changes · Ctrl+S" />
+                                        <Button
+                                            Click="CancelTextEdit_Click"
+                                            Content="Cancel"
+                                            Style="{StaticResource PocketQuietButton}"
+                                            ToolTipService.ToolTip="Discard text changes · Escape" />
                                     </StackPanel>
                                     <!--  Named and click-handled rather than command-bound: with
                                           extended selection the button also reports how many
@@ -528,12 +565,15 @@
                             Orientation="Horizontal"
                             Spacing="8">
                             <Ellipse
+                                x:Name="LibraryStatusDot"
                                 Width="6"
                                 Height="6"
                                 VerticalAlignment="Center"
                                 Fill="{ThemeResource PocketGreen}" />
                             <TextBlock
+                                x:Name="LibraryStatusText"
                                 VerticalAlignment="Center"
+                                AutomationProperties.LiveSetting="Polite"
                                 Style="{StaticResource PocketMetaText}"
                                 Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
                         </StackPanel>
