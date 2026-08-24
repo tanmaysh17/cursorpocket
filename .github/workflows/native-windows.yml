@@ -112,6 +112,7 @@ jobs:
           files: |
             ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.exe
             ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.dll
+            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.Core.dll
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
@@ -159,6 +160,7 @@ jobs:
           $signed = @(
             "artifacts/CursorPocket-win-x64/CursorPocket.exe",
             "artifacts/CursorPocket-win-x64/CursorPocket.dll",
+            "artifacts/CursorPocket-win-x64/CursorPocket.Core.dll",
             "artifacts/CursorPocket-Setup-x64.exe"
           )
           foreach ($path in $signed) {
