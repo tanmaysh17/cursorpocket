@@ -116,6 +116,102 @@ public sealed class CaptureStore
         return result.Record;
     }
 
+    /// <summary>
+    /// Rewrites a text capture without turning the edit into a second Library item.
+    /// The file and its manifest preview are staged first so validation or a staging
+    /// failure leaves the original capture intact instead of producing a stale row.
+    /// </summary>
+    public async Task<CaptureRecord> UpdateTextAsync(
+        CaptureRecord record,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        if (record.CaptureKind != CaptureKind.Text)
+        {
+            throw new ArgumentException("Only text captures can be edited as text.", nameof(record));
+        }
+
+        var value = text.Trim();
+        if (value.Length == 0)
+        {
+            throw new ArgumentException("Text capture is empty.", nameof(text));
+        }
+
+        var absolutePath = AbsolutePath(record);
+        if (!File.Exists(absolutePath))
+        {
+            throw new FileNotFoundException("The text capture is missing.", absolutePath);
+        }
+
+        var updated = record with { Preview = Compact(value) };
+        var suffix = Guid.NewGuid().ToString("N");
+        var contentTemporary = absolutePath + $".{suffix}.tmp";
+        var manifestTemporary = ManifestPath + $".{suffix}.tmp";
+        var contentBackup = absolutePath + $".{suffix}.bak";
+        var manifestBackup = ManifestPath + $".{suffix}.bak";
+
+        await _writeLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(absolutePath))
+            {
+                throw new FileNotFoundException("The text capture is missing.", absolutePath);
+            }
+            if (!File.Exists(ManifestPath))
+            {
+                throw new InvalidDataException("The capture index is missing.");
+            }
+
+            var lines = await File.ReadAllLinesAsync(ManifestPath, cancellationToken);
+            var index = Array.FindIndex(lines, line => RecordHasId(line, record.Id));
+            if (index < 0)
+            {
+                throw new InvalidDataException("The text capture is not in the capture index.");
+            }
+
+            lines[index] = JsonSerializer.Serialize(updated, JsonOptions);
+            await File.WriteAllTextAsync(contentTemporary, value + Environment.NewLine, cancellationToken);
+            await File.WriteAllLinesAsync(manifestTemporary, lines, cancellationToken);
+
+            File.Replace(contentTemporary, absolutePath, contentBackup);
+            try
+            {
+                File.Replace(manifestTemporary, ManifestPath, manifestBackup);
+            }
+            catch (Exception replacementError)
+            {
+                try
+                {
+                    File.Replace(contentBackup, absolutePath, null);
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new AggregateException(
+                        "The capture index could not be updated and the text file could not be restored.",
+                        replacementError,
+                        rollbackError);
+                }
+                throw;
+            }
+        }
+        finally
+        {
+            try
+            {
+                TryDelete(contentTemporary);
+                TryDelete(manifestTemporary);
+                TryDelete(contentBackup);
+                TryDelete(manifestBackup);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
+        }
+
+        return updated;
+    }
+
     public async Task<CaptureRecord> SaveLinkAsync(string url, CancellationToken cancellationToken = default)
     {
         var value = url.Trim();
@@ -402,6 +498,22 @@ public sealed class CaptureStore
         catch (JsonException)
         {
             return false;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A uniquely named staging artifact is safer to leave behind than a held
+            // write semaphore that would block every later capture-store operation.
         }
     }
 }
