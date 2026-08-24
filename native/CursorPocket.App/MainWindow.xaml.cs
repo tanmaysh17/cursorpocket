@@ -2,6 +2,8 @@ using System.Drawing;
 using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
+using CursorPocket.Core.Updates;
 using CursorPocket_App.Services;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -25,6 +27,9 @@ public sealed partial class MainWindow : Window
     private CaptureBounds? _lastRegion;
     private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
+    private int _activeEditors;
+    private int _activeCaptureOperations;
+    private bool _regionSelectorOpen;
     private readonly ReceiptCoordinator _receipts;
 
     // Pins are held only for their lifetime and never restored after a restart: a window
@@ -47,20 +52,32 @@ public sealed partial class MainWindow : Window
         }
         RestoreGeometry();
         AppWindow.Closing += AppWindow_Closing;
-        RootFrame.Navigate(typeof(MainPage));
+        var initialPage = OnboardingFlow.ShouldPresent(
+            App.Services.Settings.OnboardingVersion,
+            App.StartedInBackground)
+            ? typeof(OnboardingPage)
+            : typeof(MainPage);
+        RootFrame.Navigate(initialPage);
         InitializeCommandPalette();
         InitializeCompanion();
         InitializeTray();
         App.Theme.ThemeChanged += Theme_ThemeChanged;
         SubscribeToRecordingState();
-        App.Services.SettingsChanged += Services_SettingsChanged;
         _receipts = new ReceiptCoordinator(ShowLibrary);
+        App.Services.SettingsChanged += Services_SettingsChanged;
+        App.Services.Updates.UpdateAvailable += Updates_UpdateAvailable;
+        App.Services.Updates.StateChanged += Updates_StateChanged;
+        App.Services.Updates.ScheduleAutomaticCheck();
+        if (App.Services.Updates.ConsumePendingUpdateResult() is { } updateError)
+        {
+            DispatcherQueue.TryEnqueue(() => ShowError("The update did not finish", updateError));
+        }
     }
 
     public void ShowLibrary()
     {
         AppWindow.Show(true);
-        var page = RootFrame.Content as MainPage;
+        var page = EnsureMainPage();
         page?.NavigateTo("library");
         _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
@@ -69,10 +86,48 @@ public sealed partial class MainWindow : Window
     public void ShowSettings()
     {
         AppWindow.Show(true);
-        var page = RootFrame.Content as MainPage;
+        var page = EnsureMainPage();
         page?.NavigateTo("settings");
         _ = page?.EnsureLibraryLoadedAsync();
         ActivateMainWindow();
+    }
+
+    public void ShowOnboarding()
+    {
+        AppWindow.Show(true);
+        if (RootFrame.Content is not OnboardingPage)
+        {
+            RootFrame.Navigate(typeof(OnboardingPage));
+        }
+        ActivateMainWindow();
+    }
+
+    public async Task CompleteOnboardingAsync(bool startWithWindows, bool showCompanion)
+    {
+        await App.Services.UpdateAsync(settings => settings with
+        {
+            OnboardingSeen = true,
+            OnboardingVersion = OnboardingFlow.CurrentVersion,
+            StartWithWindows = startWithWindows,
+            CursorCompanionMode = showCompanion
+                ? settings.CursorCompanionMode == "off" ? "while-moving" : settings.CursorCompanionMode
+                : "off",
+        });
+        RootFrame.Navigate(typeof(MainPage));
+        if (RootFrame.Content is MainPage page)
+        {
+            page.NavigateTo("capture");
+        }
+        ActivateMainWindow();
+    }
+
+    private MainPage? EnsureMainPage()
+    {
+        if (RootFrame.Content is not MainPage)
+        {
+            RootFrame.Navigate(typeof(MainPage));
+        }
+        return RootFrame.Content as MainPage;
     }
 
     private void ActivateMainWindow() => WindowPlacement.ForceForeground(this);
@@ -157,6 +212,10 @@ public sealed partial class MainWindow : Window
             case "settings":
                 ShowSettings();
                 break;
+            case "onboarding":
+            case "welcome":
+                ShowOnboarding();
+                break;
             case "command":
             case "command-root":
                 AppWindow.Hide();
@@ -230,6 +289,7 @@ public sealed partial class MainWindow : Window
 
     public async Task ToggleAudioRecordingAsync()
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             if (App.Services.RecordingSession.IsActive && !App.Services.RecordingSession.IsVideo)
@@ -260,10 +320,15 @@ public sealed partial class MainWindow : Window
         {
             ShowError("Audio did not start", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     public async Task CaptureTextAsync()
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         var source = _lastSourceWindow != 0 ? _lastSourceWindow : App.Services.Context.SnapshotForegroundWindow();
         try
         {
@@ -283,11 +348,13 @@ public sealed partial class MainWindow : Window
         finally
         {
             App.Services.Context.RestoreFocus(source);
+            Interlocked.Decrement(ref _activeCaptureOperations);
         }
     }
 
     public async Task CaptureLinkAsync()
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         var source = _lastSourceWindow != 0 ? _lastSourceWindow : App.Services.Context.SnapshotForegroundWindow();
         try
         {
@@ -307,6 +374,7 @@ public sealed partial class MainWindow : Window
         finally
         {
             App.Services.Context.RestoreFocus(source);
+            Interlocked.Decrement(ref _activeCaptureOperations);
         }
     }
 
@@ -341,6 +409,7 @@ public sealed partial class MainWindow : Window
 
     private async Task CaptureScreenshotAsync(Func<Task<CaptureRecord>> capture)
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var record = await capture();
@@ -357,11 +426,16 @@ public sealed partial class MainWindow : Window
         {
             ShowError("Screenshot failed", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     /// <summary>Asks for an image on disk and opens the editor on a copy of it.</summary>
     private async Task PickImageToAnnotateAsync()
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var picker = new Windows.Storage.Pickers.FileOpenPicker();
@@ -384,6 +458,10 @@ public sealed partial class MainWindow : Window
         catch (Exception error)
         {
             ShowError("That image could not be opened", error.Message);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
         }
     }
 
@@ -413,6 +491,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Opens the editor on whatever image is on the clipboard.</summary>
     public async Task AnnotateClipboardAsync()
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var content = Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
@@ -455,6 +534,10 @@ public sealed partial class MainWindow : Window
         {
             ShowError("The clipboard image could not be opened", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     /// <summary>
@@ -464,6 +547,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     public async Task AnnotateFileAsync(string sourcePath)
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             if (!File.Exists(sourcePath))
@@ -492,6 +576,10 @@ public sealed partial class MainWindow : Window
         {
             ShowError("That image could not be opened", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     /// <summary>
@@ -507,6 +595,8 @@ public sealed partial class MainWindow : Window
         Action? cancelled = null)
     {
         var editor = new AnnotationWindow(record, path, origin);
+        Interlocked.Increment(ref _activeEditors);
+        editor.Closed += (_, _) => Interlocked.Decrement(ref _activeEditors);
         if (cancelled is not null)
         {
             editor.Cancelled += (_, _) => cancelled();
@@ -574,6 +664,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private async Task RegisterEditedCopyAsync(string temporaryPath)
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var reservation = App.Services.CaptureStore.Reserve(CaptureKind.Screenshot, ".png");
@@ -601,10 +692,15 @@ public sealed partial class MainWindow : Window
         {
             ShowError("The edited copy was not saved", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     private async Task RegisterEditedCopyAndPinAsync(string temporaryPath)
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var reservation = App.Services.CaptureStore.Reserve(CaptureKind.Screenshot, ".png");
@@ -623,6 +719,10 @@ public sealed partial class MainWindow : Window
             try { File.Delete(temporaryPath); } catch (IOException) { }
             ShowError("The pin was not created", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     /// <summary>
@@ -632,6 +732,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private async Task DiscardCaptureAsync(CaptureRecord record, string path)
     {
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             if (File.Exists(path))
@@ -649,11 +750,17 @@ public sealed partial class MainWindow : Window
         {
             ShowError("The screenshot was not discarded", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     private void SelectRegion(Func<CaptureBounds, Task> callback)
     {
         var selector = new RegionSelectorWindow();
+        _regionSelectorOpen = true;
+        selector.Closed += (_, _) => _regionSelectorOpen = false;
         selector.RegionSelected += async (_, bounds) =>
         {
             _lastRegion = bounds;
@@ -669,6 +776,7 @@ public sealed partial class MainWindow : Window
             SelectRegion(async bounds => await StartVideoAsync(options with { Bounds = bounds }));
             return;
         }
+        Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
             var rememberedSettings = App.Services.Settings with
@@ -717,6 +825,10 @@ public sealed partial class MainWindow : Window
             DismissCameraSelfView();
             ShowError("Video did not start", error.Message);
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeCaptureOperations);
+        }
     }
 
     private async Task ShowCameraSelfViewAsync(RecordingOptions options)
@@ -760,7 +872,105 @@ public sealed partial class MainWindow : Window
         => _receipts.Show(new ReceiptRequest(record, title, detail));
 
     private void ShowError(string title, string detail)
-        => _receipts.Show(new ReceiptRequest(null, title, detail));
+        => _receipts.Show(new ReceiptRequest(null, title, detail, VisualKind: ReceiptVisualKind.Error));
+
+    public async Task<ApplicationUpdateCheckResult> CheckForUpdatesAsync(bool force = true)
+    {
+        var result = await App.Services.Updates.CheckAsync(force);
+        if (force && result.Status == UpdateCheckStatus.UpToDate)
+        {
+            _receipts.Show(new ReceiptRequest(
+                null,
+                "CursorPocket is up to date",
+                $"Version {App.Services.Updates.CurrentVersion}",
+                VisualKind: ReceiptVisualKind.Information));
+        }
+        else if (force && result.Status is UpdateCheckStatus.Unavailable or UpdateCheckStatus.InvalidManifest)
+        {
+            ShowError("The update check did not finish", result.Message ?? "GitHub could not be reached. CursorPocket still works offline.");
+        }
+        return result;
+    }
+
+    private void Updates_UpdateAvailable(object? sender, ApplicationUpdateInfo update) =>
+        App.DispatcherQueue.TryEnqueue(() => ShowUpdateAvailable(update));
+
+    private void Updates_StateChanged(object? sender, EventArgs eventArgs) =>
+        App.DispatcherQueue.TryEnqueue(() => (RootFrame.Content as MainPage)?.RefreshUpdateStatus());
+
+    private void ShowUpdateAvailable(ApplicationUpdateInfo update)
+    {
+        _receipts.Show(new ReceiptRequest(
+            null,
+            $"CursorPocket {update.Version} is ready",
+            $"{FormatDownloadSize(update.SizeBytes)} · downloaded only when you approve",
+            [
+                new ReceiptAction("Download and install", () => DownloadAndInstallUpdateAsync(update)),
+                new ReceiptAction("Release notes", () => Windows.System.Launcher.LaunchUriAsync(update.ReleaseNotesUri).AsTask()),
+                new ReceiptAction("Later", () => Task.CompletedTask),
+            ],
+            TimeSpan.FromSeconds(15),
+            ReceiptVisualKind.Update));
+    }
+
+    private async Task DownloadAndInstallUpdateAsync(ApplicationUpdateInfo update)
+    {
+        if (IsBusyForUpdate())
+        {
+            AppWindow.Show();
+            ActivateMainWindow();
+            var message = App.Services.RecordingSession.IsActive
+                ? "Finish the current recording before installing the update."
+                : "Finish the current capture or annotation before installing the update.";
+            ShowError("CursorPocket is busy", message);
+            return;
+        }
+
+        try
+        {
+            _receipts.Show(new ReceiptRequest(
+                null,
+                $"Downloading CursorPocket {update.Version}",
+                "The signed installer is being verified before anything changes.",
+                LifetimeOverride: TimeSpan.FromSeconds(6),
+                VisualKind: ReceiptVisualKind.Information));
+            var downloaded = await App.Services.Updates.DownloadAsync(update);
+            App.Services.Updates.LaunchInstaller(downloaded);
+            await QuitForUpdateAsync();
+        }
+        catch (Exception error) when (error is IOException or HttpRequestException or InvalidDataException or InvalidOperationException)
+        {
+            ShowError("The update was not installed", error.Message);
+        }
+    }
+
+    private bool IsBusyForUpdate() =>
+        App.Services.RecordingSession.IsActive ||
+        Volatile.Read(ref _activeEditors) > 0 ||
+        Volatile.Read(ref _activeCaptureOperations) > 0 ||
+        _regionSelectorOpen ||
+        _preflight is not null;
+
+    private async Task QuitForUpdateAsync()
+    {
+        _quitting = true;
+        await PersistGeometryAsync();
+        _mouseActivity?.Dispose();
+        App.Services.Updates.UpdateAvailable -= Updates_UpdateAvailable;
+        App.Services.Updates.StateChanged -= Updates_StateChanged;
+        if (_subscribedRecording is not null)
+        {
+            _subscribedRecording.StateChanged -= Recording_StateChanged;
+        }
+        App.Theme.ThemeChanged -= Theme_ThemeChanged;
+        _receipts.Dispose();
+        _companion?.Close();
+        _tray?.Dispose();
+        Close();
+        ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
+    }
+
+    private static string FormatDownloadSize(long bytes) => $"{bytes / 1024d / 1024d:0.#} MB";
 
     private void Recording_StateChanged(object? sender, RecordingState state) => App.DispatcherQueue.TryEnqueue(() =>
     {
@@ -973,6 +1183,8 @@ public sealed partial class MainWindow : Window
         }
         _mouseActivity?.Dispose();
         App.Theme.ThemeChanged -= Theme_ThemeChanged;
+        App.Services.Updates.UpdateAvailable -= Updates_UpdateAvailable;
+        App.Services.Updates.StateChanged -= Updates_StateChanged;
         _receipts.Dispose();
         _companion?.Close();
         _tray?.Dispose();

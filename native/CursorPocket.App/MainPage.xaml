@@ -1188,16 +1188,109 @@
                             <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
+                                Text="Updates" />
+                            <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
+                                <StackPanel>
+                                    <Grid Style="{StaticResource SettingsRow}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE895;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Check privately through GitHub" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Once a day, CursorPocket reads one static release file. It sends no captures, settings, identifiers, or analytics."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ToggleSwitch
+                                            Grid.Column="2"
+                                            MinWidth="0"
+                                            IsOn="{x:Bind ViewModel.AutomaticallyCheckForUpdates, Mode=TwoWay}"
+                                            OffContent=""
+                                            OnContent=""
+                                            AutomationProperties.Name="Automatically check for updates" />
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE777;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock x:Name="InstalledVersionText" Style="{StaticResource PocketBodyStrongText}" Text="CursorPocket" />
+                                            <TextBlock
+                                                x:Name="UpdateStatusText"
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="Updates are checked privately through GitHub."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button
+                                            x:Name="CheckForUpdatesButton"
+                                            Grid.Column="2"
+                                            MinHeight="40"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="Check GitHub for CursorPocket updates"
+                                            Click="CheckForUpdates_Click"
+                                            Content="Check now"
+                                            Style="{StaticResource PocketQuietButton}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketBodyStrongText}"
                                 Text="Privacy" />
                             <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <StackPanel Padding="16,14" Spacing="6">
                                     <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="No account, no analytics, no upload" />
                                     <TextBlock
                                         Style="{StaticResource PocketCaptionText}"
-                                        Text="There is no cloud service and no AI service. Your microphone and camera open only after you choose a recording action, and close when it ends."
+                                        Text="There is no cloud service, analytics, or AI service. Your microphone and camera open only after you choose a recording action, and close when it ends. The optional update check reads only the public release file described above."
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
+
+                            <TextBlock
+                                Margin="0,22,0,10"
+                                Style="{StaticResource PocketBodyStrongText}"
+                                Text="Help" />
+                            <Grid Style="{StaticResource SettingsRow}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource PocketChipLarge}">
+                                    <FontIcon Glyph="&#xE897;" Style="{StaticResource PocketChipIcon}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Welcome tour" />
+                                    <TextBlock
+                                        Margin="0,3,0,0"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="Review command mode, mnemonic keys, and the local capture workflow."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button
+                                    Grid.Column="2"
+                                    MinHeight="40"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="Run the CursorPocket welcome tour"
+                                    Click="RunWelcomeTour_Click"
+                                    Content="Run tour"
+                                    Style="{StaticResource PocketQuietButton}" />
+                            </Grid>
                         </StackPanel>
                     </ScrollViewer>
 

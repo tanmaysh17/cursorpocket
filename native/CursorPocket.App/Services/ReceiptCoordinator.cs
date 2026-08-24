@@ -3,9 +3,25 @@ using CursorPocket.Core.Services;
 
 namespace CursorPocket_App.Services;
 
-public sealed record ReceiptRequest(CaptureRecord? Record, string Title, string? Detail = null)
+public enum ReceiptVisualKind
 {
-    public TimeSpan Lifetime => ReceiptLifetimePolicy.For(Record?.CaptureKind);
+    Capture,
+    Error,
+    Update,
+    Information,
+}
+
+public sealed record ReceiptAction(string Label, Func<Task> InvokeAsync);
+
+public sealed record ReceiptRequest(
+    CaptureRecord? Record,
+    string Title,
+    string? Detail = null,
+    IReadOnlyList<ReceiptAction>? Actions = null,
+    TimeSpan? LifetimeOverride = null,
+    ReceiptVisualKind VisualKind = ReceiptVisualKind.Capture)
+{
+    public TimeSpan Lifetime => LifetimeOverride ?? ReceiptLifetimePolicy.For(Record?.CaptureKind);
 }
 
 public interface IReceiptCoordinator : IDisposable
@@ -21,7 +37,7 @@ public sealed class ReceiptCoordinator(Action openLibrary) : IReceiptCoordinator
     public void Show(ReceiptRequest request)
     {
         Dismiss();
-        var receipt = new ReceiptWindow(request.Record, request.Title, request.Detail, request.Lifetime);
+        var receipt = new ReceiptWindow(request);
         _active = receipt;
         receipt.OpenLibraryRequested += Receipt_OpenLibraryRequested;
         receipt.Closed += Receipt_Closed;
