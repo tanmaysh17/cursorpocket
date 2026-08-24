@@ -340,7 +340,7 @@ internal sealed class NativeCompanionWindow : IDisposable
         var ready = palette.Selection;
         var recording = App.Theme.IsHighContrast
             ? palette.Selection
-            : ColorTranslator.FromHtml(palette.IsDark ? "#FF5F6B" : "#D73546");
+            : ColorTranslator.FromHtml(palette.IsDark ? "#FF5964" : "#D73546");
         var outline = palette.IsDark ? Color.FromArgb(220, 255, 255, 255) : Color.FromArgb(190, 0, 0, 0);
         for (var index = 0; index < PulseFrames; index++)
         {

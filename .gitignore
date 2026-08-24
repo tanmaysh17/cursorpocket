@@ -33,3 +33,6 @@ BundleArtifacts/
 *.appxupload
 publish/
 *.pubxml
+
+# Local image-generation explorations; approved masters live under assets/brand/.
+output/

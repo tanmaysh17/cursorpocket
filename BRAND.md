@@ -15,9 +15,9 @@ The working brand line is **Catch now. Find it later.** Supporting copy is **Qui
 
 ## Logo system
 
-### Primary signature
+### Primary expressive signature
 
-The canonical main app logo is `assets/brand/main-logo.png`: the green-and-teal capture orbit around a coral focal disc and a fully transparent negative-space cursor, with three coral signal ticks. Use this mark for the primary application identity. When the `CursorPocket` name is required beside it, pair it with the existing motion wordmark; prefer the reversed lockup on deep-pine or black surfaces.
+The canonical expressive brand mark is `assets/brand/main-logo.png`: the green-and-teal capture orbit around a coral focal disc and a fully transparent negative-space cursor, with three coral signal ticks. Use it in brand signatures, launch imagery, and recording-led communication. It is not the idle application-state icon. When the `CursorPocket` name is required beside it, pair it with the existing motion wordmark; prefer the reversed lockup on deep-pine or black surfaces.
 
 ### Secondary pocket mark
 
@@ -35,6 +35,8 @@ The canonical main app logo is `assets/brand/main-logo.png`: the green-and-teal 
 | Starting, recording, finalizing | Recording orbit | Coral live disc, three coral ticks, cursor cut out as background |
 
 Do not put a red badge on the ready mark. The recording mark is a distinct silhouette so state survives grayscale and common colour-vision differences.
+
+The ready pocket is the default runtime application icon because an idle app must not imply that recording is live. The expressive orbit becomes the runtime mark only while starting, recording, or finalizing.
 
 ### Clear space and minimum size
 
@@ -125,16 +127,18 @@ The current completed transparent hero master is `assets/brand/imagery/cursorpoc
 | `assets/brand/export/brand-assets-manifest.json` | Source and deliverable dimensions/modes for automated consumers |
 | `assets/brand/brand-tokens.json` | Machine-readable colour and shape tokens |
 | `tools/make_brand_assets.py` | Deterministic raster/ICO export pipeline |
-| `output/imagegen/` | Image-generation record and concept outputs |
 
 The export generator treats `main-logo.png`, `brand-logo-02-pocket-v3-transparent.png`, `brand-logo-03-wordmark-transparent.png`, and `imagery/cursorpocket-catch-field-v2-transparent.png` as read-only approved masters. Their direct exports are pixel-identical; only presentation backgrounds, lockup composition, and requested size reductions are derived.
 
 Regenerate production exports with:
 
 ```powershell
+python -m pip install -r .\tools\requirements-brand.txt
 python .\tools\make_brand_assets.py
 ```
 
-## Migration into the app
+## Runtime integration
 
-This kit does not replace installed application assets or UI code by itself. When the brand is promoted into the product, update the WinUI package images, tray frames, command-panel header, and design tokens together. Verify the ready and recording marks at 16, 20, 24, 32, 48, and 256 px on the active Windows display scale before release.
+`python tools/make_brand_assets.py` now stages the approved identity directly into the WinUI runtime assets. The ready pocket supplies the executable, title bar, command-panel header, Start/MSIX, installer, splash, and idle tray mark. The recording orbit supplies the live tray mark while recording is starting, active, or finalizing. `native/build-native.ps1` refuses to publish if either tray-state icon or the application assets are missing.
+
+Verify the ready and recording marks at 16, 20, 24, 32, 48, and 256 px on the active Windows display scale before release.

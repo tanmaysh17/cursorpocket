@@ -694,6 +694,18 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Tray_uses_distinct_ready_and_recording_brand_marks()
+    {
+        var code = ReadFixture("MainWindow.xaml.cs.txt");
+
+        Assert.Contains("LoadTrayIcon(\"TrayReady.ico\")", code, StringComparison.Ordinal);
+        Assert.Contains("LoadTrayIcon(\"TrayRecording.ico\")", code, StringComparison.Ordinal);
+        Assert.Contains("TrayPresentation.For(state)", code, StringComparison.Ordinal);
+        Assert.Contains("_trayRecordingIcon ?? _trayReadyIcon", code, StringComparison.Ordinal);
+        Assert.Contains("DisposeTray()", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Native_package_stages_and_verifies_compiled_winui_resources()
     {
         var script = ReadFixture("build-native.ps1.txt");
@@ -702,6 +714,10 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("Get-ChildItem -LiteralPath $targetDir -Filter \"*.pri\"", script, StringComparison.Ordinal);
         Assert.Contains("$requiredWinUiResources", script, StringComparison.Ordinal);
         Assert.Contains("Assets\\AppIcon.ico", script, StringComparison.Ordinal);
+        Assert.Contains("Assets\\AppIconRecording.ico", script, StringComparison.Ordinal);
+        Assert.Contains("Assets\\TrayReady.ico", script, StringComparison.Ordinal);
+        Assert.Contains("Assets\\TrayRecording.ico", script, StringComparison.Ordinal);
+        Assert.Contains("\"SplashScreen\"", script, StringComparison.Ordinal);
     }
 
     [Fact]

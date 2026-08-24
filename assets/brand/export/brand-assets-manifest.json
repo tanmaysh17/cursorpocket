@@ -207,6 +207,18 @@
       "mode": "RGBA"
     },
     {
+      "path": "assets/brand/export/CursorPocket-tray-ready.ico",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/CursorPocket-tray-recording.ico",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
       "path": "assets/brand/export/CursorPocket.ico",
       "width": 256,
       "height": 256,
@@ -354,6 +366,86 @@
       "path": "assets/brand/export/wordmark-transparent.png",
       "width": 2172,
       "height": 724,
+      "mode": "RGBA"
+    }
+  ],
+  "runtime": [
+    {
+      "path": "native/CursorPocket.App/Assets/AppIcon.ico",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/AppIconRecording.ico",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/CursorPocketLogo.png",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/LockScreenLogo.scale-200.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/SplashScreen.scale-200.png",
+      "width": 1240,
+      "height": 600,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/Square150x150Logo.scale-200.png",
+      "width": 300,
+      "height": 300,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/Square44x44Logo.scale-200.png",
+      "width": 88,
+      "height": 88,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/Square44x44Logo.targetsize-24_altform-unplated.png",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/Square44x44Logo.targetsize-48_altform-lightunplated.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/StoreLogo.png",
+      "width": 50,
+      "height": 50,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/TrayReady.ico",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/TrayRecording.ico",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "native/CursorPocket.App/Assets/Wide310x150Logo.scale-200.png",
+      "width": 620,
+      "height": 300,
       "mode": "RGBA"
     }
   ]

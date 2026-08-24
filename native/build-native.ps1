@@ -114,7 +114,7 @@ $compiledAssets = Join-Path $targetDir "Assets"
 if (Test-Path -LiteralPath $compiledAssets) {
     Copy-Item -LiteralPath $compiledAssets -Destination $publishRoot -Recurse -Force
 }
-$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "OnboardingPage.xbf", "AnnotationWindow.xbf", "PinnedCaptureWindow.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\CursorPocketLogo.png", "Assets\Backgrounds\graphite.png", "Assets\Backgrounds\slate.png", "Assets\Backgrounds\moss.png")
+$requiredWinUiResources = @("App.xbf", "MainWindow.xbf", "MainPage.xbf", "OnboardingPage.xbf", "AnnotationWindow.xbf", "PinnedCaptureWindow.xbf", "CursorPocket.pri", "Assets\AppIcon.ico", "Assets\AppIconRecording.ico", "Assets\TrayReady.ico", "Assets\TrayRecording.ico", "Assets\CursorPocketLogo.png", "Assets\Backgrounds\graphite.png", "Assets\Backgrounds\slate.png", "Assets\Backgrounds\moss.png")
 foreach ($resource in $requiredWinUiResources) {
     if (-not (Test-Path -LiteralPath (Join-Path $publishRoot $resource))) {
         throw "Published WinUI resource is missing: $resource"
@@ -177,7 +177,7 @@ if (-not $SkipMsix -and $makeAppx) {
     # MakeAppx validates the exact manifest paths before resource qualification is
     # evaluated. Keep the scale-qualified files for Windows and add base-name aliases
     # for the three paths declared by the hand-authored full-trust manifest.
-    foreach ($logo in @("Square150x150Logo", "Square44x44Logo", "Wide310x150Logo")) {
+    foreach ($logo in @("Square150x150Logo", "Square44x44Logo", "Wide310x150Logo", "SplashScreen")) {
         $qualifiedLogo = Join-Path $msixStaging "Assets\$logo.scale-200.png"
         $manifestLogo = Join-Path $msixStaging "Assets\$logo.png"
         if (-not (Test-Path -LiteralPath $qualifiedLogo)) {

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import struct
+from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -10,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BRAND = ROOT / "assets" / "brand"
 IMAGERY = BRAND / "imagery"
 EXPORT = BRAND / "export"
+NATIVE_ASSETS = ROOT / "native" / "CursorPocket.App" / "Assets"
 
 PRIMARY_SOURCE = BRAND / "main-logo.png"
 READY_SOURCE = BRAND / "brand-logo-02-pocket-v3-transparent.png"
@@ -38,7 +41,17 @@ def load_master(path: Path) -> Image.Image:
 
 
 def save_png(image: Image.Image, path: Path) -> None:
-    image.save(path, "PNG", optimize=True)
+    buffer = BytesIO()
+    image.save(buffer, "PNG", optimize=True)
+    write_bytes_if_changed(path, buffer.getvalue())
+
+
+def write_bytes_if_changed(path: Path, payload: bytes) -> None:
+    if path.exists() and path.read_bytes() == payload:
+        return
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_bytes(payload)
+    temporary.replace(path)
 
 
 def content_crop(image: Image.Image, padding: int = 0) -> Image.Image:
@@ -133,15 +146,15 @@ def make_stacked_lockup(
     return canvas
 
 
-def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = [
-        Path(r"C:\Windows\Fonts\SegUIVar.ttf"),
-        Path(r"C:\Windows\Fonts\segoeuib.ttf" if bold else r"C:\Windows\Fonts\segoeui.ttf"),
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return ImageFont.truetype(str(candidate), size=size)
-    return ImageFont.load_default()
+def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    del bold  # The approved board uses the same Segoe UI Variable source at every weight.
+    source = Path(r"C:\Windows\Fonts\SegUIVar.ttf")
+    if not source.exists():
+        raise FileNotFoundError(
+            "CursorPocket brand exports require C:\\Windows\\Fonts\\SegUIVar.ttf; "
+            "refusing a platform-dependent fallback font."
+        )
+    return ImageFont.truetype(str(source), size=size)
 
 
 def make_brand_board(
@@ -208,7 +221,158 @@ def make_brand_board(
     return canvas
 
 
-def export_manifest(source_paths: dict[str, Path], export_paths: list[Path]) -> None:
+def make_splash(ready_mark: Image.Image, wordmark: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", (1240, 600), PINE)
+    paste_center(canvas, ready_mark, (90, 90, 510, 510))
+    paste_center(canvas, wordmark, (505, 140, 1160, 460))
+    return canvas
+
+
+def make_wide_tile(ready_mark: Image.Image, wordmark: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", (620, 300), PINE)
+    paste_center(canvas, ready_mark, (30, 30, 270, 270))
+    paste_center(canvas, wordmark, (260, 72, 590, 228))
+    return canvas
+
+
+def write_ico(frame_paths: dict[int, Path], path: Path) -> None:
+    """Write a PNG-backed ICO without resampling any reviewed per-size frame."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frames: list[tuple[int, bytes]] = []
+    for size, frame_path in sorted(frame_paths.items()):
+        with Image.open(frame_path) as image:
+            if image.size != (size, size):
+                raise ValueError(f"ICO frame has the wrong dimensions: {frame_path}")
+        frames.append((size, frame_path.read_bytes()))
+
+    header = struct.pack("<HHH", 0, 1, len(frames))
+    offset = len(header) + len(frames) * 16
+    entries: list[bytes] = []
+    payloads: list[bytes] = []
+    for size, payload in frames:
+        dimension = 0 if size == 256 else size
+        entries.append(
+            struct.pack(
+                "<BBBBHHII",
+                dimension,
+                dimension,
+                0,
+                0,
+                1,
+                32,
+                len(payload),
+                offset,
+            )
+        )
+        payloads.append(payload)
+        offset += len(payload)
+    write_bytes_if_changed(path, header + b"".join(entries) + b"".join(payloads))
+
+
+def make_tray_ready(size: int) -> Image.Image:
+    """Rasterize the approved 24 px tray-ready geometry at one exact frame size."""
+    supersample = 8
+    render = size * supersample
+    scale = render / 24
+    canvas = Image.new("RGBA", (render, render))
+    draw = ImageDraw.Draw(canvas)
+
+    def point(x: float, y: float) -> tuple[float, float]:
+        return x * scale, y * scale
+
+    draw.ellipse((*point(6, 3), *point(18, 15)), outline=READY, width=round(3 * scale))
+    lip: list[tuple[float, float]] = []
+    for step in range(25):
+        t = step / 24
+        x = (1 - t) ** 2 * 5 + 2 * (1 - t) * t * 12 + t**2 * 19
+        y = (1 - t) ** 2 * 12 + 2 * (1 - t) * t * 17 + t**2 * 12
+        lip.append(point(x, y))
+    pocket = lip + [point(19, 18.5), point(18.5, 20), point(16.5, 21), point(7.5, 21), point(5.5, 20), point(5, 18.5)]
+    draw.polygon(pocket, fill=FOLD)
+    draw.line(
+        [point(10, 7), point(10, 14), point(12, 12), point(14.2, 16.5)],
+        fill=PINE,
+        width=round(1.8 * scale),
+        joint="curve",
+    )
+    return canvas.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def make_tray_recording(size: int) -> Image.Image:
+    """Rasterize the approved 24 px recording tray geometry with cursor cut-out."""
+    supersample = 8
+    render = size * supersample
+    scale = render / 24
+    mark = Image.new("RGBA", (render, render))
+    draw = ImageDraw.Draw(mark)
+
+    def point(x: float, y: float) -> tuple[float, float]:
+        return x * scale, y * scale
+
+    draw.ellipse((*point(4, 5), *point(18, 19)), outline=FOLD, width=round(3 * scale))
+    draw.arc((*point(4, 5), *point(18, 19)), start=135, end=315, fill=READY, width=round(3 * scale))
+    draw.ellipse((*point(7.9, 8.9), *point(14.1, 15.1)), fill=RECORDING)
+
+    alpha = mark.getchannel("A")
+    cutout = ImageDraw.Draw(alpha)
+    cutout.polygon(
+        [point(9.5, 7.5), point(9.5, 15.5), point(11.5, 13.5), point(14.5, 18.5), point(16.2, 17.5), point(13.2, 12.5), point(16, 12.5)],
+        fill=0,
+    )
+    mark.putalpha(alpha)
+
+    draw = ImageDraw.Draw(mark)
+    tick_width = round(1.6 * scale)
+    for start, end in [((17, 3), (17, 5)), ((20, 4), (18.6, 5.4)), ((21, 7), (19, 7))]:
+        draw.line([point(*start), point(*end)], fill=RECORDING, width=tick_width)
+    return mark.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def sync_native_runtime_assets(
+    ready_mark: Image.Image,
+    wordmark: Image.Image,
+    app_icon: Path,
+    recording_app_icon: Path,
+    tray_ready_icon: Path,
+    tray_recording_icon: Path,
+) -> list[Path]:
+    """Stage every image the WinUI build, installer, Start, and tray consume."""
+    NATIVE_ASSETS.mkdir(parents=True, exist_ok=True)
+    runtime: dict[str, Image.Image] = {
+        "CursorPocketLogo.png": make_unplated(ready_mark, 256),
+        "LockScreenLogo.scale-200.png": make_unplated(ready_mark, 48),
+        "SplashScreen.scale-200.png": make_splash(ready_mark, wordmark),
+        "Square150x150Logo.scale-200.png": make_tile(ready_mark, 300),
+        "Square44x44Logo.scale-200.png": make_tile(ready_mark, 88),
+        "Square44x44Logo.targetsize-24_altform-unplated.png": make_unplated(ready_mark, 24),
+        "Square44x44Logo.targetsize-48_altform-lightunplated.png": make_unplated(ready_mark, 48),
+        "StoreLogo.png": make_tile(ready_mark, 50),
+        "Wide310x150Logo.scale-200.png": make_wide_tile(ready_mark, wordmark),
+    }
+    written: list[Path] = []
+    for filename, image in runtime.items():
+        path = NATIVE_ASSETS / filename
+        save_png(image, path)
+        written.append(path)
+
+    icon_sources = {
+        "AppIcon.ico": app_icon,
+        "AppIconRecording.ico": recording_app_icon,
+        "TrayReady.ico": tray_ready_icon,
+        "TrayRecording.ico": tray_recording_icon,
+    }
+    for filename, source in icon_sources.items():
+        target = NATIVE_ASSETS / filename
+        write_bytes_if_changed(target, source.read_bytes())
+        written.append(target)
+    return written
+
+
+def export_manifest(
+    source_paths: dict[str, Path],
+    export_paths: list[Path],
+    runtime_paths: list[Path],
+) -> None:
     def image_info(path: Path) -> dict[str, object]:
         with Image.open(path) as image:
             return {
@@ -221,6 +385,7 @@ def export_manifest(source_paths: dict[str, Path], export_paths: list[Path]) -> 
     manifest = {
         "sources": {role: image_info(path) for role, path in source_paths.items()},
         "exports": [image_info(path) for path in sorted(export_paths)],
+        "runtime": [image_info(path) for path in sorted(runtime_paths)],
     }
     (EXPORT / "brand-assets-manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n",
@@ -244,10 +409,11 @@ def main() -> None:
 
     exported: list[Path] = []
 
-    def png(image: Image.Image, filename: str) -> None:
+    def png(image: Image.Image, filename: str) -> Path:
         path = EXPORT / filename
         save_png(image, path)
         exported.append(path)
+        return path
 
     # Exact approved masters, copied into the deliverables directory without
     # recoloring, redrawing, or geometry changes.
@@ -270,28 +436,43 @@ def main() -> None:
     hero_on_dark.alpha_composite(hero_master)
     png(hero_on_dark, "catch-field-on-dark.png")
 
-    app_images: dict[int, Image.Image] = {}
-    recording_images: dict[int, Image.Image] = {}
+    app_frames: dict[int, Path] = {}
+    recording_frames: dict[int, Path] = {}
     for size in APP_SIZES:
         app = make_tile(ready, size)
         recording_app = make_tile(primary, size)
-        png(app, f"app-icon-{size}.png")
-        png(recording_app, f"app-icon-recording-{size}.png")
-        app_images[size] = app
-        recording_images[size] = recording_app
+        app_frames[size] = png(app, f"app-icon-{size}.png")
+        recording_frames[size] = png(recording_app, f"app-icon-recording-{size}.png")
 
-    ico_sizes = [(size, size) for size in (16, 20, 24, 32, 48, 64, 128, 256)]
+    ico_sizes = (16, 20, 24, 32, 48, 64, 128, 256)
     cursorpocket_ico = EXPORT / "CursorPocket.ico"
     recording_ico = EXPORT / "CursorPocket-recording.ico"
-    app_images[1024].save(cursorpocket_ico, format="ICO", sizes=ico_sizes)
-    recording_images[1024].save(recording_ico, format="ICO", sizes=ico_sizes)
+    write_ico({size: app_frames[size] for size in ico_sizes}, cursorpocket_ico)
+    write_ico({size: recording_frames[size] for size in ico_sizes}, recording_ico)
     exported.extend((cursorpocket_ico, recording_ico))
 
+    tray_ready_frames: dict[int, Path] = {}
+    tray_recording_frames: dict[int, Path] = {}
     for size in TRAY_SIZES:
-        png(make_unplated(ready, size), f"tray-ready-{size}.png")
-        png(make_unplated(primary, size), f"tray-recording-{size}.png")
+        tray_ready_frames[size] = png(make_tray_ready(size), f"tray-ready-{size}.png")
+        tray_recording_frames[size] = png(make_tray_recording(size), f"tray-recording-{size}.png")
+
+    tray_ready_ico = EXPORT / "CursorPocket-tray-ready.ico"
+    tray_recording_ico = EXPORT / "CursorPocket-tray-recording.ico"
+    write_ico(tray_ready_frames, tray_ready_ico)
+    write_ico(tray_recording_frames, tray_recording_ico)
+    exported.extend((tray_ready_ico, tray_recording_ico))
 
     png(make_brand_board(primary, ready, wordmark_light, hero), "brand-board.png")
+
+    runtime = sync_native_runtime_assets(
+        ready,
+        wordmark_light,
+        cursorpocket_ico,
+        recording_ico,
+        tray_ready_ico,
+        tray_recording_ico,
+    )
 
     export_manifest(
         {
@@ -301,6 +482,7 @@ def main() -> None:
             "catch_field": HERO_SOURCE,
         },
         exported,
+        runtime,
     )
 
 

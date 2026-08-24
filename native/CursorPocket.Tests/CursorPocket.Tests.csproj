@@ -37,6 +37,7 @@
     <Compile Include="..\CursorPocket.App\Services\WindowContextService.cs" Link="Interop\WindowContextService.cs" />
     <Compile Include="..\CursorPocket.App\Services\MediaDeviceCatalog.cs" Link="Services\MediaDeviceCatalog.cs" />
     <Compile Include="..\CursorPocket.App\Services\RecordingSessionCoordinator.cs" Link="Services\RecordingSessionCoordinator.cs" />
+    <Compile Include="..\CursorPocket.App\Services\TrayPresentation.cs" Link="Services\TrayPresentation.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,6 +54,7 @@
     <None Include="..\CursorPocket.App\Services\AnnotationExport.cs" Link="Fixtures\AnnotationExport.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\AnnotationWindow.xaml.cs" Link="Fixtures\AnnotationWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\NativeCompanionWindow.cs" Link="Fixtures\NativeCompanionWindow.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Services\ThemeCoordinator.cs" Link="Fixtures\ThemeCoordinator.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\DesktopSnapshot.cs" Link="Fixtures\DesktopSnapshot.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\MouseActivityService.cs" Link="Fixtures\MouseActivityService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\ScreenshotCaptureService.cs" Link="Fixtures\ScreenshotCaptureService.cs.txt" CopyToOutputDirectory="PreserveNewest" />
@@ -79,6 +81,17 @@
     <None Include="..\CursorPocket.App\Services\CameraEffectRenderer.cs" Link="Fixtures\CameraEffectRenderer.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Services\SelfieSegmenter.cs" Link="Fixtures\SelfieSegmenter.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\build-native.ps1" Link="Fixtures\build-native.ps1.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\packaging\AppxManifest.xml" Link="Fixtures\AppxManifest.xml" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\AppIcon.ico" Link="Fixtures\Brand\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\AppIconRecording.ico" Link="Fixtures\Brand\AppIconRecording.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\TrayReady.ico" Link="Fixtures\Brand\TrayReady.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\TrayRecording.ico" Link="Fixtures\Brand\TrayRecording.ico" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\CursorPocketLogo.png" Link="Fixtures\Brand\CursorPocketLogo.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\SplashScreen.scale-200.png" Link="Fixtures\Brand\SplashScreen.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\Square150x150Logo.scale-200.png" Link="Fixtures\Brand\Square150x150Logo.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\Square44x44Logo.scale-200.png" Link="Fixtures\Brand\Square44x44Logo.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\StoreLogo.png" Link="Fixtures\Brand\StoreLogo.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\Assets\Wide310x150Logo.scale-200.png" Link="Fixtures\Brand\Wide310x150Logo.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
