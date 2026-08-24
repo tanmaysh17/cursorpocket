@@ -18,18 +18,19 @@ The visual direction is **instrument, not app**. Quiet graphite Mica for persist
 
 | Role | Token | Usage |
 | --- | --- | --- |
-| Ink | `#F2F7F4` | Primary text |
-| Ink dim | `#C2CFC9` | Descriptions and supporting copy |
-| Muted | `#8FA09A` | Tertiary only: timestamps, counts, paths; never critical recording state |
-| Base | `#0B100F` | Opaque transient surfaces (HUD, receipt) |
+| Ink | `#F6F4EC` | Primary text; brand name Paper |
+| Ink dim | `#CBD7D1` | Descriptions and supporting copy |
+| Muted | `#8EA099` | Tertiary only: timestamps, counts, paths; never critical recording state |
+| Base | `#07130F` | Opaque transient surfaces (HUD, receipt); brand name Pine |
 | Sunken | `#66070C0B` | Wells and inset groups inside a card |
 | Surface | `#CC101815` | Mica-supported panels and cards |
 | Raised | `#E0161F1C` | Inputs, key chips, and secondary controls |
 | Line | `#24FFFFFF` | Restrained structural separation |
 | Line strong | `#40FFFFFF` | Key chip edges and framing rectangles |
-| Ready | `#45E08C` | Ready, saved, audio activity, the one primary action |
-| Recording | `#FF5F6B` | Live recording, discard, destructive state |
-| Informational | `#7FBBFF` | Text/link capture only; use sparingly |
+| Ready | `#36E58C` | Ready, saved, audio activity, the one primary action, brand motion |
+| Fold | `#2B6F63` | Brand ribbon backside and pocket only; never critical state by itself |
+| Recording | `#FF5964` | Live recording, discard, destructive state |
+| Informational | `#7AA7FF` | Text/link capture only; use sparingly |
 
 **Green is load-bearing, not decorative.** It is allowed on exactly four things: live or ready state, the single primary action on a surface, the current selection, and the command-mode edge field. It is never a background wash behind a list of items, and never a tint on a per-kind icon. Red is never used for ordinary navigation.
 
@@ -162,13 +163,15 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ## Brand mark
 
-The mark is one idea: a cursor crossing into a pocket. Above the pocket mouth the arrow is solid; where it crosses, a keyline cuts the pocket back so the arrow reads as passing in front of it. Nothing is shaded, glossed, or beveled.
+The identity is **Pocket + Orbit**: one mark for the quiet ready/saved state and a matched mark for unmistakable live recording. The full rationale, usage rules, glyph system, imagery direction, and export map live in [BRAND.md](BRAND.md).
 
-- The canonical cursor geometry lives in two places that must agree: `PocketCursorPath` in `App.xaml` and `CURSOR` in `tools/make_logo.py`.
-- Below 40 px the pocket and its keyline collapse, so the icon falls back to the cursor alone. `tools/make_icon.py` renders every `.ico` frame at its own size rather than downscaling one raster.
-- The tray icon turns red end to end while recording, matching the cursor companion. It never gains a corner badge, which would swallow a 16 px icon.
-- The command panel header is the one place a raster of the mark is used, at 26 dips over a green pulse. `tools/make_logo.py` writes that asset in the cursor-only form so it stays crisp from 100% to 250% scale.
-- Regenerate with `python tools/make_logo.py && python tools/make_icon.py`.
+- **Ready / saved:** the green capture orbit drops into a lighter teal pocket. This is the default application, Start, Library, installer, and wordmark emblem.
+- **Recording:** a green/teal orbit surrounds a coral live disc and carries three coral signal ticks. The cursor is a transparent negative-space cut through the disc and ribbon; it is never filled with a brand colour.
+- The teal fold is deliberately `#2B6F63`, light enough to remain visible on Pine and black at the active display scale.
+- The motion wordmark carries a two-loop green gesture line ending in a square capture token. Use it for brand signatures, splash/onboarding, documentation, and installer surfaces—not as page decoration inside everyday utility UI.
+- At 16–20 px use the hand-tuned tray assets. Do not downscale the 1024 px application tile and do not add a recording badge.
+- Canonical approved raster masters live in `assets/brand/` and `assets/brand/imagery/`; derived PNG/ICO deliverables live in `assets/brand/export/` and are regenerated without redrawing the masters using `python tools/make_brand_assets.py`. The SVGs remain implementation-safe and small-size references rather than the source of the approved full-colour artwork.
+- The product-specific monochrome glyph family lives in `assets/brand/icons/`. Capture kinds remain distinguished by glyph rather than hue.
 
 ## Deliberate exceptions
 

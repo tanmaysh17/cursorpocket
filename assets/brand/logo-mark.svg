@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">CursorPocket ready mark</title>
+  <desc id="desc">A green capture orbit dropping into a teal pocket with a cursor inside.</desc>
+  <circle cx="128" cy="92" r="64" fill="none" stroke="#36E58C" stroke-width="30"/>
+  <path d="M166 43a64 64 0 0 1 21 102" fill="none" stroke="#2B6F63" stroke-width="30" stroke-linecap="round"/>
+  <path d="M52 128Q128 183 204 128v74q0 24-24 24H76q-24 0-24-24z" fill="#2B6F63"/>
+  <path d="M55 129Q128 179 201 129" fill="none" stroke="#36E58C" stroke-width="7" stroke-linecap="round"/>
+  <path d="M104 74v69l17-17 22 45 18-9-22-44h25z" fill="#2B6F63"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 300" role="img" aria-labelledby="title desc">
+  <title id="title">CursorPocket</title><desc id="desc">The CursorPocket wordmark and ready pocket emblem.</desc>
+  <g transform="translate(12 16) scale(.94)"><circle cx="128" cy="92" r="64" fill="none" stroke="#36E58C" stroke-width="30"/><path d="M166 43a64 64 0 0 1 21 102" fill="none" stroke="#2B6F63" stroke-width="30" stroke-linecap="round"/><path d="M52 128Q128 183 204 128v74q0 24-24 24H76q-24 0-24-24z" fill="#2B6F63"/><path d="M55 129Q128 179 201 129" fill="none" stroke="#36E58C" stroke-width="7" stroke-linecap="round"/><path d="M104 74v69l17-17 22 45 18-9-22-44h25z" fill="#2B6F63"/></g>
+  <text x="270" y="145" fill="#07130F" font-family="Segoe UI Variable Display, Segoe UI, sans-serif" font-size="104" font-weight="700" letter-spacing="-4">CursorPocket</text>
+  <path d="M292 166C390 226 540 211 650 194c87-14 147-6 135 18-12 25 35 28 58 1 24-29 63-24 50 4-12 25 56 24 121-9 35-18 67-23 82-20" fill="none" stroke="#36E58C" stroke-width="10" stroke-linecap="round"/>
+  <rect x="1090" y="180" width="18" height="18" rx="5" fill="#36E58C"/>
+</svg>

@@ -1,0 +1,360 @@
+{
+  "sources": {
+    "primary_mark": {
+      "path": "assets/brand/main-logo.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    "ready_mark": {
+      "path": "assets/brand/brand-logo-02-pocket-v3-transparent.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    "motion_wordmark": {
+      "path": "assets/brand/brand-logo-03-wordmark-transparent.png",
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA"
+    },
+    "catch_field": {
+      "path": "assets/brand/imagery/cursorpocket-catch-field-v2-transparent.png",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGBA"
+    }
+  },
+  "exports": [
+    {
+      "path": "assets/brand/export/app-icon-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-128.png",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-150.png",
+      "width": 150,
+      "height": 150,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-16.png",
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-20.png",
+      "width": 20,
+      "height": 20,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-24.png",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-256.png",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-310.png",
+      "width": 310,
+      "height": 310,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-32.png",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-44.png",
+      "width": 44,
+      "height": 44,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-48.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-512.png",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-64.png",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-128.png",
+      "width": 128,
+      "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-150.png",
+      "width": 150,
+      "height": 150,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-16.png",
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-20.png",
+      "width": 20,
+      "height": 20,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-24.png",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-256.png",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-310.png",
+      "width": 310,
+      "height": 310,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-32.png",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-44.png",
+      "width": 44,
+      "height": 44,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-48.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-512.png",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/app-icon-recording-64.png",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/brand-board.png",
+      "width": 2400,
+      "height": 1800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/catch-field-on-dark.png",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/catch-field-transparent.png",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/CursorPocket-recording.ico",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/CursorPocket.ico",
+      "width": 256,
+      "height": 256,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-lockup-on-dark.png",
+      "width": 2800,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-lockup-on-light.png",
+      "width": 2800,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-lockup-ready-on-dark.png",
+      "width": 2800,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-lockup-transparent.png",
+      "width": 2800,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-mark-ready.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-mark-recording.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-mark.png",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-stacked-on-dark.png",
+      "width": 1800,
+      "height": 1600,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/logo-stacked-transparent.png",
+      "width": 1800,
+      "height": 1600,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-16.png",
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-20.png",
+      "width": 20,
+      "height": 20,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-24.png",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-32.png",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-48.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-ready-64.png",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-16.png",
+      "width": 16,
+      "height": 16,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-20.png",
+      "width": 20,
+      "height": 20,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-24.png",
+      "width": 24,
+      "height": 24,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-32.png",
+      "width": 32,
+      "height": 32,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-48.png",
+      "width": 48,
+      "height": 48,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/tray-recording-64.png",
+      "width": 64,
+      "height": 64,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/wordmark-on-dark.png",
+      "width": 2400,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/wordmark-on-light.png",
+      "width": 2400,
+      "height": 800,
+      "mode": "RGBA"
+    },
+    {
+      "path": "assets/brand/export/wordmark-transparent.png",
+      "width": 2172,
+      "height": 724,
+      "mode": "RGBA"
+    }
+  ]
+}
