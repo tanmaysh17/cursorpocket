@@ -60,6 +60,15 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ## Surface contracts
 
+### First-run onboarding
+
+- A first visible launch opens a three-stage field guide before the persistent Library: meet CursorPocket, learn command-mode activation, and rehearse with the real command surface. A `--background` launch never raises or flashes onboarding.
+- The flow has one job: move a new user from install to a confident first capture in under a minute. It explains local storage and recording colour semantics, shows all seven commands from the shared action catalogue, confirms the registered activation shortcut, and makes the real command mode directly launchable.
+- The signature is one changing cursor-field instrument over the persistent Mica backdrop. It is not a marketing carousel and does not introduce a decorative card mosaic, gradients, screenshots of obsolete UI, or permission requests before a relevant action.
+- The rail is a real three-step sequence and may be selected directly. At narrow widths it collapses while Back and Continue preserve the same sequence. The surface may use one document-level vertical scroll under text scaling; it never scrolls horizontally or nests scroll regions.
+- The final step offers two relevant, reversible choices: start at sign-in and show the cursor companion. The installer does not maintain a competing startup preference. Finish and Skip both persist the current onboarding version atomically; Skip preserves the loaded choices. Settings exposes `Run tour` without clearing completion, so leaving a revisited tour cannot make it appear again at startup. A future materially changed tour may increment the version and run once.
+- Onboarding inherits live System, Light, Dark, high-contrast, transparency, text-scale, and reduced-motion policies. Every action is at least 36 px, named, keyboard-operable, and visibly focused.
+
 ### Cursor companion
 
 - Rendered by a per-pixel-alpha native window: a 4 px borderless status mark with a 28 px invisible target.
@@ -171,6 +180,15 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
 
+### Updates and public distribution
+
+- The friend-facing path is one per-user `CursorPocket-Setup-x64.exe` linked from the CursorPocket GitHub Pages site and hosted by GitHub Releases. ZIP and MSIX builds are development artifacts, not competing public choices.
+- Automatic checks are on by default and read only the static project `update.json` at most once every 24 hours. They transmit no custom identifier, settings, capture metadata, or analytics and fail silently offline. Settings exposes the current version, last state, opt-out, and a manual Check now action.
+- An available update uses the ordinary receipt coordinator with labelled Download and install, Release notes, and Later actions. Nothing downloads without approval. Update UI inherits the current app theme and uses the update glyph as information, not a new decorative colour.
+- The installer is accepted only when its size and SHA-256 match the manifest, its Authenticode chain and timestamp are trusted, its publisher is Tanmay Sharma, its Windows floor is satisfied, and its version is newer. A mismatch changes nothing and produces an actionable error.
+- Installation never begins during recording, capture, preflight, region selection, or annotation. It uses the recording lifecycle and application shutdown path, preserves captures and settings, and relaunches only after a successful update install.
+- Public tags are stable, match the centralized version exactly, and are release-blocked until GitHub OIDC Artifact Signing, signature verification, installed-payload verification, provenance, hashes, notices, and the Pages manifest all succeed.
+
 ## Brand mark
 
 The mark is one idea: a cursor crossing into a pocket. Above the pocket mouth the arrow is solid; where it crosses, a keyline cuts the pocket back so the arrow reads as passing in front of it. Nothing is shaded, glossed, or beveled.
@@ -196,6 +214,8 @@ Four rules above are overridden by explicit product decision on one surface each
 
 The design-consultation gate requires all of the following before release:
 
+- a new profile sees onboarding exactly once on a visible launch, can skip it, can rerun it from Settings, and can open the real command surface from the rehearsal step;
+- onboarding exposes the registered activation shortcut and all seven command actions without horizontal or nested scrolling at required scales;
 - no opaque gray capture surface or black companion rectangle;
 - the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
 - command mode has no scroll region and switches to a drill-down layout before clipping at 100–250% scale;
@@ -213,6 +233,7 @@ The design-consultation gate requires all of the following before release:
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
+- automatic update checks can be disabled, never block offline startup, and cannot install an untrusted, corrupt, older, or wrong-publisher artifact;
 - every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
 - no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;
 - a drawn mark and the saved PNG are the same shape, at every display scale;

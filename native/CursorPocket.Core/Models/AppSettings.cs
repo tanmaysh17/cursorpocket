@@ -37,6 +37,15 @@ public sealed record AppSettings
     [JsonPropertyName("onboarding_seen")]
     public bool OnboardingSeen { get; init; }
 
+    [JsonPropertyName("onboarding_version")]
+    public int OnboardingVersion { get; init; }
+
+    [JsonPropertyName("automatically_check_for_updates")]
+    public bool AutomaticallyCheckForUpdates { get; init; } = true;
+
+    [JsonPropertyName("last_update_check_at")]
+    public DateTimeOffset? LastUpdateCheckAt { get; init; }
+
     [JsonPropertyName("panel_geometry")]
     public string PanelGeometry { get; init; } = string.Empty;
 

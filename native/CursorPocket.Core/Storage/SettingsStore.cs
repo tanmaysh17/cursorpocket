@@ -140,6 +140,14 @@ public sealed class SettingsStore(string? settingsPath = null)
         var anchorY = ClampAnchor(value.CommandPanelAnchorY, CommandPanelPlacement.DefaultAnchorY);
         var themeMode = Enum.IsDefined(value.ThemeMode) ? value.ThemeMode : AppThemeMode.System;
 
+        var onboardingVersion = value.OnboardingVersion > 0
+            ? value.OnboardingVersion
+            : value.OnboardingSeen ? OnboardingFlow.CurrentVersion : 0;
+        DateTimeOffset? lastUpdateCheckAt = value.LastUpdateCheckAt is { } checkedAt &&
+            checkedAt > DateTimeOffset.UnixEpoch && checkedAt < DateTimeOffset.UtcNow.AddDays(1)
+                ? checkedAt
+                : null;
+
         return value with
         {
             ThemeMode = themeMode,
@@ -156,6 +164,9 @@ public sealed class SettingsStore(string? settingsPath = null)
             VideoCameraWarmth = cameraWarmth,
             VideoCameraContrast = cameraContrast,
             CursorCompanionMode = companionMode,
+            OnboardingSeen = onboardingVersion >= OnboardingFlow.CurrentVersion,
+            OnboardingVersion = onboardingVersion,
+            LastUpdateCheckAt = lastUpdateCheckAt,
             CommandPanelAnchorX = anchorX,
             CommandPanelAnchorY = anchorY,
         };

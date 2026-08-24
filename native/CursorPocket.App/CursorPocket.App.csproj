@@ -1,4 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\Version.props" />
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.26100.0</TargetFramework>
@@ -22,6 +23,10 @@
     <Product>CursorPocket</Product>
     <Company>Tanmay Sharma</Company>
     <Description>Local-first Windows capture utility</Description>
+    <Version>$(CursorPocketVersion)</Version>
+    <FileVersion>$(CursorPocketFileVersion)</FileVersion>
+    <AssemblyVersion>$(CursorPocketFileVersion)</AssemblyVersion>
+    <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>

@@ -15,6 +15,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
         nameof(MouseChordEnabled), nameof(CursorCompanionMode), nameof(ActivationShortcut),
         nameof(VideoMicrophoneEnabled), nameof(VideoCameraEnabled), nameof(VideoFramesPerSecond),
         nameof(VideoCountdownSeconds), nameof(AudioNoiseSuppression), nameof(AudioAutoLevel),
+        nameof(AutomaticallyCheckForUpdates),
     ];
     private CancellationTokenSource? _settingsSaveDebounce;
     private bool _applyingSettings;
@@ -47,6 +48,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private int _videoCountdownSeconds = services.Settings.VideoCountdownSeconds;
     [ObservableProperty] private bool _audioNoiseSuppression = services.Settings.AudioNoiseSuppression;
     [ObservableProperty] private bool _audioAutoLevel = services.Settings.AudioAutoLevel;
+    [ObservableProperty] private bool _automaticallyCheckForUpdates = services.Settings.AutomaticallyCheckForUpdates;
 
     public string CaptureCountLabel => _allItems.Count switch
     {
@@ -292,6 +294,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             VideoCountdownSeconds = VideoCountdownSeconds,
             AudioNoiseSuppression = AudioNoiseSuppression,
             AudioAutoLevel = AudioAutoLevel,
+            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates,
         };
         try
         {
