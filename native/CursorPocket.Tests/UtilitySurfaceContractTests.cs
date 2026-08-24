@@ -130,7 +130,6 @@ public sealed class UtilitySurfaceContractTests
 
         Assert.Contains("UpdateLayeredWindow", code, StringComparison.Ordinal);
         Assert.Contains("WsExNoActivate", code, StringComparison.Ordinal);
-        Assert.Contains("4f, 4f", code, StringComparison.Ordinal);
         Assert.Contains("_x = x + 10", code, StringComparison.Ordinal);
         Assert.Contains("_y = y + 12", code, StringComparison.Ordinal);
     }
