@@ -1,9 +1,9 @@
 #define MyAppName "CursorPocket"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.4.0-preview"
+  #define MyAppVersion "0.4.1-preview"
 #endif
 #ifndef MyAppFileVersion
-  #define MyAppFileVersion "0.4.0.0"
+  #define MyAppFileVersion "0.4.1.0"
 #endif
 #define MyAppPublisher "Tanmay Sharma"
 #define MyAppExeName "CursorPocket.exe"
