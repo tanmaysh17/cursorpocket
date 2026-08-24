@@ -2,11 +2,23 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
+using System.ComponentModel;
+using Microsoft.UI.Xaml;
 
 namespace CursorPocket_App.ViewModels;
 
 public partial class MainPageViewModel(AppServices services) : ObservableObject
 {
+    private static readonly HashSet<string> SettingsProperties =
+    [
+        nameof(CaptureDirectory), nameof(ThemeModeIndex), nameof(StartWithWindows), nameof(MouseGestureEnabled),
+        nameof(MouseChordEnabled), nameof(CursorCompanionMode), nameof(ActivationShortcut),
+        nameof(VideoMicrophoneEnabled), nameof(VideoCameraEnabled), nameof(VideoFramesPerSecond),
+        nameof(VideoCountdownSeconds), nameof(AudioNoiseSuppression), nameof(AudioAutoLevel),
+        nameof(AutomaticallyCheckForUpdates),
+    ];
+    private CancellationTokenSource? _settingsSaveDebounce;
+    private bool _applyingSettings;
     private readonly List<CaptureItemViewModel> _allItems = [];
 
     public BulkObservableCollection<CaptureItemViewModel> Items { get; } = [];
@@ -15,8 +27,16 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private CaptureItemViewModel? _selectedItem;
     [ObservableProperty] private string _selectedFilter = "All";
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private string? _libraryErrorMessage;
     [ObservableProperty] private string _statusMessage = "Ready";
+    [ObservableProperty] private Visibility _settingsRetryVisibility = Visibility.Collapsed;
     [ObservableProperty] private string _captureDirectory = services.Settings.CaptureDirectory;
+    [ObservableProperty] private int _themeModeIndex = services.Settings.ThemeMode switch
+    {
+        AppThemeMode.Light => 1,
+        AppThemeMode.Dark => 2,
+        _ => 0,
+    };
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
     [ObservableProperty] private bool _mouseChordEnabled = services.Settings.MouseChordEnabled;
@@ -28,6 +48,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     [ObservableProperty] private int _videoCountdownSeconds = services.Settings.VideoCountdownSeconds;
     [ObservableProperty] private bool _audioNoiseSuppression = services.Settings.AudioNoiseSuppression;
     [ObservableProperty] private bool _audioAutoLevel = services.Settings.AudioAutoLevel;
+    [ObservableProperty] private bool _automaticallyCheckForUpdates = services.Settings.AutomaticallyCheckForUpdates;
 
     public string CaptureCountLabel => _allItems.Count switch
     {
@@ -93,6 +114,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     public async Task InitializeAsync()
     {
         IsBusy = true;
+        LibraryErrorMessage = null;
         try
         {
             var records = await services.Library.GetRecentAsync();
@@ -103,6 +125,11 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             StatusMessage = services.Hotkey.RegisteredShortcut is null
                 ? "Choose an available activation shortcut in Settings"
                 : $"Press {services.Hotkey.RegisteredShortcut} anywhere to capture";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            LibraryErrorMessage = "CursorPocket could not read the capture index. Your capture files have not been changed.";
+            StatusMessage = "Library unavailable";
         }
         finally
         {
@@ -200,11 +227,61 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     }
 
     [RelayCommand]
-    private async Task SaveSettingsAsync()
+    private Task SaveSettingsAsync() => SaveSettingsCoreAsync();
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    {
+        base.OnPropertyChanged(eventArgs);
+        if (!_applyingSettings && eventArgs.PropertyName is { } name && SettingsProperties.Contains(name))
+        {
+            if (name == nameof(ThemeModeIndex))
+            {
+                App.Theme.SetMode(ThemeModeIndex switch
+                {
+                    1 => AppThemeMode.Light,
+                    2 => AppThemeMode.Dark,
+                    _ => AppThemeMode.System,
+                });
+            }
+            QueueSettingsSave();
+        }
+    }
+
+    private void QueueSettingsSave()
+    {
+        _settingsSaveDebounce?.Cancel();
+        _settingsSaveDebounce?.Dispose();
+        var cancellation = _settingsSaveDebounce = new CancellationTokenSource();
+        StatusMessage = "Saving…";
+        SettingsRetryVisibility = Visibility.Collapsed;
+        _ = SaveAfterDelayAsync(cancellation);
+    }
+
+    private async Task SaveAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(350, cancellation.Token);
+            await SaveSettingsCoreAsync(cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer change owns the save status.
+        }
+    }
+
+    private async Task SaveSettingsCoreAsync(CancellationToken cancellationToken = default)
     {
         var requestedShortcut = ActivationShortcut;
+        var folderChanged = !string.Equals(services.Settings.CaptureDirectory, CaptureDirectory, StringComparison.OrdinalIgnoreCase);
         var updated = services.Settings with
         {
+            ThemeMode = ThemeModeIndex switch
+            {
+                1 => AppThemeMode.Light,
+                2 => AppThemeMode.Dark,
+                _ => AppThemeMode.System,
+            },
             CaptureDirectory = CaptureDirectory,
             StartWithWindows = StartWithWindows,
             MouseGestureEnabled = MouseGestureEnabled,
@@ -217,14 +294,27 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             VideoCountdownSeconds = VideoCountdownSeconds,
             AudioNoiseSuppression = AudioNoiseSuppression,
             AudioAutoLevel = AudioAutoLevel,
+            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates,
         };
-        await services.UpdateSettingsAsync(updated);
-        ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
-        OnPropertyChanged(nameof(ActivationHint));
-        await InitializeAsync();
-        StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
-            ? "Settings saved"
-            : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+        try
+        {
+            await services.UpdateSettingsAsync(updated, cancellationToken);
+            _applyingSettings = true;
+            ActivationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
+            _applyingSettings = false;
+            OnPropertyChanged(nameof(ActivationHint));
+            if (folderChanged) await InitializeAsync();
+            StatusMessage = string.Equals(requestedShortcut, ActivationShortcut, StringComparison.OrdinalIgnoreCase)
+                ? "Saved"
+                : $"{requestedShortcut} was unavailable · using {ActivationShortcut}";
+            SettingsRetryVisibility = Visibility.Collapsed;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            _applyingSettings = false;
+            StatusMessage = error.Message;
+            SettingsRetryVisibility = Visibility.Visible;
+        }
     }
 
     private void ApplyFilter()

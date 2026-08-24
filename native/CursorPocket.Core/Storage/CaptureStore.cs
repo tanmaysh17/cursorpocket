@@ -14,10 +14,13 @@ public sealed class CaptureStore
 
     // Recoverable media only ever lands in these two per-day folders. Walking the
     // whole tree also visited every screenshot, text file, and cached preview.
-    private static readonly (string Category, string Extension)[] MediaCategories =
+    private static readonly (CaptureKind Kind, string Category, string Extension, long MinimumBytes)[] CaptureCategories =
     [
-        ("videos", ".mp4"),
-        ("audio", ".wav"),
+        (CaptureKind.Screenshot, "screenshots", ".png", 8),
+        (CaptureKind.Video, "videos", ".mp4", 1024),
+        (CaptureKind.Audio, "audio", ".wav", 44),
+        (CaptureKind.Text, "text", ".txt", 1),
+        (CaptureKind.Link, "links", ".url", 1),
     ];
 
     public CaptureStore(string rootDirectory)
@@ -106,9 +109,107 @@ public sealed class CaptureStore
             throw new ArgumentException("Text capture is empty.", nameof(text));
         }
 
-        var reservation = Reserve(CaptureKind.Text, ".txt");
-        await File.WriteAllTextAsync(reservation.AbsolutePath, value + Environment.NewLine, cancellationToken);
-        return await AppendAsync(CreateRecord(reservation, Compact(value), []), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(CaptureKind.Text, ".txt", Compact(value)),
+            (path, token) => File.WriteAllTextAsync(path, value + Environment.NewLine, token),
+            cancellationToken);
+        return result.Record;
+    }
+
+    /// <summary>
+    /// Rewrites a text capture without turning the edit into a second Library item.
+    /// The file and its manifest preview are staged first so validation or a staging
+    /// failure leaves the original capture intact instead of producing a stale row.
+    /// </summary>
+    public async Task<CaptureRecord> UpdateTextAsync(
+        CaptureRecord record,
+        string text,
+        CancellationToken cancellationToken = default)
+    {
+        if (record.CaptureKind != CaptureKind.Text)
+        {
+            throw new ArgumentException("Only text captures can be edited as text.", nameof(record));
+        }
+
+        var value = text.Trim();
+        if (value.Length == 0)
+        {
+            throw new ArgumentException("Text capture is empty.", nameof(text));
+        }
+
+        var absolutePath = AbsolutePath(record);
+        if (!File.Exists(absolutePath))
+        {
+            throw new FileNotFoundException("The text capture is missing.", absolutePath);
+        }
+
+        var updated = record with { Preview = Compact(value) };
+        var suffix = Guid.NewGuid().ToString("N");
+        var contentTemporary = absolutePath + $".{suffix}.tmp";
+        var manifestTemporary = ManifestPath + $".{suffix}.tmp";
+        var contentBackup = absolutePath + $".{suffix}.bak";
+        var manifestBackup = ManifestPath + $".{suffix}.bak";
+
+        await _writeLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!File.Exists(absolutePath))
+            {
+                throw new FileNotFoundException("The text capture is missing.", absolutePath);
+            }
+            if (!File.Exists(ManifestPath))
+            {
+                throw new InvalidDataException("The capture index is missing.");
+            }
+
+            var lines = await File.ReadAllLinesAsync(ManifestPath, cancellationToken);
+            var index = Array.FindIndex(lines, line => RecordHasId(line, record.Id));
+            if (index < 0)
+            {
+                throw new InvalidDataException("The text capture is not in the capture index.");
+            }
+
+            lines[index] = JsonSerializer.Serialize(updated, JsonOptions);
+            await File.WriteAllTextAsync(contentTemporary, value + Environment.NewLine, cancellationToken);
+            await File.WriteAllLinesAsync(manifestTemporary, lines, cancellationToken);
+
+            File.Replace(contentTemporary, absolutePath, contentBackup);
+            try
+            {
+                File.Replace(manifestTemporary, ManifestPath, manifestBackup);
+            }
+            catch (Exception replacementError)
+            {
+                try
+                {
+                    File.Replace(contentBackup, absolutePath, null);
+                }
+                catch (Exception rollbackError)
+                {
+                    throw new AggregateException(
+                        "The capture index could not be updated and the text file could not be restored.",
+                        replacementError,
+                        rollbackError);
+                }
+                throw;
+            }
+        }
+        finally
+        {
+            try
+            {
+                TryDelete(contentTemporary);
+                TryDelete(manifestTemporary);
+                TryDelete(contentBackup);
+                TryDelete(manifestBackup);
+            }
+            finally
+            {
+                _writeLock.Release();
+            }
+        }
+
+        return updated;
     }
 
     public async Task<CaptureRecord> SaveLinkAsync(string url, CancellationToken cancellationToken = default)
@@ -119,11 +220,12 @@ public sealed class CaptureStore
             throw new ArgumentException("The active window is not a complete web page.", nameof(url));
         }
 
-        var reservation = Reserve(CaptureKind.Link, ".url");
-        await File.WriteAllTextAsync(reservation.AbsolutePath, $"[InternetShortcut]{Environment.NewLine}URL={value}{Environment.NewLine}", cancellationToken);
         var host = uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host;
-        var metadata = JsonMetadata(("url", value), ("host", host));
-        return await AppendAsync(CreateRecord(reservation, Compact(value), metadata), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(CaptureKind.Link, ".url", Compact(value), new Dictionary<string, object?> { ["url"] = value, ["host"] = host }),
+            (path, token) => File.WriteAllTextAsync(path, $"[InternetShortcut]{Environment.NewLine}URL={value}{Environment.NewLine}", token),
+            cancellationToken);
+        return result.Record;
     }
 
     public async Task<CaptureRecord> ImportFileAsync(
@@ -138,14 +240,16 @@ public sealed class CaptureStore
             throw new FileNotFoundException("The capture output is missing.", sourcePath);
         }
 
-        var suffix = Path.GetExtension(sourcePath);
-        var reservation = Reserve(kind, suffix);
-        await using (var input = File.OpenRead(sourcePath))
-        await using (var output = File.Create(reservation.AbsolutePath))
-        {
-            await input.CopyToAsync(output, cancellationToken);
-        }
-        return await AppendAsync(CreateRecord(reservation, preview, JsonMetadata(metadata)), cancellationToken);
+        var result = await new CaptureTransaction(this).CommitAsync(
+            new CaptureTransactionRequest(kind, Path.GetExtension(sourcePath), preview, metadata),
+            async (path, token) =>
+            {
+                await using var input = File.OpenRead(sourcePath);
+                await using var output = File.Create(path);
+                await input.CopyToAsync(output, token);
+            },
+            cancellationToken);
+        return result.Record;
     }
 
     public async Task<CaptureRecord> RegisterExistingAsync(
@@ -173,6 +277,20 @@ public sealed class CaptureStore
             Metadata = JsonMetadata(metadata),
         };
         return await AppendAsync(record, cancellationToken);
+    }
+
+    public async Task<CaptureRecord> RegisterReservationAsync(
+        CaptureReservation reservation,
+        string preview,
+        IReadOnlyDictionary<string, object?>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureInsideRoot(Path.GetFullPath(reservation.AbsolutePath));
+        if (!File.Exists(reservation.AbsolutePath))
+        {
+            throw new FileNotFoundException("The capture output is missing.", reservation.AbsolutePath);
+        }
+        return await AppendAsync(CreateRecord(reservation, preview, JsonMetadata(metadata)), cancellationToken);
     }
 
     public CaptureReservation Reserve(CaptureKind kind, string suffix)
@@ -231,8 +349,11 @@ public sealed class CaptureStore
     }
 
     public async Task<IReadOnlyList<CaptureRecord>> RecoverOrphanedMediaAsync(CancellationToken cancellationToken = default)
+        => await ReconcileUnindexedCapturesAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<CaptureRecord>> ReconcileUnindexedCapturesAsync(CancellationToken cancellationToken = default)
     {
-        var candidates = EnumerateMediaCandidates().OrderBy(File.GetLastWriteTimeUtc).ToList();
+        var candidates = EnumerateCaptureCandidates().OrderBy(candidate => File.GetLastWriteTimeUtc(candidate.Path)).ToList();
         if (candidates.Count == 0)
         {
             return [];
@@ -247,24 +368,22 @@ public sealed class CaptureStore
         }
 
         var recovered = new List<CaptureRecord>();
-        foreach (var path in candidates)
+        foreach (var candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var fullPath = Path.GetFullPath(path);
+            var fullPath = Path.GetFullPath(candidate.Path);
             if (indexed.Contains(fullPath))
             {
                 continue;
             }
-            var kind = Path.GetExtension(fullPath).Equals(".mp4", StringComparison.OrdinalIgnoreCase) ? CaptureKind.Video : CaptureKind.Audio;
-            var minimumBytes = kind == CaptureKind.Video ? 1024 : 44;
-            if (new FileInfo(fullPath).Length < minimumBytes)
+            if (new FileInfo(fullPath).Length < candidate.MinimumBytes)
             {
                 continue;
             }
             var record = await RegisterExistingAsync(
-                kind,
+                candidate.Kind,
                 fullPath,
-                kind == CaptureKind.Video ? "Recovered video" : "Recovered audio note",
+                $"Recovered {candidate.Kind.ToStorageValue()}",
                 new Dictionary<string, object?> { ["recovered"] = true },
                 cancellationToken);
             indexed.Add(fullPath);
@@ -273,7 +392,7 @@ public sealed class CaptureStore
         return recovered;
     }
 
-    private IEnumerable<string> EnumerateMediaCandidates()
+    private IEnumerable<(string Path, CaptureKind Kind, long MinimumBytes)> EnumerateCaptureCandidates()
     {
         foreach (var dayDirectory in Directory.EnumerateDirectories(RootDirectory))
         {
@@ -283,7 +402,7 @@ public sealed class CaptureStore
             {
                 continue;
             }
-            foreach (var (category, extension) in MediaCategories)
+            foreach (var (kind, category, extension, minimumBytes) in CaptureCategories)
             {
                 var categoryDirectory = Path.Combine(dayDirectory, category);
                 if (!Directory.Exists(categoryDirectory))
@@ -292,7 +411,7 @@ public sealed class CaptureStore
                 }
                 foreach (var path in Directory.EnumerateFiles(categoryDirectory, "*" + extension))
                 {
-                    yield return path;
+                    yield return (path, kind, minimumBytes);
                 }
             }
         }
@@ -379,6 +498,22 @@ public sealed class CaptureStore
         catch (JsonException)
         {
             return false;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A uniquely named staging artifact is safer to leave behind than a held
+            // write semaphore that would block every later capture-store operation.
         }
     }
 }

@@ -6,8 +6,6 @@ CursorPocket should remain a quiet Windows utility that makes a capture obvious,
 
 ```powershell
 dotnet restore .\native\CursorPocket.Native.sln -p:RuntimeIdentifier=win-x64
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
 ```
 
 ## Before submitting a change
@@ -15,8 +13,6 @@ python -m venv .venv
 ```powershell
 dotnet test .\native\CursorPocket.Tests\CursorPocket.Tests.csproj -c Release
 dotnet build .\native\CursorPocket.App\CursorPocket.App.csproj -c Release
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe main.py --self-test
 powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 py -m tools.verify_video_media --ffmpeg .\third_party\ffmpeg\bin\ffmpeg.exe
 ```
@@ -28,18 +24,8 @@ For UI changes, also verify the packaged app on Windows with one and multiple di
 - `native/CursorPocket.App/` — WinUI windows, native Windows integration, and recording services
 - `native/CursorPocket.Core/` — capture contracts, compatible storage/settings, and FFmpeg command construction
 - `native/CursorPocket.Tests/` — xUnit compatibility, safety, metadata, and recording-command tests
-- `native/build-native.ps1` — self-contained x64 portable/installer packaging
-- `main.py` — application entry point and self-test
-- `cursorpocket/app.py` — Windows UI and capture workflows
-- `cursorpocket/hotkeys.py` — global Windows shortcuts
-- `cursorpocket/storage.py` — organized local file storage and index
-- `cursorpocket/audio.py` — WAV recording
-- `cursorpocket/video.py` — FFmpeg command construction and recorder lifecycle
-- `cursorpocket/media_devices.py` — Windows camera and microphone discovery
-- `cursorpocket/tray.py` — system tray menu and state
-- `cursorpocket/settings.py` — persisted user preferences
-- `cursorpocket/startup.py` — per-user Windows startup toggle
-- `tests/` — unit and interaction-level regression checks
+- `native/build-native.ps1` — self-contained x64 portable, MSIX, and installer packaging
+- `legacy-python/` — unsupported historical source; do not update it
 
 Do not commit `.venv`, `bin`, `obj`, `artifacts`, user settings, captures, device information, or downloaded binaries. Distribute compiled executables through GitHub Actions or a versioned Release instead of checking binaries into source control.
 

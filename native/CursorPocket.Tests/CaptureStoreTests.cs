@@ -40,6 +40,89 @@ public sealed class CaptureStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdatesTextContentAndManifestInPlace()
+    {
+        var store = new CaptureStore(_root);
+        var first = await store.SaveTextAsync("First");
+        var original = await store.SaveTextAsync("Before");
+        var last = await store.SaveTextAsync("Last");
+        var longText = $"  After editing{Environment.NewLine}inside the Library {new string('x', 120)}  ";
+
+        var updated = await store.UpdateTextAsync(original, longText);
+
+        Assert.Equal(original.Id, updated.Id);
+        Assert.Equal(original.RelativePath, updated.RelativePath);
+        Assert.Equal(96, updated.Preview.Length);
+        Assert.StartsWith("After editing inside the Library", updated.Preview, StringComparison.Ordinal);
+        Assert.Equal(longText.Trim(), (await File.ReadAllTextAsync(store.AbsolutePath(updated))).Trim());
+        var records = await store.RecentAsync();
+        Assert.Equal([last.Id, original.Id, first.Id], records.Select(record => record.Id));
+        var indexed = Assert.Single(records, record => record.Id == original.Id);
+        Assert.Equal(updated.Id, indexed.Id);
+        Assert.Equal(updated.RelativePath, indexed.RelativePath);
+        Assert.Equal(updated.Preview, indexed.Preview);
+    }
+
+    [Fact]
+    public async Task RejectsInvalidTextUpdatesWithoutChangingTheCapture()
+    {
+        var store = new CaptureStore(_root);
+        var original = await store.SaveTextAsync("Original");
+        var link = await store.SaveLinkAsync("https://example.com");
+        var contentBefore = await File.ReadAllTextAsync(store.AbsolutePath(original));
+        var manifestBefore = await File.ReadAllTextAsync(store.ManifestPath);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => store.UpdateTextAsync(original, "  \r\n  "));
+        await Assert.ThrowsAsync<ArgumentException>(() => store.UpdateTextAsync(link, "not a link edit"));
+
+        Assert.Equal(contentBefore, await File.ReadAllTextAsync(store.AbsolutePath(original)));
+        Assert.Equal(manifestBefore, await File.ReadAllTextAsync(store.ManifestPath));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.bak", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task RollsBackTextWhenManifestReplacementFails()
+    {
+        var store = new CaptureStore(_root);
+        var original = await store.SaveTextAsync("Original");
+        var contentBefore = await File.ReadAllTextAsync(store.AbsolutePath(original));
+        var manifestBefore = await File.ReadAllTextAsync(store.ManifestPath);
+
+        await using (File.Open(store.ManifestPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await Assert.ThrowsAnyAsync<IOException>(() => store.UpdateTextAsync(original, "Should roll back"));
+        }
+
+        Assert.Equal(contentBefore, await File.ReadAllTextAsync(store.AbsolutePath(original)));
+        Assert.Equal(manifestBefore, await File.ReadAllTextAsync(store.ManifestPath));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.bak", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task RejectsMissingTextFilesAndIndexRows()
+    {
+        var store = new CaptureStore(_root);
+        var original = await store.SaveTextAsync("Original");
+        var manifestBefore = await File.ReadAllTextAsync(store.ManifestPath);
+        File.Delete(store.AbsolutePath(original));
+
+        await Assert.ThrowsAsync<FileNotFoundException>(() => store.UpdateTextAsync(original, "After"));
+
+        await File.WriteAllTextAsync(store.AbsolutePath(original), "Original" + Environment.NewLine);
+        File.Delete(store.ManifestPath);
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.UpdateTextAsync(original, "After"));
+
+        await File.WriteAllTextAsync(store.ManifestPath, manifestBefore);
+        await store.RemoveFromIndexAsync(original.Id);
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.UpdateTextAsync(original, "After"));
+        Assert.Equal("Original", (await File.ReadAllTextAsync(store.AbsolutePath(original))).Trim());
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.tmp", SearchOption.AllDirectories));
+        Assert.Empty(Directory.EnumerateFiles(_root, "*.bak", SearchOption.AllDirectories));
+    }
+
+    [Fact]
     public async Task SkipsCorruptAndUnsafeManifestRows()
     {
         Directory.CreateDirectory(_root);
@@ -96,6 +179,23 @@ public sealed class CaptureStoreTests : IDisposable
         Assert.True(record.Metadata["recovered"].GetBoolean());
         Assert.Empty(secondPass);
         Assert.Single(await store.RecentAsync());
+    }
+
+    [Fact]
+    public async Task Reconciles_unindexed_non_media_capture_files()
+    {
+        var screenshotDirectory = Path.Combine(_root, "2026-08-18", "screenshots");
+        var textDirectory = Path.Combine(_root, "2026-08-18", "text");
+        Directory.CreateDirectory(screenshotDirectory);
+        Directory.CreateDirectory(textDirectory);
+        await File.WriteAllBytesAsync(Path.Combine(screenshotDirectory, "shot.png"), new byte[32]);
+        await File.WriteAllTextAsync(Path.Combine(textDirectory, "note.txt"), "saved note");
+
+        var recovered = await new CaptureStore(_root).ReconcileUnindexedCapturesAsync();
+
+        Assert.Equal(2, recovered.Count);
+        Assert.Contains(recovered, record => record.CaptureKind == CaptureKind.Screenshot);
+        Assert.Contains(recovered, record => record.CaptureKind == CaptureKind.Text);
     }
 
     public void Dispose()

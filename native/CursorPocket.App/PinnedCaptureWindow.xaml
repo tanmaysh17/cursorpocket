@@ -10,14 +10,16 @@
           this is a window the user drags.  -->
     <Grid
         x:Name="Root"
-        Background="{StaticResource PocketBase}"
+        Background="{ThemeResource PocketBase}"
         PointerEntered="Root_PointerEntered"
         PointerExited="Root_PointerExited"
         PointerMoved="Root_PointerMoved"
         PointerPressed="Root_PointerPressed"
         PointerReleased="Root_PointerReleased"
         PointerCaptureLost="Root_PointerCaptureLost"
-        PointerWheelChanged="Root_PointerWheelChanged">
+        PointerWheelChanged="Root_PointerWheelChanged"
+        GotFocus="Root_GotFocus"
+        LostFocus="Root_LostFocus">
         <!--  Escape closes only while the pin has focus, as a page accelerator. It must
               never take a scoped global Escape lease: a pin can sit on screen for hours
               while the user works elsewhere, and holding the topmost lease would steal
@@ -38,13 +40,13 @@
               what makes a floating thumbnail useless.  -->
         <Grid
             x:Name="ControlStrip"
-            Height="36"
+            Height="40"
             Margin="8"
             VerticalAlignment="Bottom"
             Opacity="0">
             <Border
-                Background="{StaticResource PocketRaised}"
-                BorderBrush="{StaticResource PocketLine}"
+                Background="{ThemeResource PocketRaised}"
+                BorderBrush="{ThemeResource PocketLine}"
                 BorderThickness="1"
                 CornerRadius="10" />
             <Grid Padding="6,0">
@@ -65,7 +67,7 @@
                         Height="24"
                         Data="M6,9 H18 M6,12 H18 M6,15 H18"
                         Stretch="None"
-                        Stroke="{StaticResource PocketMuted}"
+                        Stroke="{ThemeResource PocketMuted}"
                         StrokeEndLineCap="Round"
                         StrokeStartLineCap="Round"
                         StrokeThickness="2" />
@@ -76,34 +78,35 @@
                     Spacing="6">
                     <Button
                         Click="Edit_Click"
-                        Style="{StaticResource PocketIconButton}"
+                        Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Mark up this screenshot"
                         ToolTipService.ToolTip="Mark up">
-                        <FontIcon FontSize="12" Glyph="&#xE70F;" />
+                        <StackPanel Orientation="Horizontal" Spacing="5"><FontIcon FontSize="12" Glyph="&#xE70F;" /><TextBlock Text="Mark up" /></StackPanel>
                     </Button>
                     <Button
                         Click="CopyPath_Click"
-                        Style="{StaticResource PocketIconButton}"
+                        Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Copy the file path"
                         ToolTipService.ToolTip="Copy file path">
-                        <TextBlock Style="{StaticResource PocketTagText}" Text="PATH" />
+                        <TextBlock Text="Copy path" />
                     </Button>
                     <Button
                         Click="Copy_Click"
-                        Style="{StaticResource PocketIconButton}"
+                        Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Copy this screenshot"
                         ToolTipService.ToolTip="Copy image · Ctrl+C">
-                        <FontIcon FontSize="12" Glyph="&#xE8C8;" />
+                        <StackPanel Orientation="Horizontal" Spacing="5"><FontIcon FontSize="12" Glyph="&#xE8C8;" /><TextBlock Text="Copy" /></StackPanel>
                     </Button>
                     <Button
                         Click="Close_Click"
-                        Style="{StaticResource PocketIconButton}"
+                        Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Close this pin"
                         ToolTipService.ToolTip="Close · Esc or middle-click">
-                        <FontIcon FontSize="12" Glyph="&#xE711;" />
+                        <StackPanel Orientation="Horizontal" Spacing="5"><FontIcon FontSize="12" Glyph="&#xE711;" /><TextBlock Text="Close" /></StackPanel>
                     </Button>
                 </StackPanel>
             </Grid>
         </Grid>
     </Grid>
 </Window>
+

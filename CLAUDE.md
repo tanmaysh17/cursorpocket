@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 CursorPocket is a local-first Windows capture utility (screenshots, screen video, audio notes, selected text, browser links). No account, cloud, analytics, or AI services — everything lands in one dated folder tree on disk.
 
-## Two implementations
+## Implementation
 
-- `native/` — the **shipping app**: .NET 8 / WinUI 3, x64, self-contained, unpackaged. All product work happens here.
-- `cursorpocket/` + `main.py` — the **previous Python implementation, kept only as a behavioral parity reference**. It still runs in CI (unit tests + `--self-test`) but is not shipped in artifacts. Do not add a Python bridge to the native release; do not port new features into it.
+- `native/` — the shipping and sole supported app: .NET 8 / WinUI 3, x64, self-contained. All product work happens here.
+- `legacy-python/` — unsupported historical source for archaeology only. It is outside CI and release scope.
 
-`tools/` (FFmpeg fetch, segmentation-model fetch, background generation, media verifier, icon generation) is shared by both.
+`tools/` contains native build helpers for FFmpeg, models, backgrounds, verification, and icons.
 
 ## Commands
 
@@ -33,14 +33,7 @@ Packaging (portable ZIP always, installer if Inno Setup 6 is present) into `arti
 powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 ```
 
-`build-native.ps1` accepts `-SkipRestore -SkipTests -SkipFfmpeg -SkipModels -RequireInstaller` (CI uses all five). `-SkipModels` skips the segmentation-model fetch used by camera background effects.
-
-Python reference checks:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe main.py --self-test
-```
+`build-native.ps1` accepts `-SkipRestore -SkipTests -SkipFfmpeg -SkipModels -RequireInstaller -RequireMsix`. `-SkipModels` skips the segmentation-model fetch used by camera background effects.
 
 FFmpeg media pipeline verification (encodes screen-only, narrated, webcam, combined, and interrupted-fragment fixtures):
 

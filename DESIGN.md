@@ -4,7 +4,7 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 ## Product principles
 
-1. **Source first.** Command mode preserves a frozen view of the source desktop so the user never loses visual context.
+1. **Source first.** Command mode uses desktop acrylic to preserve the live source context without obscuring it.
 2. **One deliberate next action.** Each surface has one dominant decision: choose a command, confirm a recording, stop and save, or inspect a capture.
 3. **State is visible.** Green means ready/saved. Red is reserved for recording, discard, and destructive action. Every successful or failed capture produces a receipt.
 4. **Local is legible.** Device names, the capture folder, final file type, and reveal/open actions are explicit. There are no cloud, account, sharing, or analytics affordances.
@@ -12,7 +12,14 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 ## Visual direction
 
-The visual direction is **instrument, not app**. Quiet graphite Mica for persistent surfaces, a compact command panel over the frozen desktop with a restrained green edge, and the cursor mark used sparingly as the brand: at command-panel header scale, never as page decoration. Structure comes from a strict grid, hairline rules, and a real type scale — never from tinted blobs. Avoid floating glass cards with arbitrary borders, excessive gradients, decorative spheres, glossy or three-dimensional marks, and ornamental copy.
+The visual direction is **instrument, not app**. CursorPocket uses layered liquid glass throughout: Mica or Mica Alt for long-lived windows, Desktop Acrylic for short-lived decision surfaces, and restrained translucent planes for navigation, inspectors, and controls. Each window owns one compositor backdrop; individual panels do not stack independent blur effects. Structure comes from a strict grid, hairline highlights, and a real type scale — never from tinted blobs. Avoid decorative glass-card mosaics, excessive gradients, decorative spheres, glossy or three-dimensional marks, and ornamental copy.
+
+### Theme and material
+
+- `System`, `Light`, and `Dark` are first-class app modes. The choice applies live to every app-owned window, title bar, flyout, tooltip, dialog, overlay, and tray/context menu.
+- Light uses a pale mineral glass with dark graphite ink. Dark uses graphite glass with chalk ink. Both retain the same green-ready and red-recording meanings.
+- High contrast always wins over the app preference. Disabled transparency, battery saver, unsupported backdrop hardware, and inactive windows use the matching opaque semantic fallback.
+- Windows-owned File/Folder pickers and Explorer surfaces follow Windows. CursorPocket never replaces system UI merely to force its app theme.
 
 ### Colour roles
 
@@ -41,7 +48,7 @@ Capture kinds are distinguished by their glyph and a mono file-type tag, never b
 - Segoe UI Variable Display for `PocketDisplayText` (32) and `PocketTitleText` (22), both with negative tracking.
 - Segoe UI Variable Text for `PocketSubtitleText` (16), `PocketBodyText` (14), and `PocketCaptionText` (13).
 - Segoe UI Variable Small for `PocketMetaText` (13, muted).
-- Cascadia Mono for anything the eye has to compare: `PocketNumericText` (12) for sizes, counts, timers, and paths; `PocketLabelText` (11, tracked, uppercase) for section labels; `PocketTagText` (11) for file-type tags; and every key chip.
+- Cascadia Mono only for values the eye compares: timers, coordinates, sizes, paths, file-type tags, and compact key hints. Interface headings and section labels use Segoe UI Variable in sentence case.
 - Base spacing unit: 4 px. Normal sequences use 8, 12, 16, 20, 24, or 32 px.
 - Corner radii: 8 px controls, 12 px cards, 16 px wells and transient receipts, 20 px HUD.
 - Minimum critical text: 13 px with high contrast. Recording state and timer are 17–22 px.
@@ -53,6 +60,15 @@ All buttons share one template, so height (36 px), radius (8 px), hover, pressed
 Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px), mono, with a heavier bottom edge. The same chip renders a shortcut wherever it appears — capture tiles, command mode, settings, region selector — so the app teaches its own keys.
 
 ## Surface contracts
+
+### First-run onboarding
+
+- A first visible launch opens a three-stage field guide before the persistent Library: meet CursorPocket, learn command-mode activation, and rehearse with the real command surface. A `--background` launch never raises or flashes onboarding.
+- The flow has one job: move a new user from install to a confident first capture in under a minute. It explains local storage and recording colour semantics, shows all seven commands from the shared action catalogue, confirms the registered activation shortcut, and makes the real command mode directly launchable.
+- The signature is one changing cursor-field instrument over the persistent Mica backdrop. It is not a marketing carousel and does not introduce a decorative card mosaic, gradients, screenshots of obsolete UI, or permission requests before a relevant action.
+- The rail is a real three-step sequence and may be selected directly. At narrow widths it collapses while Back and Continue preserve the same sequence. The surface may use one document-level vertical scroll under text scaling; it never scrolls horizontally or nests scroll regions.
+- The final step offers two relevant, reversible choices: start at sign-in and show the cursor companion. The installer does not maintain a competing startup preference. Finish and Skip both persist the current onboarding version atomically; Skip preserves the loaded choices. Settings exposes `Run tour` without clearing completion, so leaving a revisited tour cannot make it appear again at startup. A future materially changed tour may increment the version and run once.
+- Onboarding inherits live System, Light, Dark, high-contrast, transparency, text-scale, and reduced-motion policies. Every action is at least 36 px, named, keyboard-operable, and visibly focused.
 
 ### Cursor companion
 
@@ -73,7 +89,10 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
 - The row icon column says one thing on every row: which kind of capture it is. It never mixes a submenu chevron with kind glyphs, and no row is left without one.
 - Every key chip is the same width and a combination rides in a single chip, so a two-key shortcut cannot shift its label out of line with the rest.
-- The command list scrolls rather than clipping, so nothing critical is lost at high display scale.
+- The root presents seven content-sized actions: Screenshot `S`, Video `V`, Repeat video `Shift+V`, Audio `A`, Highlighted text `T`, Current link `L`, and Library `O`.
+- Screenshot drills into Region `R`, Window `W`, Display `D`, All displays `A`, and Previous region `P`; `Esc` returns to the root. Numeric screenshot shortcuts are forbidden.
+- Visible command rows are always clickable. Bare keys are accelerators scoped to the visible panel and cannot depend on which control currently owns focus.
+- At normal height the root is one compact list. A short work area uses a two-column command matrix, and the screenshot page uses a 3 × 2 matrix. Neither page scrolls or clips.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
 - Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent. Because the panel no longer covers the screen it can lose activation while still shown; the global bare-key service is what keeps the keys working, and clicking elsewhere deliberately does **not** dismiss it.
 
@@ -91,11 +110,11 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - When a recording includes the camera, a live self-view sits inside the area being recorded at the chosen corner and size, so the user can see their own feed while they record.
 - **It is the one CursorPocket surface deliberately visible in captured media.** CursorPocket holds the camera for the whole recording, and the webcam reaches the file by being on screen inside the captured rectangle. FFmpeg must never be given a `dshow` camera input at the same time—DirectShow grants a single consumer exclusive use, and that is exactly what made a live self-view impossible before.
 - Placement is computed by `CameraSelfViewPlacement` and must always land inside the recorded rectangle. Anything outside it is missing from the file.
-- **Draggable, and clamped to the recorded rectangle.** The user drags it to reposition their camera mid recording, so it accepts pointer input rather than being click-through. The clamp is not cosmetic: the webcam reaches the file by being on screen inside that rectangle, so a self-view dragged outside it would silently vanish from the recording. It never takes activation from the work being demonstrated.
+- **Draggable, and clamped to the recorded rectangle.** The user drags it to reposition their camera mid recording, so it deliberately accepts pointer input while keeping the source application active. The clamp is not cosmetic: the webcam reaches the file by being on screen inside that rectangle, so a self-view dragged outside it would silently vanish from the recording. It never takes activation from the work being demonstrated.
 - Window-source recordings capture a single window, so the self-view stays visible on screen but cannot appear in the file. Preflight says so before recording rather than letting the user discover it afterwards.
 - A camera that cannot be opened—privacy settings, unplugged, held by another app—never blocks the recording. The screen still records, without a webcam inset.
 - The camera is released as soon as the recording stops, so the next preflight preview does not find the device busy.
-- Shape is the user's choice: `rounded` (16:9, the default) or `squircle` (1:1 superellipse). Both are cut by a GDI window region. Regions are 1-bit, so their edges are aliased; the existing hairline border rides that edge and is what keeps it from reading as stairsteps. Never region-clip a surface the user can drag—this one is click-through and never handed to the move loop, which is why it is allowed here.
+- Shape is the user's choice: `rounded` (16:9, the default) or `squircle` (1:1 superellipse). Both are cut by a GDI window region. Regions are 1-bit, so their edges are aliased; the existing hairline border rides that edge and is what keeps it from reading as stairsteps. This surface uses application pointer tracking rather than Windows' modal move loop, so its region does not introduce the command-panel drag regression.
 - Camera effects render into the self-view, so whatever the user sees is exactly what the file gets. With every effect off the plain `MediaPlayerElement` path still runs; effects swap in an `Image` fed by the frame-reader pipeline. Neither path is ever capture-excluded.
 
 ### Camera effects
@@ -128,7 +147,8 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 ### Annotation editor
 
 - The editor is a normal Mica window the user works *in*, not a transient overlay, so the opaque-root and capture-exclusion rules for transient surfaces do not apply to it. It is brought up with `WindowPlacement.ForceForeground` on the capture path and plain `Activate()` everywhere else — a transient surface has just hidden itself on the capture path, so the source app still owns the foreground lock.
-- **The toolbar teaches its own keys.** Every tool carries its key engraved on its own button as a bare mono letter. Icons are 19 px of content in a 24 px box on a 2 px round-capped stroke; that ratio is what makes a dense toolbar read as an instrument rather than a puzzle. As the window narrows the letters collapse, then a label shortens — **the teaching degrades, never the capability.** No tool is ever hidden, there is no overflow menu, and the toolbar never scrolls.
+- **The editor separates selection from adjustment without hiding capability.** All sixteen tools live in a stable left panel; contextual properties and Save, Copy, Pin, Undo, and Redo live in a stable right panel. No tool is placed in `More` at any width.
+- Every tool button shows its shortcut. At full width it shows icon, name, and key; constrained layouts use a two- or three-column icon-and-key matrix. The teaching compresses, never the capability. Neither side panel scrolls.
 - A tool's variants are reached by pressing its key again, and the status strip states the current variant and what the next press will do. That is the teaching surface a hover submenu would otherwise be.
 - **Green on this surface means the active tool and the crop handles, plus the one solid-green Save button. Nothing else.** No annotation ink may be a state colour: green is absent from the palette entirely, red is present at a deliberately different value from `Recording`, and blue is absent because it is too close to `Informational`. A green arrow would read as CursorPocket talking rather than as the user's own mark. The active *swatch* is deliberately not green either — two competing selection greens in one toolbar would make neither readable — so it takes an ink-white ring instead. Crop handles are green corner brackets: same hue as the active tool, told apart by form, which is the rule the app already uses for capture kinds.
 - Mark weight and text size are derived from the image's short edge, never fixed. A constant is illegible on a 4K shot and most of the frame on a small region capture.
@@ -152,14 +172,23 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 - The Library gives the preview the majority of the width, and the preview can take the whole window when the list is collapsed. Video and audio use the full transport controls — seek, volume, playback rate, skip, fast forward and rewind, zoom, repeat, full window.
 - Rows are compact strips carrying the capture's own thumbnail — the screenshot, a video frame, or its waveform — with the kind icon only as a fallback. Each row states kind and file size. Selection is extended, and delete moves every selected capture to the Recycle Bin, saying how many.
-- Receipt appears without stealing focus, remains for 12 seconds, and pauses on hover. Because hovering pauses the countdown indefinitely, it also carries an explicit dismiss control.
-- **Every capture is actionable without a mouse.** Because a receipt never takes focus, its actions are reachable through scoped global keys: `Ctrl+Alt+O` open or play, `Ctrl+Alt+R` reveal, `Ctrl+Alt+L` Library, `Ctrl+Alt+X` dismiss. Those combinations carry modifiers deliberately — a receipt is up while the user keeps working, and bare keys would swallow their typing for twelve seconds. The receipt states the keys, since nothing else would teach them.
+- Receipt appears without stealing focus. Screenshot receipts remain for 3 seconds; video and audio receipts remain for 6 seconds. The countdown pauses on hover or keyboard focus, and a 36 px dismiss control plus `Esc` provide an immediate exit.
+- Receipts never register global action shortcuts. Their labelled controls are pointer- and keyboard-operable when focused, and `Esc` dismisses a focused receipt without stealing keys from the user's work.
 - The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy path, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Every one stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
-- Receipts use the correct media preview and explicit Open/Reveal/Library actions. A screenshot is also copied to the clipboard the moment it is taken, and again after annotation so the clipboard holds the marked-up image; the receipt says so.
+- Receipts use the correct media preview and labelled click actions such as Open, Mark up, and Show in folder. Receipt-specific global action shortcuts are forbidden. A screenshot is copied to the clipboard when taken and after a saved annotation; Copy inside the editor never overwrites the source capture.
 - Library is a standard resizable Mica window with a top navigation bar, so the wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
 - Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter.
 - Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
+
+### Updates and public distribution
+
+- The friend-facing path is one per-user `CursorPocket-Setup-x64.exe` linked from the CursorPocket GitHub Pages site and hosted by GitHub Releases. ZIP and MSIX builds are development artifacts, not competing public choices.
+- Automatic checks are on by default and read only the static project `update.json` at most once every 24 hours. They transmit no custom identifier, settings, capture metadata, or analytics and fail silently offline. Settings exposes the current version, last state, opt-out, and a manual Check now action.
+- An available update uses the ordinary receipt coordinator with labelled Download and install, Release notes, and Later actions. Nothing downloads without approval. Update UI inherits the current app theme and uses the update glyph as information, not a new decorative colour.
+- The installer is accepted only when its size and SHA-256 match the manifest, its Authenticode chain and timestamp are trusted, its publisher is Tanmay Sharma, its Windows floor is satisfied, and its version is newer. A mismatch changes nothing and produces an actionable error.
+- Installation never begins during recording, capture, preflight, region selection, or annotation. It uses the recording lifecycle and application shutdown path, preserves captures and settings, and relaunches only after a successful update install.
+- Public tags are stable, match the centralized version exactly, and are release-blocked until GitHub OIDC Artifact Signing, signature verification, installed-payload verification, provenance, hashes, notices, and the Pages manifest all succeed.
 
 ## Brand mark
 
@@ -188,9 +217,11 @@ Four rules above are overridden by explicit product decision on one surface each
 
 The design-consultation gate requires all of the following before release:
 
+- a new profile sees onboarding exactly once on a visible launch, can skip it, can rerun it from Settings, and can open the real command surface from the rehearsal step;
+- onboarding exposes the registered activation shortcut and all seven command actions without horizontal or nested scrolling at required scales;
 - no opaque gray capture surface or black companion rectangle;
 - the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
-- the command list scrolls instead of clipping at 100–250% scale;
+- command mode has no scroll region and switches to a drill-down layout before clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
 - a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
 - `Enter` saves a screenshot from the annotation surface whether or not anything was drawn, and the shot is on the clipboard without asking;
@@ -205,6 +236,7 @@ The design-consultation gate requires all of the following before release:
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
+- automatic update checks can be disabled, never block offline startup, and cannot install an untrusted, corrupt, older, or wrong-publisher artifact;
 - every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
 - no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;
 - a drawn mark and the saved PNG are the same shape, at every display scale;
