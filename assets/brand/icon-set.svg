@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">CursorPocket product icon set</title>
+  <desc id="desc">Fourteen monochrome product glyphs for capture kinds and capture workflows.</desc>
+  <rect width="1200" height="620" rx="40" fill="#07130F"/>
+  <text x="72" y="92" fill="#F6F4EC" font-family="Segoe UI Variable Display, Segoe UI, sans-serif" font-size="44" font-weight="650">Capture glyphs</text>
+  <text x="72" y="132" fill="#8EA099" font-family="Segoe UI Variable Text, Segoe UI, sans-serif" font-size="22">24 px grid · 1.8 px round stroke · monochrome by default</text>
+  <g fill="#101B17" stroke="#34423C">
+    <rect x="70" y="180" width="132" height="132" rx="24"/><rect x="224" y="180" width="132" height="132" rx="24"/><rect x="378" y="180" width="132" height="132" rx="24"/><rect x="532" y="180" width="132" height="132" rx="24"/><rect x="686" y="180" width="132" height="132" rx="24"/><rect x="840" y="180" width="132" height="132" rx="24"/><rect x="994" y="180" width="132" height="132" rx="24"/>
+    <rect x="70" y="380" width="132" height="132" rx="24"/><rect x="224" y="380" width="132" height="132" rx="24"/><rect x="378" y="380" width="132" height="132" rx="24"/><rect x="532" y="380" width="132" height="132" rx="24"/><rect x="686" y="380" width="132" height="132" rx="24"/><rect x="840" y="380" width="132" height="132" rx="24"/><rect x="994" y="380" width="132" height="132" rx="24"/>
+  </g>
+  <g color="#F6F4EC">
+    <image href="icons/screenshot.svg" x="108" y="207" width="56" height="56"/><image href="icons/video.svg" x="262" y="207" width="56" height="56"/><image href="icons/audio.svg" x="416" y="207" width="56" height="56"/><image href="icons/text.svg" x="570" y="207" width="56" height="56"/><image href="icons/link.svg" x="724" y="207" width="56" height="56"/><image href="icons/library.svg" x="878" y="207" width="56" height="56"/><image href="icons/receipt.svg" x="1032" y="207" width="56" height="56"/>
+    <image href="icons/annotate.svg" x="108" y="407" width="56" height="56"/><image href="icons/ocr.svg" x="262" y="407" width="56" height="56"/><image href="icons/pin.svg" x="416" y="407" width="56" height="56"/><image href="icons/region.svg" x="570" y="407" width="56" height="56"/><image href="icons/window.svg" x="724" y="407" width="56" height="56"/><image href="icons/display.svg" x="878" y="407" width="56" height="56"/><image href="icons/all-displays.svg" x="1032" y="407" width="56" height="56"/>
+  </g>
+  <g fill="#CBD7D1" font-family="Segoe UI Variable Text, Segoe UI, sans-serif" font-size="16" text-anchor="middle">
+    <text x="136" y="292">Screenshot</text><text x="290" y="292">Video</text><text x="444" y="292">Audio</text><text x="598" y="292">Text</text><text x="752" y="292">Link</text><text x="906" y="292">Library</text><text x="1060" y="292">Receipt</text>
+    <text x="136" y="492">Annotate</text><text x="290" y="492">OCR</text><text x="444" y="492">Pin</text><text x="598" y="492">Region</text><text x="752" y="492">Window</text><text x="906" y="492">Display</text><text x="1060" y="492">All displays</text>
+  </g>
+</svg>

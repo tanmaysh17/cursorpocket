@@ -281,8 +281,8 @@ public sealed class AnnotationContractTests
         // spends green on the active tool, so a green mark would be indistinguishable
         // from CursorPocket's own state. The swatches are built from AnnotationPalette,
         // which excludes every state colour.
-        Assert.DoesNotContain("45E08C", xaml, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("FF5F6B", xaml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("36E58C", xaml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("FF5964", xaml, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -421,11 +421,11 @@ public sealed class AnnotationContractTests
         // red means recording or destructive. If the user could paint with either, a
         // mark on a screenshot would be indistinguishable from CursorPocket's own state
         // — and the annotation surface needs green for the active tool and crop handles.
-        Assert.DoesNotContain("45E08C", inks, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("FF5F6B", inks, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("36E58C", inks, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("FF5964", inks, StringComparison.OrdinalIgnoreCase);
         // Blue is reserved for text and link captures, and PocketBlue is close enough to
         // omasnap's blue ink to be confusable.
-        Assert.DoesNotContain("7FBBFF", inks, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("7AA7FF", inks, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

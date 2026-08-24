@@ -199,7 +199,7 @@ public sealed class AnnotationPaletteTests
         // Red means recording or destructive. Blue marks text and link captures. If the
         // user could paint with any of them, their mark would read as CursorPocket
         // talking rather than as their own annotation.
-        string[] stateColours = ["#45E08C", "#FF5F6B", "#7FBBFF"];
+        string[] stateColours = ["#36E58C", "#FF5964", "#7AA7FF"];
 
         foreach (var ink in AnnotationPalette.Inks)
         {

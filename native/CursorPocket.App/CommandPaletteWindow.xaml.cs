@@ -17,11 +17,11 @@ public sealed partial class CommandPaletteWindow : Window
 {
     // Command mode reopens wherever the user last put it and never moves on its own.
     private const int RegularWidth = 304;
-    private const int RegularHeight = 430;
+    private const int RegularHeight = 438;
     private const int ShortWidth = 520;
-    private const int ShortHeight = 300;
+    private const int ShortHeight = 308;
     private const int ScreenshotWidth = 304;
-    private const int ScreenshotHeight = 286;
+    private const int ScreenshotHeight = 294;
     private const int PanelMargin = 22;
 
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };

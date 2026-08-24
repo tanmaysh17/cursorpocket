@@ -11,9 +11,9 @@ namespace CursorPocket_App.Services;
 internal static class CompanionFrameRenderer
 {
     internal const int FrameSize = 28;
-    internal static readonly Color ReadyColor = Color.FromArgb(255, 69, 224, 140);
+    internal static readonly Color ReadyColor = Color.FromArgb(255, 54, 229, 140);
     internal static readonly Color LightRecordingColor = Color.FromArgb(255, 215, 53, 70);
-    internal static readonly Color RecordingColor = Color.FromArgb(255, 255, 95, 107);
+    internal static readonly Color RecordingColor = Color.FromArgb(255, 255, 89, 100);
 
     internal static (Color Ready, Color Recording, Color Outline) ResolvePalette(
         bool isHighContrast,

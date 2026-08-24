@@ -1,0 +1,21 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "color": {
+    "pine": { "$value": "#07130F", "$type": "color", "$description": "Primary dark ground and dark wordmark." },
+    "paper": { "$value": "#F6F4EC", "$type": "color", "$description": "Warm light ground and primary text on dark." },
+    "ready": { "$value": "#36E58C", "$type": "color", "$description": "Brand signal, ready, saved, primary action, and active capture field." },
+    "fold": { "$value": "#2B6F63", "$type": "color", "$description": "Visible ribbon backside and pocket." },
+    "recording": { "$value": "#FF5964", "$type": "color", "$description": "Recording, discard, destructive, and stop states only." },
+    "link": { "$value": "#7AA7FF", "$type": "color", "$description": "Informational and link emphasis only." },
+    "inkDim": { "$value": "#CBD7D1", "$type": "color", "$description": "Secondary text on dark." },
+    "mist": { "$value": "#8EA099", "$type": "color", "$description": "Tertiary metadata." },
+    "surface": { "$value": "#101B17", "$type": "color", "$description": "Persistent dark surface." },
+    "raised": { "$value": "#18241F", "$type": "color", "$description": "Raised controls and keycaps." },
+    "line": { "$value": "#34423C", "$type": "color", "$description": "Structural line on dark surfaces." }
+  },
+  "shape": {
+    "markStrokeRatio": { "$value": 0.1171875, "$type": "number", "$description": "30/256 nominal Pocket + Orbit ribbon stroke ratio." },
+    "iconStroke": { "$value": "1.8px", "$type": "dimension", "$description": "Core product glyph stroke on a 24 px grid." },
+    "recordingCursorNegativeSpace": { "$value": true, "$type": "boolean", "$description": "The recording cursor is always punched through to the background." }
+  }
+}

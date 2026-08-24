@@ -25,6 +25,7 @@ public sealed record ThemePalette(
     System.Drawing.Color Background,
     System.Drawing.Color Raised,
     System.Drawing.Color Text,
+    System.Drawing.Color InkDim,
     System.Drawing.Color Muted,
     System.Drawing.Color Line,
     System.Drawing.Color Selection,
@@ -121,16 +122,18 @@ public sealed class ThemeCoordinator : IDisposable
             ? new ThemePalette(
                 ColorTranslator.FromHtml("#141E1A"),
                 ColorTranslator.FromHtml("#1C2924"),
-                ColorTranslator.FromHtml("#F2F7F4"),
-                ColorTranslator.FromHtml("#A7B6B0"),
+                ColorTranslator.FromHtml("#F6F4EC"),
+                ColorTranslator.FromHtml("#CBD7D1"),
+                ColorTranslator.FromHtml("#8EA099"),
                 ColorTranslator.FromHtml("#42504B"),
-                ColorTranslator.FromHtml("#45E08C"),
-                ColorTranslator.FromHtml("#06120C"),
+                ColorTranslator.FromHtml("#36E58C"),
+                ColorTranslator.FromHtml("#07130F"),
                 true)
             : new ThemePalette(
                 ColorTranslator.FromHtml("#F5F9F7"),
                 ColorTranslator.FromHtml("#FFFFFF"),
                 ColorTranslator.FromHtml("#15201C"),
+                ColorTranslator.FromHtml("#35443E"),
                 ColorTranslator.FromHtml("#5F6E68"),
                 ColorTranslator.FromHtml("#C4CEC9"),
                 ColorTranslator.FromHtml("#168B52"),
@@ -159,7 +162,7 @@ public sealed class ThemeCoordinator : IDisposable
         var colour = key switch
         {
             "PocketInk" => palette.Text,
-            "PocketInkDim" => palette.Muted,
+            "PocketInkDim" => palette.InkDim,
             "PocketMuted" => palette.Muted,
             "PocketBase" => palette.Background,
             "PocketSunken" => Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12),
@@ -170,9 +173,9 @@ public sealed class ThemeCoordinator : IDisposable
             "PocketGreen" => palette.Selection,
             "PocketGreenSoft" => WithAlpha(palette.Selection, 48),
             "PocketOnGreen" => palette.SelectionText,
-            "PocketRed" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#FF5F6B" : "#D73546"),
-            "PocketRedSoft" => WithAlpha(ColorTranslator.FromHtml(IsDark ? "#FF5F6B" : "#D73546"), 44),
-            "PocketBlue" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#7FBBFF" : "#276EA8"),
+            "PocketRed" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#D73546"),
+            "PocketRedSoft" => WithAlpha(ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#D73546"), 44),
+            "PocketBlue" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#7AA7FF" : "#276EA8"),
             _ => Color.Transparent,
         };
         return new SolidColorBrush(Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B));
@@ -254,7 +257,7 @@ public sealed class ThemeCoordinator : IDisposable
         var bg = Color.FromArgb(background.A, background.R, background.G, background.B);
         var fg = Color.FromArgb(foreground.A, foreground.R, foreground.G, foreground.B);
         var hi = Color.FromArgb(accent.A, accent.R, accent.G, accent.B);
-        return new ThemePalette(bg, bg, fg, fg, fg, hi, fg, IsSystemDark());
+        return new ThemePalette(bg, bg, fg, fg, fg, fg, hi, fg, IsSystemDark());
     }
 
     private static Windows.UI.Color ToWindowsColor(Color colour) =>

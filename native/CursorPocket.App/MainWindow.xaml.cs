@@ -22,6 +22,8 @@ public sealed partial class MainWindow : Window
     private System.Windows.Forms.NotifyIcon? _tray;
     private System.Windows.Forms.ContextMenuStrip? _trayMenu;
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
+    private Icon? _trayReadyIcon;
+    private Icon? _trayRecordingIcon;
     private long _lastSourceWindow;
     private (CaptureBounds Bounds, int? OutputIndex)? _displayTarget;
     private CaptureBounds? _lastRegion;
@@ -43,7 +45,10 @@ public sealed partial class MainWindow : Window
         App.Theme.Register(this, Root, SurfaceRole.Persistent);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        AppWindow.SetIcon(iconPath);
+        AppWindow.SetTaskbarIcon(iconPath);
+        AppWindow.SetTitleBarIcon(iconPath);
         WindowPlacement.ResizeInDips(this, 1100, 760);
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
@@ -965,7 +970,7 @@ public sealed partial class MainWindow : Window
         App.Theme.ThemeChanged -= Theme_ThemeChanged;
         _receipts.Dispose();
         _companion?.Close();
-        _tray?.Dispose();
+        DisposeTray();
         Close();
         ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
     }
@@ -977,7 +982,11 @@ public sealed partial class MainWindow : Window
         _companion?.SetRecording(state is RecordingState.Starting or RecordingState.Recording or RecordingState.Finalizing);
         if (_tray is not null)
         {
-            _tray.Text = state == RecordingState.Recording ? "CursorPocket · recording" : "CursorPocket · ready";
+            var presentation = TrayPresentation.For(state);
+            _tray.Text = presentation.Tooltip;
+            _tray.Icon = presentation.IconFilename == "TrayRecording.ico"
+                ? _trayRecordingIcon ?? _trayReadyIcon ?? SystemIcons.Application
+                : _trayReadyIcon ?? SystemIcons.Application;
         }
         // Release the camera as soon as the recording is no longer running, so the
         // device is free for the next preflight preview.
@@ -1083,12 +1092,13 @@ public sealed partial class MainWindow : Window
 
     private void InitializeTray()
     {
-        var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+        _trayReadyIcon = LoadTrayIcon("TrayReady.ico");
+        _trayRecordingIcon = LoadTrayIcon("TrayRecording.ico");
         _tray = new System.Windows.Forms.NotifyIcon
         {
             Text = "CursorPocket · ready",
             Visible = true,
-            Icon = File.Exists(iconPath) ? new Icon(iconPath) : SystemIcons.Application,
+            Icon = _trayReadyIcon ?? SystemIcons.Application,
         };
         var menu = _trayMenu = new System.Windows.Forms.ContextMenuStrip
         {
@@ -1187,7 +1197,7 @@ public sealed partial class MainWindow : Window
         App.Services.Updates.StateChanged -= Updates_StateChanged;
         _receipts.Dispose();
         _companion?.Close();
-        _tray?.Dispose();
+        DisposeTray();
         Close();
         ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
     }
@@ -1209,6 +1219,22 @@ public sealed partial class MainWindow : Window
             item.BackColor = palette.Background;
         }
         _trayMenu.Invalidate();
+    }
+
+    private static Icon? LoadTrayIcon(string filename)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Assets", filename);
+        return File.Exists(path) ? new Icon(path) : null;
+    }
+
+    private void DisposeTray()
+    {
+        _tray?.Dispose();
+        _tray = null;
+        _trayReadyIcon?.Dispose();
+        _trayReadyIcon = null;
+        _trayRecordingIcon?.Dispose();
+        _trayRecordingIcon = null;
     }
 
     private void SubscribeToRecordingState()

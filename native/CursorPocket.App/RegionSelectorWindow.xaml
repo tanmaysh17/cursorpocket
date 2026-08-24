@@ -50,7 +50,7 @@
             </Border>
             <Rectangle
                 x:Name="Selection"
-                Fill="#1445E08C"
+                Fill="#1436E58C"
                 RadiusX="8"
                 RadiusY="8"
                 Stroke="{ThemeResource PocketGreen}"
