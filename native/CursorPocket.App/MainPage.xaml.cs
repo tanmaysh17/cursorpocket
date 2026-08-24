@@ -72,6 +72,7 @@ public sealed partial class MainPage : Page
         ApplyFilterSelection(ViewModel.SelectedFilter);
         ApplyThemeModeSelection();
         ShowActivationShortcut();
+        RefreshUpdateStatus();
         // A tray-only launch has nothing on screen, so reading the manifest and
         // materializing every row can wait until the window is actually revealed.
         if (!App.StartedInBackground)
@@ -81,7 +82,11 @@ public sealed partial class MainPage : Page
     }
 
     private void Services_SettingsChanged(object? sender, AppSettings settings) =>
-        DispatcherQueue.TryEnqueue(SubscribeRecordingStatus);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            SubscribeRecordingStatus();
+            RefreshUpdateStatus();
+        });
 
     private void SubscribeRecordingStatus()
     {
@@ -526,6 +531,28 @@ public sealed partial class MainPage : Page
 
     private void RunWelcomeTour_Click(object sender, RoutedEventArgs eventArgs) =>
         (App.Window as MainWindow)?.ShowOnboarding();
+
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        CheckForUpdatesButton.IsEnabled = false;
+        UpdateStatusText.Text = "Checking for updates…";
+        try
+        {
+            await (App.Window as MainWindow)!.CheckForUpdatesAsync();
+        }
+        finally
+        {
+            RefreshUpdateStatus();
+        }
+    }
+
+    public void RefreshUpdateStatus()
+    {
+        if (InstalledVersionText is null || UpdateStatusText is null || CheckForUpdatesButton is null) return;
+        InstalledVersionText.Text = $"CursorPocket {App.Services.Updates.CurrentVersion}";
+        UpdateStatusText.Text = App.Services.Updates.StatusMessage;
+        CheckForUpdatesButton.IsEnabled = !App.Services.Updates.IsChecking && !App.Services.Updates.IsDownloading;
+    }
 
     private void ThemeMode_Click(object sender, RoutedEventArgs eventArgs)
     {

@@ -1,6 +1,7 @@
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket.Core.Storage;
+using CursorPocket.Core.Updates;
 
 namespace CursorPocket_App.Services;
 
@@ -23,6 +24,15 @@ public sealed class AppServices : IDisposable, ISettingsUpdateQueue
         EscapeHotkey = new ScopedEscapeHotkeyService();
         Startup = new StartupService();
         Previews = new PreviewService(captureStore, ffmpegPath);
+        var updateClient = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        updateClient.DefaultRequestHeaders.UserAgent.ParseAdd("CursorPocket-Update/1");
+        Updates = new ApplicationUpdateCoordinator(
+            new ApplicationUpdateService(
+                updateClient,
+                ApplicationUpdateCoordinator.ManifestUri,
+                new WinTrustInstallerSignatureVerifier()),
+            this,
+            () => Settings);
         CaptureStore.CaptureCompleted += CaptureStore_CaptureCompleted;
     }
 
@@ -39,6 +49,7 @@ public sealed class AppServices : IDisposable, ISettingsUpdateQueue
     public ScopedEscapeHotkeyService EscapeHotkey { get; }
     public StartupService Startup { get; }
     public PreviewService Previews { get; private set; }
+    public ApplicationUpdateCoordinator Updates { get; }
     public string FfmpegPath { get; }
     public event EventHandler<CaptureCompletedEventArgs>? CaptureCompleted;
     public event EventHandler<AppSettings>? SettingsChanged;
@@ -115,14 +126,16 @@ public sealed class AppServices : IDisposable, ISettingsUpdateQueue
     {
         var normalized = SettingsStore.Normalize(settings);
         var folderChanged = !string.Equals(Settings.CaptureDirectory, normalized.CaptureDirectory, StringComparison.OrdinalIgnoreCase);
+        var startupChanged = Settings.StartWithWindows != normalized.StartWithWindows;
+        var shortcutChanged = !string.Equals(Settings.ActivationShortcut, normalized.ActivationShortcut, StringComparison.OrdinalIgnoreCase);
         if (folderChanged && RecordingSession.IsActive)
         {
             throw new InvalidOperationException("Finish the current recording before changing the capture folder.");
         }
         Settings = normalized;
         await SettingsStore.SaveAsync(normalized, cancellationToken);
-        Startup.SetEnabled(normalized.StartWithWindows);
-        RegisterAvailableHotkey(normalized.ActivationShortcut);
+        if (startupChanged) Startup.SetEnabled(normalized.StartWithWindows);
+        if (shortcutChanged) RegisterAvailableHotkey(normalized.ActivationShortcut);
 
         if (folderChanged)
         {
@@ -197,6 +210,7 @@ public sealed class AppServices : IDisposable, ISettingsUpdateQueue
         EscapeHotkey.Dispose();
         RecordingSession.Dispose();
         Recording.Dispose();
+        Updates.Dispose();
     }
 
     private void CaptureStore_CaptureCompleted(object? sender, CaptureCompletedEventArgs eventArgs) =>

@@ -11,6 +11,9 @@ public sealed class OnboardingFlowTests
         Assert.True(OnboardingFlow.ShouldPresent(onboardingSeen: false, startedInBackground: false));
         Assert.False(OnboardingFlow.ShouldPresent(onboardingSeen: true, startedInBackground: false));
         Assert.False(OnboardingFlow.ShouldPresent(onboardingSeen: false, startedInBackground: true));
+        Assert.True(OnboardingFlow.ShouldPresent(OnboardingFlow.CurrentVersion - 1, startedInBackground: false));
+        Assert.False(OnboardingFlow.ShouldPresent(OnboardingFlow.CurrentVersion, startedInBackground: false));
+        Assert.False(OnboardingFlow.ShouldPresent(OnboardingFlow.CurrentVersion - 1, startedInBackground: true));
     }
 
     [Fact]

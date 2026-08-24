@@ -5,6 +5,8 @@ param(
     [switch]$SkipFfmpeg,
     [switch]$SkipModels,
     [switch]$SkipInstaller,
+    [switch]$SkipPortableArchive,
+    [switch]$SkipMsix,
     [switch]$RequireInstaller,
     [switch]$RequireMsix
 )
@@ -16,6 +18,7 @@ $appProject = Join-Path $PSScriptRoot "CursorPocket.App\CursorPocket.App.csproj"
 $testsProject = Join-Path $PSScriptRoot "CursorPocket.Tests\CursorPocket.Tests.csproj"
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishRoot = Join-Path $artifactsRoot "CursorPocket-win-x64"
+$symbolsRoot = Join-Path $artifactsRoot "CursorPocket-symbols"
 $portableArchive = Join-Path $artifactsRoot "CursorPocket-portable-win-x64.zip"
 $msixPath = Join-Path $artifactsRoot "CursorPocket-x64.msix"
 $msixStaging = Join-Path $artifactsRoot ".msix-staging"
@@ -57,6 +60,7 @@ if (-not $SkipTests) {
 
 New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 Remove-ArtifactPath $publishRoot
+Remove-ArtifactPath $symbolsRoot
 if (Test-Path -LiteralPath $portableArchive) { Remove-Item -LiteralPath $portableArchive -Force }
 if (Test-Path -LiteralPath $msixPath) { Remove-Item -LiteralPath $msixPath -Force }
 Remove-ArtifactPath $msixStaging
@@ -68,6 +72,29 @@ Remove-ArtifactPath $msixStaging
 & $dotnet publish $appProject -c Release -r win-x64 --self-contained true --no-restore `
     -p:PublishTrimmed=false -p:PublishReadyToRun=true -o $publishRoot
 if ($LASTEXITCODE -ne 0) { throw "Native publish failed." }
+
+# Keep diagnostic symbols as a private CI artifact, never inside the friend-facing
+# installer. Static import libraries and non-English framework satellites are build
+# payload, not runtime dependencies for this English-only release.
+New-Item -ItemType Directory -Path $symbolsRoot -Force | Out-Null
+Get-ChildItem -LiteralPath $publishRoot -Filter "*.pdb" -File -Recurse | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $symbolsRoot $_.Name) -Force
+    Remove-Item -LiteralPath $_.FullName -Force
+}
+Get-ChildItem -LiteralPath $publishRoot -Filter "*.lib" -File -Recurse | ForEach-Object {
+    Remove-Item -LiteralPath $_.FullName -Force
+}
+Get-ChildItem -LiteralPath $publishRoot -Directory | ForEach-Object {
+    try {
+        $culture = [Globalization.CultureInfo]::GetCultureInfo($_.Name)
+        if ($culture.Name -notin @("en", "en-US")) {
+            Remove-ArtifactPath $_.FullName
+        }
+    }
+    catch [Globalization.CultureNotFoundException] {
+        # Assets, licenses, and runtime folders are not cultures and stay intact.
+    }
+}
 
 # Unpackaged WinUI publish can omit compiled XAML resources even though they
 # are present in TargetDir. An installer without these files starts and then
@@ -144,7 +171,7 @@ if (-not $makeAppx) {
         Sort-Object FullName -Descending |
         Select-Object -First 1
 }
-if ($makeAppx) {
+if (-not $SkipMsix -and $makeAppx) {
     Copy-Item -LiteralPath $publishRoot -Destination $msixStaging -Recurse
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "packaging\AppxManifest.xml") -Destination (Join-Path $msixStaging "AppxManifest.xml") -Force
     # MakeAppx validates the exact manifest paths before resource qualification is
@@ -162,14 +189,16 @@ if ($makeAppx) {
     if ($LASTEXITCODE -ne 0) { throw "MSIX packaging failed." }
     Remove-ArtifactPath $msixStaging
 }
-elseif ($RequireMsix) {
+elseif (-not $SkipMsix -and $RequireMsix) {
     throw "The Windows SDK makeappx.exe is required to create the MSIX artifact."
 }
-else {
+elseif (-not $SkipMsix) {
     Write-Warning "makeappx.exe is not installed; no MSIX was created."
 }
 
-Compress-Archive -Path (Join-Path $publishRoot "*") -DestinationPath $portableArchive -CompressionLevel Optimal
+if (-not $SkipPortableArchive) {
+    Compress-Archive -Path (Join-Path $publishRoot "*") -DestinationPath $portableArchive -CompressionLevel Optimal
+}
 
 $iscc = if ($SkipInstaller) { $null } else { Get-Command ISCC.exe -ErrorAction SilentlyContinue }
 $isccPath = if ($iscc) { $iscc.Source } else { $null }
@@ -181,14 +210,13 @@ if (-not $SkipInstaller -and -not $isccPath) {
     $isccPath = $knownIsccPaths | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 if (-not $SkipInstaller -and $isccPath) {
-    & $isccPath (Join-Path $PSScriptRoot "installer\CursorPocket.iss")
-    if ($LASTEXITCODE -ne 0) { throw "The CursorPocket installer build failed." }
+    & (Join-Path $PSScriptRoot "build-installer.ps1") -IsccPath $isccPath
 }
 elseif ($RequireInstaller) {
     throw "Inno Setup 6 is required to create the installer artifact."
 }
 elseif (-not $SkipInstaller) {
-    Write-Warning "Inno Setup is not installed; the portable ZIP is ready, but no installer was created."
+    Write-Warning "Inno Setup is not installed; no installer was created."
 }
 
 Write-Host "Native CursorPocket artifacts are ready in $artifactsRoot" -ForegroundColor Green

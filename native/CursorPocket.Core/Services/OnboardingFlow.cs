@@ -22,6 +22,8 @@ public sealed record OnboardingStepDescriptor(
 /// </summary>
 public static class OnboardingFlow
 {
+    public const int CurrentVersion = 1;
+
     public static IReadOnlyList<OnboardingStepDescriptor> Steps { get; } =
     [
         new(
@@ -47,6 +49,9 @@ public static class OnboardingFlow
 
     public static bool ShouldPresent(bool onboardingSeen, bool startedInBackground) =>
         !onboardingSeen && !startedInBackground;
+
+    public static bool ShouldPresent(int completedVersion, bool startedInBackground) =>
+        completedVersion < CurrentVersion && !startedInBackground;
 
     public static IReadOnlyList<CaptureActionDescriptor> Commands => CaptureActionCatalog.Primary;
 }
