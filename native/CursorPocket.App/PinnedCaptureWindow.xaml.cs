@@ -44,6 +44,7 @@ public sealed partial class PinnedCaptureWindow : Window
         _imageWidth = imageWidth;
         _imageHeight = imageHeight;
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.Pin);
 
         // Topmost so it stays a reference, but not capture-excluded: see the class remarks.
         WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
@@ -91,6 +92,13 @@ public sealed partial class PinnedCaptureWindow : Window
         {
             ControlStrip.Opacity = 0;
         }
+    }
+
+    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) => ControlStrip.Opacity = 1;
+
+    private void Root_LostFocus(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!_dragging) ControlStrip.Opacity = 0;
     }
 
     // ------------------------------------------------------------------------ dragging

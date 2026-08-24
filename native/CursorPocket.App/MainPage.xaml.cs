@@ -3,6 +3,7 @@ using CursorPocket_App.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Media.Core;
@@ -16,10 +17,31 @@ public sealed partial class MainPage : Page
     private CancellationTokenSource? _detailLoad;
     private bool _loaded;
     private bool _libraryLoaded;
+    private Services.RecordingService? _recordingStatusSource;
 
     public MainPage()
     {
         InitializeComponent();
+        ApplyCaptureActionCatalog();
+    }
+
+    private void ApplyCaptureActionCatalog()
+    {
+        foreach (var (button, id) in new[]
+        {
+            (ScreenshotTile, CaptureActionId.Screenshot),
+            (VideoTile, CaptureActionId.Video),
+            (RepeatVideoTile, CaptureActionId.RepeatVideo),
+            (AudioTile, CaptureActionId.Audio),
+            (TextCaptureTile, CaptureActionId.Text),
+            (LinkCaptureTile, CaptureActionId.Link),
+            (LibraryTile, CaptureActionId.Library),
+        })
+        {
+            var action = CaptureActionCatalog.Get(id);
+            AutomationProperties.SetName(button, $"{action.Title}. {action.Description}. Key {action.Key} in command mode.");
+            ToolTipService.SetToolTip(button, $"{action.Title} · {action.Key}");
+        }
     }
 
     public void NavigateTo(string destination)
@@ -40,12 +62,15 @@ public sealed partial class MainPage : Page
         }
         _loaded = true;
         App.Services.CaptureCompleted += CaptureStore_CaptureCompleted;
+        App.Services.SettingsChanged += Services_SettingsChanged;
+        SubscribeRecordingStatus();
         CompanionModeBox.SelectedIndex = ViewModel.CursorCompanionMode switch { "off" => 0, "always" => 2, _ => 1 };
         FpsBox.SelectedIndex = ViewModel.VideoFramesPerSecond == 60 ? 1 : 0;
         CountdownBox.SelectedIndex = ViewModel.VideoCountdownSeconds switch { 0 => 0, 5 => 2, _ => 1 };
         FpsBox.SelectionChanged += VideoDefaults_SelectionChanged;
         CountdownBox.SelectionChanged += VideoDefaults_SelectionChanged;
         ApplyFilterSelection(ViewModel.SelectedFilter);
+        ApplyThemeModeSelection();
         ShowActivationShortcut();
         // A tray-only launch has nothing on screen, so reading the manifest and
         // materializing every row can wait until the window is actually revealed.
@@ -55,6 +80,23 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private void Services_SettingsChanged(object? sender, AppSettings settings) =>
+        DispatcherQueue.TryEnqueue(SubscribeRecordingStatus);
+
+    private void SubscribeRecordingStatus()
+    {
+        if (!ReferenceEquals(_recordingStatusSource, App.Services.Recording))
+        {
+            if (_recordingStatusSource is not null) _recordingStatusSource.StateChanged -= Recording_StateChanged;
+            _recordingStatusSource = App.Services.Recording;
+            _recordingStatusSource.StateChanged += Recording_StateChanged;
+        }
+        ChooseCaptureFolderButton.IsEnabled = !App.Services.RecordingSession.IsActive;
+    }
+
+    private void Recording_StateChanged(object? sender, RecordingState state) => DispatcherQueue.TryEnqueue(() =>
+        ChooseCaptureFolderButton.IsEnabled = state is RecordingState.Idle or RecordingState.Failed);
+
     /// <summary>Reads the library once, on the first reveal that needs it.</summary>
     public async Task EnsureLibraryLoadedAsync()
     {
@@ -63,7 +105,9 @@ public sealed partial class MainPage : Page
             return;
         }
         _libraryLoaded = true;
-        await ViewModel.InitializeAsync();
+        var load = ViewModel.InitializeAsync();
+        UpdateLibraryVisibility();
+        await load;
         UpdateLibraryVisibility();
         SyncDeleteAffordance();
         await UpdateDetailAsync();
@@ -105,6 +149,12 @@ public sealed partial class MainPage : Page
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs eventArgs)
     {
+        // SelectionChanged can fire while InitializeComponent is still constructing
+        // the page, before the three named panels have been assigned.
+        if (LibraryPanel is null || CapturePanel is null || SettingsPanel is null)
+        {
+            return;
+        }
         var tag = (eventArgs.SelectedItemContainer?.Tag as string) ?? "library";
         LibraryPanel.Visibility = tag == "library" ? Visibility.Visible : Visibility.Collapsed;
         CapturePanel.Visibility = tag == "capture" ? Visibility.Visible : Visibility.Collapsed;
@@ -373,7 +423,7 @@ public sealed partial class MainPage : Page
         var item = ViewModel.SelectedItem;
         if (item is null)
         {
-            DetailKind.Text = "CAPTURE PREVIEW";
+            DetailKind.Text = "Capture preview";
             DetailTitle.Text = "Choose something from your library";
             DetailIcon.Glyph = "\uE7C3";
             DetailText.Text = "Screenshots, waveforms, and video posters appear here.";
@@ -382,7 +432,7 @@ public sealed partial class MainPage : Page
         }
 
         DetailFacts.Visibility = Visibility.Visible;
-        DetailKind.Text = item.KindLabel.ToUpperInvariant();
+        DetailKind.Text = item.KindLabel;
         DetailTitle.Text = item.Preview;
         FactKind.Text = item.KindLabel;
         FactSize.Text = item.SizeLabel;
@@ -446,22 +496,60 @@ public sealed partial class MainPage : Page
 
     private void UpdateLibraryVisibility()
     {
-        EmptyLibrary.Visibility = ViewModel.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        CaptureList.Visibility = ViewModel.Items.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        var failed = !string.IsNullOrWhiteSpace(ViewModel.LibraryErrorMessage);
+        LoadingLibrary.Visibility = ViewModel.IsBusy ? Visibility.Visible : Visibility.Collapsed;
+        LibraryError.Visibility = !ViewModel.IsBusy && failed ? Visibility.Visible : Visibility.Collapsed;
+        EmptyLibrary.Visibility = !ViewModel.IsBusy && !failed && ViewModel.Items.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CaptureList.Visibility = !ViewModel.IsBusy && !failed && ViewModel.Items.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private async void RetryLibrary_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        _libraryLoaded = false;
+        await EnsureLibraryLoadedAsync();
     }
 
     private void OpenCommand_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowCommandPalette();
     private void LibraryTile_Click(object sender, RoutedEventArgs eventArgs) => NavigateTo("library");
     private void ScreenshotTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowCommandPalette("screenshot");
     private void VideoTile_Click(object sender, RoutedEventArgs eventArgs) => (App.Window as MainWindow)?.ShowVideoPreflight();
+    private async void RepeatVideoTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.RepeatVideoRecordingAsync();
     private async void AudioTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.ToggleAudioRecordingAsync();
     private async void TextTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.CaptureTextAsync();
     private async void LinkTile_Click(object sender, RoutedEventArgs eventArgs) => await (App.Window as MainWindow)!.CaptureLinkAsync();
 
     private void OpenFolder_Click(object sender, RoutedEventArgs eventArgs) => ViewModel.OpenCaptureFolderCommand.Execute(null);
 
+    private void ThemeMode_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (sender is Button { Tag: string value } && int.TryParse(value, out var index))
+        {
+            ViewModel.ThemeModeIndex = index;
+            ApplyThemeModeSelection();
+        }
+    }
+
+    private void ApplyThemeModeSelection()
+    {
+        foreach (var button in new[] { ThemeSystemButton, ThemeLightButton, ThemeDarkButton })
+        {
+            var selected = int.TryParse(button.Tag as string, out var index) && index == ViewModel.ThemeModeIndex;
+            button.Background = App.Theme.Brush(selected ? "PocketGreenSoft" : "PocketRaised");
+            button.BorderBrush = App.Theme.Brush(selected ? "PocketGreen" : "PocketLine");
+        }
+    }
+
     private async void ChooseCaptureFolder_Click(object sender, RoutedEventArgs eventArgs)
     {
+        if (App.Services.RecordingSession.IsActive)
+        {
+            ViewModel.StatusMessage = "Finish the current recording before changing the capture folder.";
+            return;
+        }
         var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
         picker.FileTypeFilter.Add("*");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);

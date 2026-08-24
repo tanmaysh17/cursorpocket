@@ -12,12 +12,22 @@ public partial class App : Microsoft.UI.Xaml.Application
     public static Window Window { get; private set; } = null!;
     public static bool StartedInBackground { get; private set; }
     public static AppServices Services { get; private set; } = null!;
+    public static ThemeCoordinator Theme { get; private set; } = null!;
     public static Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue { get; private set; } = null!;
     public static nint WindowHandle => WinRT.Interop.WindowNative.GetWindowHandle(Window);
+    public static bool AnimationsEnabled { get; private set; } = true;
 
     public App()
     {
         InitializeComponent();
+        try
+        {
+            AnimationsEnabled = new Windows.UI.ViewManagement.UISettings().AnimationsEnabled;
+        }
+        catch
+        {
+            AnimationsEnabled = true;
+        }
         UnhandledException += (_, eventArgs) =>
         {
             System.Diagnostics.Debug.WriteLine(eventArgs.Exception);
@@ -40,6 +50,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             Services = await AppServices.CreateAsync();
+            Theme = new ThemeCoordinator(Services.Settings.ThemeMode);
             // Resolved before the window exists so the Library knows not to build
             // itself for a tray-only launch, rather than racing the deferred hide.
             StartedInBackground = args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase)
@@ -75,6 +86,19 @@ public partial class App : Microsoft.UI.Xaml.Application
                 DispatcherQueue.TryEnqueue(
                     Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
                     async () => await ((MainWindow)Window).AnnotateFileAsync(path));
+            }
+
+            // Deterministic installed-build review entry point. It is deliberately
+            // command-line only and never appears in product navigation.
+            var qaAt = Array.FindIndex(
+                commandLine,
+                argument => argument.Equals("--qa-surface", StringComparison.OrdinalIgnoreCase));
+            if (qaAt >= 0 && qaAt + 1 < commandLine.Length)
+            {
+                var surface = commandLine[qaAt + 1];
+                DispatcherQueue.TryEnqueue(
+                    Microsoft.UI.Dispatching.DispatcherQueuePriority.Low,
+                    async () => await ((MainWindow)Window).ShowQaSurfaceAsync(surface));
             }
         }
         catch (Exception error)
@@ -123,6 +147,7 @@ public partial class App : Microsoft.UI.Xaml.Application
         _activationRegistration?.Unregister(null);
         _activationRegistration = null;
         _activationEvent?.Dispose();
+        Theme?.Dispose();
         Services?.Dispose();
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();

@@ -303,20 +303,18 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
-    public void The_tool_cluster_scrolls_and_never_hides_a_key()
+    public void The_editor_uses_a_tool_rail_and_context_bar_without_scrolling()
     {
         var xaml = ReadFixture("AnnotationWindow.xaml");
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
-        // Shrinking to fit meant dropping the engraved keys first, which throws away the
-        // whole reason the toolbar teaches itself — and the thresholds it compared against
-        // were set for eight tools and then silently outgrown as more were added.
-        // Scrolling keeps every tool reachable and every key visible at any width, which is
-        // the answer command mode already uses for its command list.
-        Assert.Contains("x:Name=\"ToolbarScroller\"", xaml, StringComparison.Ordinal);
-        var scroller = Slice(xaml, "x:Name=\"ToolbarScroller\"", "x:Name=\"ToolbarLeft\"");
-        Assert.Contains("HorizontalScrollBarVisibility=\"Auto\"", scroller, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollMode=\"Disabled\"", scroller, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ToolRail\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PropertyPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ToolContextHost\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"OutputHost\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("MoreToolsButton", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("AnnotationToolCatalog.Get", code, StringComparison.Ordinal);
 
         // No width state machine, and nothing collapses a key.
         Assert.DoesNotContain("CompactToolbarWidth", code, StringComparison.Ordinal);
@@ -546,25 +544,16 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
-    public void The_receipt_lists_every_key_it_registers()
+    public void The_receipt_uses_click_actions_and_only_escape_to_dismiss()
     {
         var code = ReadFixture("ReceiptWindow.xaml.cs.txt");
         var xaml = ReadFixture("ReceiptWindow.xaml");
 
-        // A receipt never takes focus, so its keys are the only mouse-free way to act on
-        // it and nothing else teaches them. Every registered key must therefore appear in
-        // the hint — adding one and forgetting the other is silent.
-        var registered = System.Text.RegularExpressions.Regex
-            .Matches(code, @"new\(VirtualKey\.(?<key>\w+), Control: true, Alt: true\)")
-            .Select(match => match.Groups["key"].Value)
-            .ToArray();
-
-        Assert.NotEmpty(registered);
-        var hint = Slice(xaml, "x:Name=\"ReceiptKeysHint\"", "</Grid>");
-        foreach (var key in registered)
-        {
-            Assert.Contains($" {key} ", hint, StringComparison.Ordinal);
-        }
+        Assert.DoesNotContain("PaletteHotkeyService", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReceiptKeysHint", xaml, StringComparison.Ordinal);
+        Assert.Contains("VirtualKey.Escape", code, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Show in folder\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"36\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -672,7 +661,7 @@ public sealed class AnnotationContractTests
         // Explicit action only, and never restored: a window that reappears after a reboot
         // with no explanation is the unexplained floating widget the anti-references warn
         // against. The Library holds the durable copy.
-        Assert.Contains("editor.PinRequested", main, StringComparison.Ordinal);
+        Assert.Contains("editor.PinExportRequested", main, StringComparison.Ordinal);
         Assert.Equal(1, Occurrences(main, "PinnedCaptureWindow.TryShow"));
         Assert.DoesNotContain("RestorePins", main, StringComparison.Ordinal);
         Assert.DoesNotContain("pin_geometry", main, StringComparison.Ordinal);

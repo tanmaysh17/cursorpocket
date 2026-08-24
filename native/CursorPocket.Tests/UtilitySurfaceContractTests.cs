@@ -9,8 +9,8 @@ public sealed class UtilitySurfaceContractTests
         var xaml = ReadFixture("CommandPaletteWindow.xaml");
         var main = ReadFixture("MainWindow.xaml.cs.txt");
 
-        Assert.Contains("PanelWidth = 296", code, StringComparison.Ordinal);
-        Assert.Contains("PanelHeight = 340", code, StringComparison.Ordinal);
+        Assert.Contains("RegularWidth = 304", code, StringComparison.Ordinal);
+        Assert.Contains("ShortWidth = 520", code, StringComparison.Ordinal);
         // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
         // per-move realignment are gone along with the keep-away behaviour.
         Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
@@ -18,10 +18,11 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
         // The panel only ever moves because the user dragged it — never on its own.
         Assert.DoesNotContain("NotifyPointerMoved", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("NotifyPointerMoved", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("_palette.NotifyPointerMoved", main, StringComparison.Ordinal);
         Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
-        // The command list still has to scroll rather than clip at 250% scale.
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("CaptureActionCatalog.Primary", code, StringComparison.Ordinal);
+        Assert.Contains("TransientWindowLayoutPolicy.Resolve", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -64,13 +65,10 @@ public sealed class UtilitySurfaceContractTests
         var pageXaml = ReadFixture("MainPage.xaml");
         var hotkeys = ReadFixture("PaletteHotkeyService.cs.txt");
 
-        // A receipt never takes focus, so its actions are reachable only through global
-        // keys — and those must carry modifiers, or they would swallow the typing the
-        // user does during the twelve seconds the receipt is up.
-        Assert.Contains("Control: true, Alt: true", receipt, StringComparison.Ordinal);
-        Assert.Contains("ModControl", hotkeys, StringComparison.Ordinal);
-        Assert.Contains("_keys.SetEnabled(false)", receipt, StringComparison.Ordinal);
-        Assert.Contains("ReceiptKeysHint", receiptXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PaletteHotkeyService", receipt, StringComparison.Ordinal);
+        Assert.Contains("VirtualKey.Escape", receipt, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Open\"", receiptXaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Show in folder\"", receiptXaml, StringComparison.Ordinal);
 
         // The Library is driven by page accelerators, which cannot affect other apps.
         Assert.Contains("OpenAccelerator_Invoked", pageXaml, StringComparison.Ordinal);
@@ -143,7 +141,7 @@ public sealed class UtilitySurfaceContractTests
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
 
         Assert.Contains("App.Services.Context.RestoreFocus(SourceWindow)", code, StringComparison.Ordinal);
-        Assert.Contains("_restoreSourceOnClose = command != \"library\"", code, StringComparison.Ordinal);
+        Assert.Contains("_restoreSourceOnClose = command != CaptureActionId.Library", code, StringComparison.Ordinal);
         Assert.Contains("_openLibraryAfterPaletteCloses", ReadFixture("MainWindow.xaml.cs.txt"), StringComparison.Ordinal);
         Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
         Assert.Contains("FocusCommandSurface", code, StringComparison.Ordinal);
@@ -206,15 +204,15 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("_captureArea.Right - width", code, StringComparison.Ordinal);
         Assert.Contains("_captureArea.Bottom - height", code, StringComparison.Ordinal);
         Assert.Contains("CameraSelfViewPlacement.Compute", code, StringComparison.Ordinal);
-        // Opaque edge to edge, like every other transient surface.
-        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
+        // The feed remains unaltered while denied-camera fallback follows the theme.
+        Assert.Contains("Background=\"{ThemeResource PocketBase}\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         // The camera has to be held before FFmpeg writes frames and released as
         // soon as the recording stops, or the next preflight preview finds it busy.
         Assert.True(main.IndexOf("ShowCameraSelfViewAsync(options)", StringComparison.Ordinal) <
-            main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
+            main.IndexOf("RecordingSession.StartVideoAsync(options)", StringComparison.Ordinal));
         Assert.Contains("DismissCameraSelfView", main, StringComparison.Ordinal);
-        Assert.Contains("RecordingState.Idle or RecordingState.Failed", main, StringComparison.Ordinal);
+        Assert.Contains("RecordingState.Finalizing or RecordingState.Idle or RecordingState.Failed", main, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -299,13 +297,17 @@ public sealed class UtilitySurfaceContractTests
         // The seed does not trigger a start of its own.
         var selectionChanged = Section(preflight, "private async void CameraBox_SelectionChanged", "}");
         Assert.Contains("_seeding", selectionChanged, StringComparison.Ordinal);
-        // And the assignment disposes anything already there rather than dropping it.
-        var start = Section(preflight, "private async Task StartCameraPreviewCoreAsync", "ShowCameraSlot(true");
-        Assert.Contains("_previewRenderer = started;", start, StringComparison.Ordinal);
-        Assert.True(
-            start.IndexOf("await _previewRenderer.DisposeAsync()", StringComparison.Ordinal) <
-            start.IndexOf("_previewRenderer = started;", StringComparison.Ordinal),
-            "The previous renderer has to go down before the new one takes its place.");
+        // A start owns candidates locally until it is safe to publish them. Closing
+        // at any await therefore leaves the resources reachable by finally instead
+        // of publishing a new camera after teardown has already run.
+        var start = Section(preflight, "private async Task StartCameraPreviewCoreAsync", "private void ShowCameraSlot");
+        Assert.Contains("MediaCapture? capture = null", start, StringComparison.Ordinal);
+        Assert.Contains("CameraEffectRenderer? renderer = null", start, StringComparison.Ordinal);
+        Assert.Contains("if (_closing)", start, StringComparison.Ordinal);
+        Assert.Contains("_mediaCapture = capture", start, StringComparison.Ordinal);
+        Assert.Contains("if (!published)", start, StringComparison.Ordinal);
+        Assert.Contains("await renderer.DisposeAsync()", start, StringComparison.Ordinal);
+        Assert.Contains("capture?.Dispose()", start, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -320,10 +322,15 @@ public sealed class UtilitySurfaceContractTests
         // drained, which strands the MediaCapture and leaves the capture light on.
         Assert.Contains("ConfigureAwait(false)", renderer, StringComparison.Ordinal);
         Assert.Contains("await renderer.DisposeAsync().ConfigureAwait(false)", preflight, StringComparison.Ordinal);
-        // And the device dispose does not sit behind that await unguarded: the
-        // Closed path disposes the capture directly as well.
-        var cleanup = Section(preflight, "private void CleanupDevices()", "private static string GetDiskSpaceStatus");
-        Assert.Contains("capture?.Dispose()", cleanup, StringComparison.Ordinal);
+        // Normal close is intercepted and awaits serialized teardown while the
+        // window dispatcher is alive. Closed retains a synchronous last resort.
+        Assert.Contains("AppWindow.Closing += AppWindow_Closing", preflight, StringComparison.Ordinal);
+        var close = Section(preflight, "private async Task CloseAfterCleanupAsync()", "private void EmergencyCleanupDevices()");
+        Assert.Contains("await StopCameraPreviewAsync()", close, StringComparison.Ordinal);
+        Assert.True(close.IndexOf("await StopCameraPreviewAsync()", StringComparison.Ordinal) <
+            close.IndexOf("Close()", StringComparison.Ordinal));
+        var cleanup = Section(preflight, "private void EmergencyCleanupDevices()", "private static string GetDiskSpaceStatus");
+        Assert.Contains("_mediaCapture?.Dispose()", cleanup, StringComparison.Ordinal);
         // The self-view disposes its capture synchronously, after the async
         // renderer teardown is kicked off rather than awaited.
         var release = Section(selfView, "private void ReleaseCamera()", "_mediaCapture = null;");
@@ -354,6 +361,26 @@ public sealed class UtilitySurfaceContractTests
         Assert.True(preflight.IndexOf("await renderer.DisposeAsync()", StringComparison.Ordinal) <
             preflight.IndexOf("capture?.Dispose()", StringComparison.Ordinal));
         Assert.Contains("await renderer.DisposeAsync()", selfView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recording_releases_the_camera_after_capture_and_before_finalization_work()
+    {
+        var recording = ReadFixture("RecordingService.cs.txt");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var stop = Section(recording, "public async Task<CaptureRecord?> StopVideoAsync", "private void StartVideoMicrophone");
+
+        // The self-view must be present through FFmpeg's last frame. Finalizing is
+        // published only after the process has exited and been disposed, but before
+        // muxing and capture registration can keep the operation busy.
+        Assert.True(stop.IndexOf("process.Dispose()", StringComparison.Ordinal) <
+            stop.IndexOf("SetState(RecordingState.Finalizing)", StringComparison.Ordinal));
+        Assert.True(stop.IndexOf("SetState(RecordingState.Finalizing)", StringComparison.Ordinal) <
+            stop.IndexOf("MuxVideoMicrophoneAsync", StringComparison.Ordinal));
+        Assert.True(stop.IndexOf("process.Dispose()", StringComparison.Ordinal) <
+            stop.IndexOf("SetState(RecordingState.Failed)", StringComparison.Ordinal));
+        Assert.Contains("RecordingState.Finalizing or RecordingState.Idle or RecordingState.Failed", main, StringComparison.Ordinal);
+        Assert.Contains("DismissCameraSelfView()", main, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -506,14 +533,15 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
-    public void Video_preflight_keeps_advanced_controls_scrollable_and_auto_reveals_them()
+    public void Video_preflight_has_one_bounded_inspector_scroll_and_a_fixed_start_action()
     {
         var xaml = ReadFixture("VideoPreflightWindow.xaml");
         var code = ReadFixture("VideoPreflightWindow.xaml.cs.txt");
-
-        Assert.Contains("VerticalScrollBarVisibility=\"Visible\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Expanding=\"MoreOptions_Expanding\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("OptionsScroll.ChangeView", code, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(xaml, "<ScrollViewer").Cast<System.Text.RegularExpressions.Match>());
+        Assert.Contains("x:Name=\"OptionsPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Camera appearance", xaml, StringComparison.Ordinal);
+        Assert.Contains("Recording options", xaml, StringComparison.Ordinal);
+        Assert.Contains("TransientWindowLayoutPolicy.Resolve", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -521,14 +549,12 @@ public sealed class UtilitySurfaceContractTests
     {
         var xaml = ReadFixture("RecordingHudWindow.xaml");
 
-        Assert.Contains("Background=\"#FF09110F\"", xaml, StringComparison.Ordinal);
-        // Sized to fit the drawer. The previous 17/22 pt text overflowed the panel and
-        // was cut off, which is worse for legibility than smaller text that fits.
-        Assert.Contains("FontSize=\"15\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"12\"", xaml, StringComparison.Ordinal);
-        Assert.DoesNotContain("FontSize=\"22\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Content=\"Stop &amp; save\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("BorderThickness=\"0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketGlassPanel}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"20\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"13\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Stop and save\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"40\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=\"#CCFF5A67\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ThemeShadow", xaml, StringComparison.Ordinal);
@@ -544,14 +570,14 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("PointerExited=\"Root_PointerExited\"", xaml, StringComparison.Ordinal);
         // Keyboard users must be able to reach the actions without a pointer.
         Assert.Contains("GotFocus=\"Root_GotFocus\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("StripHeight = 32", code, StringComparison.Ordinal);
+        Assert.Contains("StripHeight = 40", code, StringComparison.Ordinal);
         // The window is one fixed size that slides; resizing it or recomputing a window
         // region per frame is what made the travel stutter.
         Assert.Contains("WindowPlacement.MoveTo(this, _panelLeft, top)", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ClipToRoundedRegion", code, StringComparison.Ordinal);
         Assert.DoesNotContain("PlaceTopCenter", code, StringComparison.Ordinal);
-        // Opens on approach, not on contact.
-        Assert.Contains("DrawerAnimation.IsPointerNear", code, StringComparison.Ordinal);
+        Assert.Contains("SetDrawerTarget", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("WindowPlacement.PointerPosition()", code, StringComparison.Ordinal);
         Assert.Contains("DrawerAnimation.Advance", code, StringComparison.Ordinal);
         // Escape still stops and saves, so a collapsed HUD never traps a recording.
         Assert.Contains("EscapeHotkey.Capture", code, StringComparison.Ordinal);
@@ -567,7 +593,7 @@ public sealed class UtilitySurfaceContractTests
         var receipt = ReadFixture("ReceiptWindow.xaml");
         var placement = ReadFixture("WindowPlacement.cs.txt");
 
-        Assert.Contains("Background=\"#FF141E1A\"", receipt, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketTransientSurface}\"", receipt, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"Transparent\"", receipt, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderBrush=", receipt, StringComparison.Ordinal);
         Assert.Contains("DwmSetWindowAttribute", placement, StringComparison.Ordinal);
@@ -604,7 +630,7 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("UriSource", snapshot, StringComparison.Ordinal);
         Assert.Contains("Starting…", hud, StringComparison.Ordinal);
         Assert.True(main.IndexOf("RecordingHudWindow.ShowForVideo", StringComparison.Ordinal) <
-            main.IndexOf("Recording.StartVideoAsync(options)", StringComparison.Ordinal));
+            main.IndexOf("RecordingSession.StartVideoAsync(options)", StringComparison.Ordinal));
     }
 
     [Fact]

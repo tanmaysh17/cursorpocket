@@ -18,12 +18,14 @@ public sealed partial class MainWindow : Window
     private RecordingService? _subscribedRecording;
     private MouseActivityService? _mouseActivity;
     private System.Windows.Forms.NotifyIcon? _tray;
+    private System.Windows.Forms.ContextMenuStrip? _trayMenu;
     private System.Windows.Forms.ToolStripMenuItem? _companionTrayItem;
     private long _lastSourceWindow;
     private (CaptureBounds Bounds, int? OutputIndex)? _displayTarget;
     private CaptureBounds? _lastRegion;
     private bool _openLibraryAfterPaletteCloses;
     private bool _quitting;
+    private readonly ReceiptCoordinator _receipts;
 
     // Pins are held only for their lifetime and never restored after a restart: a window
     // that reappears after a reboot with no explanation is exactly the unexplained
@@ -33,6 +35,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.Persistent);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon("Assets/AppIcon.ico");
@@ -48,8 +51,10 @@ public sealed partial class MainWindow : Window
         InitializeCommandPalette();
         InitializeCompanion();
         InitializeTray();
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         SubscribeToRecordingState();
         App.Services.SettingsChanged += Services_SettingsChanged;
+        _receipts = new ReceiptCoordinator(ShowLibrary);
     }
 
     public void ShowLibrary()
@@ -131,13 +136,105 @@ public sealed partial class MainWindow : Window
         _preflight.Activate();
     }
 
+    /// <summary>
+    /// Opens one deterministic surface for installed-build visual and accessibility
+    /// review. Normal activation never calls this path.
+    /// </summary>
+    public async Task ShowQaSurfaceAsync(string surface)
+    {
+        var scenario = surface.Trim().ToLowerInvariant();
+        var page = RootFrame.Content as MainPage;
+        switch (scenario)
+        {
+            case "library":
+                ShowLibrary();
+                break;
+            case "capture":
+                AppWindow.Show(true);
+                page?.NavigateTo("capture");
+                ActivateMainWindow();
+                break;
+            case "settings":
+                ShowSettings();
+                break;
+            case "command":
+            case "command-root":
+                AppWindow.Hide();
+                ShowCommandPalette();
+                break;
+            case "screenshot":
+            case "screenshot-chooser":
+                AppWindow.Hide();
+                ShowCommandPalette("screenshot");
+                break;
+            case "video":
+            case "video-preflight":
+                AppWindow.Hide();
+                ShowVideoPreflight();
+                break;
+            case "annotation":
+                AppWindow.Hide();
+                await AnnotateFileAsync(CreateQaFixture());
+                break;
+            case "receipt":
+                AppWindow.Hide();
+                _receipts.Show(new ReceiptRequest(CreateQaRecord(CreateQaFixture()), "Screenshot saved", "Copied to the clipboard"));
+                break;
+            case "error-receipt":
+                AppWindow.Hide();
+                ShowError("Camera is unavailable", "Screen recording is still available without the camera.");
+                break;
+            case "pin":
+                AppWindow.Hide();
+                var fixture = CreateQaFixture();
+                PinCapture(CreateQaRecord(fixture), fixture);
+                break;
+            case "hud":
+                AppWindow.Hide();
+                RecordingHudWindow.ShowForAudio("QA microphone", _ => Task.CompletedTask);
+                break;
+            default:
+                ShowLibrary();
+                break;
+        }
+    }
+
+    private static string CreateQaFixture()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "CursorPocket-surface-fixture.png");
+        if (File.Exists(path)) return path;
+        using var bitmap = new Bitmap(1280, 720);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.FromArgb(238, 241, 236));
+        using var line = new Pen(Color.FromArgb(39, 179, 106), 6);
+        graphics.DrawRectangle(line, 72, 72, 1136, 576);
+        using var heading = new Font("Segoe UI Variable Display", 42, FontStyle.Bold);
+        using var body = new Font("Segoe UI Variable Text", 22, FontStyle.Regular);
+        using var ink = new SolidBrush(Color.FromArgb(24, 31, 27));
+        graphics.DrawString("CursorPocket review fixture", heading, ink, 112, 128);
+        graphics.DrawString("A deterministic canvas for annotation, pin, and receipt states.", body, ink, 116, 210);
+        graphics.DrawLine(line, 116, 310, 560, 520);
+        graphics.DrawEllipse(line, 690, 300, 300, 210);
+        bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        return path;
+    }
+
+    private static CaptureRecord CreateQaRecord(string path) => new()
+    {
+        Id = "qa-surface",
+        Kind = "screenshot",
+        CreatedAt = DateTimeOffset.Now.ToString("O"),
+        RelativePath = path,
+        Preview = "CursorPocket review fixture",
+    };
+
     public async Task ToggleAudioRecordingAsync()
     {
         try
         {
-            if (App.Services.Recording.State == RecordingState.Recording && !App.Services.Recording.IsVideo)
+            if (App.Services.RecordingSession.IsActive && !App.Services.RecordingSession.IsVideo)
             {
-                var record = await App.Services.Recording.StopAudioAsync();
+                var record = await App.Services.RecordingSession.FinishAsync();
                 if (record is not null)
                 {
                     ShowReceipt(record, "Audio note saved");
@@ -147,12 +244,14 @@ public sealed partial class MainWindow : Window
             var microphones = App.Services.Recording.GetMicrophones();
             var microphone = CursorPocket.Core.Services.MediaDeviceSelector.SelectRemembered(microphones, App.Services.Settings.VideoMicrophoneName);
             App.Services.Context.RestoreFocus(_lastSourceWindow);
-            await App.Services.Recording.StartAudioAsync(microphone?.Id);
+            await App.Services.RecordingSession.StartAudioAsync(microphone?.Id);
             RecordingHudWindow.ShowForAudio(
                 microphone?.Name ?? "Default microphone",
                 async discard =>
                 {
-                    var record = await App.Services.Recording.StopAudioAsync(discard);
+                    CaptureRecord? record = null;
+                    if (discard) await App.Services.RecordingSession.DiscardAsync();
+                    else record = await App.Services.RecordingSession.FinishAsync();
                     if (record is not null) ShowReceipt(record, "Audio note saved");
                     else ShowError(discard ? "Audio note discarded" : "Audio note was not saved", "No file was created.");
                 });
@@ -211,11 +310,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void Palette_CommandRequested(object? sender, string command)
+    private async void Palette_CommandRequested(object? sender, CaptureActionId command)
     {
         var source = sender is CommandPaletteWindow palette ? palette.SourceWindow : _lastSourceWindow;
         _lastSourceWindow = source;
-        if (command == "library")
+        if (command == CaptureActionId.Library)
         {
             // Showing a persistent window from the palette's close callback
             // avoids Windows reactivating the source after we show Library.
@@ -224,17 +323,16 @@ public sealed partial class MainWindow : Window
         }
         switch (command)
         {
-            case "video": ShowVideoPreflight(); break;
-            case "repeat-video": await StartVideoAsync(BuildRememberedVideoOptions()); break;
-            case "audio": await ToggleAudioRecordingAsync(); break;
-            case "text": await CaptureTextAsync(); break;
-            case "link": await CaptureLinkAsync(); break;
-            case "clipboard": await AnnotateClipboardAsync(); break;
-            case "display": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureDisplayAsync()); break;
-            case "all-displays": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureAllDisplaysAsync()); break;
-            case "window": await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureWindowAsync(source)); break;
-            case "region": SelectRegion(async bounds => await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureRegionAsync(bounds))); break;
-            case "previous-region":
+            case CaptureActionId.Video: ShowVideoPreflight(); break;
+            case CaptureActionId.RepeatVideo: await StartVideoAsync(BuildRememberedVideoOptions()); break;
+            case CaptureActionId.Audio: await ToggleAudioRecordingAsync(); break;
+            case CaptureActionId.Text: await CaptureTextAsync(); break;
+            case CaptureActionId.Link: await CaptureLinkAsync(); break;
+            case CaptureActionId.Display: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureDisplayAsync()); break;
+            case CaptureActionId.AllDisplays: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureAllDisplaysAsync()); break;
+            case CaptureActionId.Window: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureWindowAsync(source)); break;
+            case CaptureActionId.Region: SelectRegion(async bounds => await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureRegionAsync(bounds))); break;
+            case CaptureActionId.PreviousRegion:
                 if (_lastRegion is null) ShowError("No previous region", "Capture a region once and CursorPocket will remember it.");
                 else await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureRegionAsync(_lastRegion));
                 break;
@@ -252,7 +350,8 @@ public sealed partial class MainWindow : Window
             var copied = await CopyImageToClipboardAsync(path);
             OpenEditor(record, path, AnnotationOrigin.FreshCapture, cancelled: () => ShowReceipt(
                 record,
-                copied ? "Screenshot saved · copied" : "Screenshot saved without annotation"));
+                copied ? "Screenshot saved · copied" : "Screenshot saved",
+                copied ? null : "The clipboard was busy. The saved capture is safe."));
         }
         catch (Exception error)
         {
@@ -413,14 +512,25 @@ public sealed partial class MainWindow : Window
             editor.Cancelled += (_, _) => cancelled();
         }
 
-        editor.CopyRequested += async (_, _) => await CopyImageToClipboardAsync(path);
+        editor.CopyRequested += async (_, temporary) =>
+        {
+            try
+            {
+                if (!await CopyImageToClipboardAsync(temporary))
+                {
+                    ShowError("Copy did not finish", "The clipboard was busy. The original capture is unchanged.");
+                }
+            }
+            finally { try { File.Delete(temporary); } catch (IOException) { } }
+        };
         editor.SavedAsNewCapture += async (_, temporary) => await RegisterEditedCopyAsync(temporary);
         editor.Discarded += async (_, _) => await DiscardCaptureAsync(record, path);
-        editor.PinRequested += (_, _) => PinCapture(record, path);
+        editor.PinExportRequested += async (_, temporary) => await RegisterEditedCopyAndPinAsync(temporary);
         editor.Saved += async (_, _) =>
         {
             var copied = await CopyImageToClipboardAsync(path);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied));
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
+                copied ? null : "Saved successfully, but the clipboard was busy.");
         };
 
         if (origin == AnnotationOrigin.FreshCapture)
@@ -484,11 +594,34 @@ public sealed partial class MainWindow : Window
                 new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
 
             var copied = await CopyImageToClipboardAsync(reservation.AbsolutePath);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied));
+            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied),
+                copied ? null : "Saved successfully, but the clipboard was busy.");
         }
         catch (Exception error)
         {
             ShowError("The edited copy was not saved", error.Message);
+        }
+    }
+
+    private async Task RegisterEditedCopyAndPinAsync(string temporaryPath)
+    {
+        try
+        {
+            var reservation = App.Services.CaptureStore.Reserve(CaptureKind.Screenshot, ".png");
+            File.Move(temporaryPath, reservation.AbsolutePath, true);
+            using var bitmap = new System.Drawing.Bitmap(reservation.AbsolutePath);
+            var record = await App.Services.CaptureStore.RegisterExistingAsync(
+                CaptureKind.Screenshot,
+                reservation.AbsolutePath,
+                $"Screenshot · {bitmap.Width} × {bitmap.Height}",
+                new Dictionary<string, object?> { ["width"] = bitmap.Width, ["height"] = bitmap.Height });
+            PinCapture(record, reservation.AbsolutePath);
+            ShowReceipt(record, "Screenshot saved and pinned");
+        }
+        catch (Exception error)
+        {
+            try { File.Delete(temporaryPath); } catch (IOException) { }
+            ShowError("The pin was not created", error.Message);
         }
     }
 
@@ -565,7 +698,9 @@ public sealed partial class MainWindow : Window
                 options,
                 async discard =>
                 {
-                    var record = await App.Services.Recording.StopVideoAsync(discard);
+                    CaptureRecord? record = null;
+                    if (discard) await App.Services.RecordingSession.DiscardAsync();
+                    else record = await App.Services.RecordingSession.FinishAsync();
                     if (record is not null) ShowReceipt(record, "Video saved");
                     else ShowError(discard ? "Recording discarded" : "Video was not saved", "No file was created.");
                 });
@@ -574,7 +709,7 @@ public sealed partial class MainWindow : Window
             // before FFmpeg starts writing frames. The preflight has already released
             // its own preview by this point.
             await ShowCameraSelfViewAsync(options);
-            await App.Services.Recording.StartVideoAsync(options);
+            await App.Services.RecordingSession.StartVideoAsync(options);
             _ = App.Services.UpdateRecordingDefaultsAsync(rememberedSettings);
         }
         catch (Exception error)
@@ -621,19 +756,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ShowReceipt(CaptureRecord record, string title)
-    {
-        var receipt = new ReceiptWindow(record, title);
-        receipt.OpenLibraryRequested += (_, _) => ShowLibrary();
-        receipt.AppWindow.Show(false);
-    }
+    private void ShowReceipt(CaptureRecord record, string title, string? detail = null)
+        => _receipts.Show(new ReceiptRequest(record, title, detail));
 
     private void ShowError(string title, string detail)
-    {
-        var receipt = new ReceiptWindow(null, title, detail);
-        receipt.OpenLibraryRequested += (_, _) => ShowLibrary();
-        receipt.AppWindow.Show(false);
-    }
+        => _receipts.Show(new ReceiptRequest(null, title, detail));
 
     private void Recording_StateChanged(object? sender, RecordingState state) => App.DispatcherQueue.TryEnqueue(() =>
     {
@@ -644,7 +771,7 @@ public sealed partial class MainWindow : Window
         }
         // Release the camera as soon as the recording is no longer running, so the
         // device is free for the next preflight preview.
-        if (state is RecordingState.Idle or RecordingState.Failed)
+        if (state is RecordingState.Finalizing or RecordingState.Idle or RecordingState.Failed)
         {
             DismissCameraSelfView();
         }
@@ -697,6 +824,7 @@ public sealed partial class MainWindow : Window
     private void Services_SettingsChanged(object? sender, AppSettings settings) =>
         App.DispatcherQueue.TryEnqueue(() =>
         {
+            App.Theme.SetMode(settings.ThemeMode);
             SubscribeToRecordingState();
             _companion?.SetMode(settings.CursorCompanionMode);
             if (_mouseActivity is not null)
@@ -739,6 +867,7 @@ public sealed partial class MainWindow : Window
         if (_mouseActivity?.TryConsumeLatestPosition(out var x, out var y) == true)
         {
             _companion?.Follow(x, y);
+            RecordingHudWindow.NotifyPointerMoved(x, y);
         }
     }
 
@@ -751,11 +880,19 @@ public sealed partial class MainWindow : Window
             Visible = true,
             Icon = File.Exists(iconPath) ? new Icon(iconPath) : SystemIcons.Application,
         };
-        var menu = new System.Windows.Forms.ContextMenuStrip();
+        var menu = _trayMenu = new System.Windows.Forms.ContextMenuStrip
+        {
+            ShowImageMargin = false,
+            Padding = new System.Windows.Forms.Padding(6),
+            Font = new Font("Segoe UI Variable Text", 10f),
+        };
         menu.Items.Add("Open command mode", null, (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette()));
         menu.Items.Add("Screenshot…", null, (_, _) => App.DispatcherQueue.TryEnqueue(() => ShowCommandPalette("screenshot")));
         menu.Items.Add("Video…", null, (_, _) => App.DispatcherQueue.TryEnqueue(ShowVideoPreflight));
+        menu.Items.Add("Repeat video", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await RepeatVideoRecordingAsync()));
         menu.Items.Add("Audio note", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await ToggleAudioRecordingAsync()));
+        menu.Items.Add("Highlighted text", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await CaptureTextAsync()));
+        menu.Items.Add("Current link", null, (_, _) => App.DispatcherQueue.TryEnqueue(async () => await CaptureLinkAsync()));
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         // Two ways into the editor for an image CursorPocket did not take. On the tray
         // rather than in command mode, so neither costs a bare key that would then have to
@@ -775,6 +912,8 @@ public sealed partial class MainWindow : Window
         menu.Items.Add(_companionTrayItem);
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => App.DispatcherQueue.TryEnqueue(Quit));
+        menu.Opening += (_, _) => ApplyTrayTheme();
+        ApplyTrayTheme();
         _tray.ContextMenuStrip = menu;
         _tray.DoubleClick += (_, _) => App.DispatcherQueue.TryEnqueue(ShowLibrary);
     }
@@ -792,6 +931,40 @@ public sealed partial class MainWindow : Window
 
     private async void Quit()
     {
+        if (App.Services.RecordingSession.IsActive)
+        {
+            AppWindow.Show();
+            Activate();
+            var dialog = new Microsoft.UI.Xaml.Controls.ContentDialog
+            {
+                Title = "A recording is still running",
+                Content = "Finish the recording before CursorPocket quits, discard it, or keep the app open.",
+                PrimaryButtonText = "Finish and quit",
+                SecondaryButtonText = "Discard and quit",
+                CloseButtonText = "Cancel",
+                DefaultButton = Microsoft.UI.Xaml.Controls.ContentDialogButton.Primary,
+                XamlRoot = RootFrame.XamlRoot,
+            };
+            var result = await dialog.ShowAsync();
+            if (result == Microsoft.UI.Xaml.Controls.ContentDialogResult.None) return;
+            try
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                if (result == Microsoft.UI.Xaml.Controls.ContentDialogResult.Primary)
+                {
+                    await App.Services.RecordingSession.FinishAsync(timeout.Token);
+                }
+                else
+                {
+                    await App.Services.RecordingSession.DiscardAsync(timeout.Token);
+                }
+            }
+            catch (Exception error)
+            {
+                ShowError("CursorPocket is still recording", error.Message);
+                return;
+            }
+        }
         _quitting = true;
         await PersistGeometryAsync();
         if (_subscribedRecording is not null)
@@ -799,10 +972,31 @@ public sealed partial class MainWindow : Window
             _subscribedRecording.StateChanged -= Recording_StateChanged;
         }
         _mouseActivity?.Dispose();
+        App.Theme.ThemeChanged -= Theme_ThemeChanged;
+        _receipts.Dispose();
         _companion?.Close();
         _tray?.Dispose();
         Close();
         ((App)Microsoft.UI.Xaml.Application.Current).Shutdown();
+    }
+
+    public Task RepeatVideoRecordingAsync() => StartVideoAsync(BuildRememberedVideoOptions());
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => ApplyTrayTheme();
+
+    private void ApplyTrayTheme()
+    {
+        if (_trayMenu is null) return;
+        var palette = App.Theme.Palette;
+        _trayMenu.Renderer = App.Theme.CreateMenuRenderer();
+        _trayMenu.BackColor = palette.Background;
+        _trayMenu.ForeColor = palette.Text;
+        foreach (System.Windows.Forms.ToolStripItem item in _trayMenu.Items)
+        {
+            item.ForeColor = item.Enabled ? palette.Text : palette.Muted;
+            item.BackColor = palette.Background;
+        }
+        _trayMenu.Invalidate();
     }
 
     private void SubscribeToRecordingState()

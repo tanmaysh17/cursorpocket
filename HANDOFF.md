@@ -13,7 +13,7 @@ This is the continuation map for another coding agent. Read `AGENTS.md` and `DES
 - Default capture root: `%USERPROFILE%\Documents\CursorPocket Captures`
 - Release outputs: `artifacts\CursorPocket-Setup-x64.exe` and `artifacts\CursorPocket-portable-win-x64.zip`
 
-The Python app remains only as a behavioral reference. Do not add a Python bridge to the native release.
+The unsupported Python app is archived under `legacy-python/`. It is outside CI and release scope; do not add a Python bridge or port fixes into it.
 
 ## Architecture map
 

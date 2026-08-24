@@ -4,7 +4,9 @@ param(
     [switch]$SkipTests,
     [switch]$SkipFfmpeg,
     [switch]$SkipModels,
-    [switch]$RequireInstaller
+    [switch]$SkipInstaller,
+    [switch]$RequireInstaller,
+    [switch]$RequireMsix
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +17,8 @@ $testsProject = Join-Path $PSScriptRoot "CursorPocket.Tests\CursorPocket.Tests.c
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishRoot = Join-Path $artifactsRoot "CursorPocket-win-x64"
 $portableArchive = Join-Path $artifactsRoot "CursorPocket-portable-win-x64.zip"
+$msixPath = Join-Path $artifactsRoot "CursorPocket-x64.msix"
+$msixStaging = Join-Path $artifactsRoot ".msix-staging"
 
 function Resolve-Dotnet {
     $command = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -54,6 +58,8 @@ if (-not $SkipTests) {
 New-Item -ItemType Directory -Path $artifactsRoot -Force | Out-Null
 Remove-ArtifactPath $publishRoot
 if (Test-Path -LiteralPath $portableArchive) { Remove-Item -LiteralPath $portableArchive -Force }
+if (Test-Path -LiteralPath $msixPath) { Remove-Item -LiteralPath $msixPath -Force }
+Remove-ArtifactPath $msixStaging
 
 # ReadyToRun precompiles the managed code that WinUI startup would otherwise JIT
 # method by method, which is the bulk of cold-start time for an unpackaged app.
@@ -126,25 +132,62 @@ foreach ($packageNotice in $packageNotices) {
     }
 }
 
+$makeAppx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter makeappx.exe -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '\\x64\\makeappx\.exe$' } |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1
+if (-not $makeAppx) {
+    # The SDK build-tools package already restored by the native project carries
+    # MakeAppx. Developer machines do not need a separate full Windows SDK install.
+    $makeAppx = Get-ChildItem $nugetRoot -Filter makeappx.exe -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match 'microsoft\.windows\.sdk\.buildtools.*\\x64\\makeappx\.exe$' } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1
+}
+if ($makeAppx) {
+    Copy-Item -LiteralPath $publishRoot -Destination $msixStaging -Recurse
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot "packaging\AppxManifest.xml") -Destination (Join-Path $msixStaging "AppxManifest.xml") -Force
+    # MakeAppx validates the exact manifest paths before resource qualification is
+    # evaluated. Keep the scale-qualified files for Windows and add base-name aliases
+    # for the three paths declared by the hand-authored full-trust manifest.
+    foreach ($logo in @("Square150x150Logo", "Square44x44Logo", "Wide310x150Logo")) {
+        $qualifiedLogo = Join-Path $msixStaging "Assets\$logo.scale-200.png"
+        $manifestLogo = Join-Path $msixStaging "Assets\$logo.png"
+        if (-not (Test-Path -LiteralPath $qualifiedLogo)) {
+            throw "MSIX logo is missing: $qualifiedLogo"
+        }
+        Copy-Item -LiteralPath $qualifiedLogo -Destination $manifestLogo -Force
+    }
+    & $makeAppx.FullName pack /d $msixStaging /p $msixPath /o
+    if ($LASTEXITCODE -ne 0) { throw "MSIX packaging failed." }
+    Remove-ArtifactPath $msixStaging
+}
+elseif ($RequireMsix) {
+    throw "The Windows SDK makeappx.exe is required to create the MSIX artifact."
+}
+else {
+    Write-Warning "makeappx.exe is not installed; no MSIX was created."
+}
+
 Compress-Archive -Path (Join-Path $publishRoot "*") -DestinationPath $portableArchive -CompressionLevel Optimal
 
-$iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+$iscc = if ($SkipInstaller) { $null } else { Get-Command ISCC.exe -ErrorAction SilentlyContinue }
 $isccPath = if ($iscc) { $iscc.Source } else { $null }
-if (-not $isccPath) {
+if (-not $SkipInstaller -and -not $isccPath) {
     $knownIsccPaths = @(
         (Join-Path $env:LOCALAPPDATA "Programs\Inno Setup 6\ISCC.exe"),
         (Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe")
     )
     $isccPath = $knownIsccPaths | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
-if ($isccPath) {
+if (-not $SkipInstaller -and $isccPath) {
     & $isccPath (Join-Path $PSScriptRoot "installer\CursorPocket.iss")
     if ($LASTEXITCODE -ne 0) { throw "The CursorPocket installer build failed." }
 }
 elseif ($RequireInstaller) {
     throw "Inno Setup 6 is required to create the installer artifact."
 }
-else {
+elseif (-not $SkipInstaller) {
     Write-Warning "Inno Setup is not installed; the portable ZIP is ready, but no installer was created."
 }
 
