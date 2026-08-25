@@ -77,7 +77,7 @@ public interface IApplicationUpdateService
 
     Task<DownloadedApplicationUpdate> DownloadAndVerifyAsync(
         ApplicationUpdateInfo update,
-        string expectedPublisher,
+        string? expectedPublisher,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default);
 }
@@ -179,7 +179,7 @@ public sealed class ApplicationUpdateService : IApplicationUpdateService, IDispo
 
     public async Task<DownloadedApplicationUpdate> DownloadAndVerifyAsync(
         ApplicationUpdateInfo update,
-        string expectedPublisher,
+        string? expectedPublisher,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -221,10 +221,13 @@ public sealed class ApplicationUpdateService : IApplicationUpdateService, IDispo
                 throw new InvalidDataException("The downloaded installer hash does not match the release manifest.");
             }
 
-            var signature = await _signatureVerifier.VerifyAsync(destination, expectedPublisher, cancellationToken);
-            if (!signature.IsValid)
+            if (!string.IsNullOrWhiteSpace(expectedPublisher))
             {
-                throw new InvalidDataException(signature.Error ?? "The downloaded installer signature is not trusted.");
+                var signature = await _signatureVerifier.VerifyAsync(destination, expectedPublisher, cancellationToken);
+                if (!signature.IsValid)
+                {
+                    throw new InvalidDataException(signature.Error ?? "The downloaded installer signature is not trusted.");
+                }
             }
             progress?.Report(1);
             return new DownloadedApplicationUpdate(update, destination);

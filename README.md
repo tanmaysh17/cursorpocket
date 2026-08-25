@@ -116,7 +116,9 @@ A normal first launch opens a short field guide that explains the cursor compani
 
 CursorPocket reads one static release file from `https://tanmaysh17.github.io/cursorpocket/update.json` at most once every 24 hours. The check sends no installation ID, capture information, settings, or analytics, and it fails silently when offline. Disable it or run a manual check under **Settings → Updates**.
 
-When a newer signed release is available, CursorPocket asks before downloading. It verifies the exact SHA-256, trusted Authenticode signature, publisher, Windows requirement, and version before launching the installer. Installation waits until recording, capture, and annotation work is finished.
+When a newer release is available, CursorPocket asks before downloading. It accepts only this project's HTTPS GitHub Release address and verifies the exact byte length, SHA-256, Windows requirement, and version before launching the installer. Installation waits until recording, capture, and annotation work is finished.
+
+Early builds that still require a Tanmay Sharma code-signing certificate cannot install the first unsigned release automatically. Install version 0.4.1 manually from this repository once; automatic updates are seamless from 0.4.1 onward.
 
 ## Native Windows build
 
@@ -128,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 
 This produces the self-contained app under `artifacts\CursorPocket-win-x64`. With Inno Setup 6 installed it also creates `artifacts\CursorPocket-Setup-x64.exe`. Portable ZIP and MSIX outputs remain optional development artifacts and can be skipped with `-SkipPortableArchive` and `-SkipMsix`.
 
-For another person, the only supported public artifact is `CursorPocket-Setup-x64.exe`: it installs per user, requires no administrator access, and includes the self-contained runtime and FFmpeg. Download it from the [CursorPocket site](https://tanmaysh17.github.io/cursorpocket/) or the latest GitHub Release. Tagged releases use Azure Artifact Signing through GitHub OIDC, verify the publisher and timestamp, install the finished artifact in CI, and refuse to publish any unsigned build. A new signing identity may still show a temporary SmartScreen reputation warning; confirm the publisher is **Tanmay Sharma** and never install a certificate manually.
+For another person, the only supported public artifact is `CursorPocket-Setup-x64.exe`: it installs per user, requires no administrator access, and includes the self-contained runtime and FFmpeg. Download it from the [CursorPocket site](https://tanmaysh17.github.io/cursorpocket/) or the latest GitHub Release. Releases are intentionally unsigned so this open-source project can publish entirely through GitHub's free public-repository infrastructure. Windows may therefore show **Unknown publisher** or a Microsoft Defender SmartScreen warning; verify that the download came from this repository before choosing **More info → Run anyway**. The release workflow still installs and checks the finished artifact in CI, publishes SHA-256 hashes, and attests its GitHub build provenance.
 
 Release configuration and the exact version/tag procedure are documented in [RELEASING.md](RELEASING.md).
 

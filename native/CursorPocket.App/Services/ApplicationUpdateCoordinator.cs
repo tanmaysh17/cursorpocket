@@ -8,7 +8,9 @@ namespace CursorPocket_App.Services;
 
 public sealed class ApplicationUpdateCoordinator : IDisposable
 {
-    public const string ExpectedPublisher = "Tanmay Sharma";
+    // Public releases are intentionally unsigned while CursorPocket is a free project.
+    // Set this to the certificate publisher name if code signing is added later.
+    public const string? ExpectedPublisher = null;
     public static readonly Uri ManifestUri = new("https://tanmaysh17.github.io/cursorpocket/update.json");
     private readonly IApplicationUpdateService _service;
     private readonly ISettingsUpdateQueue _settings;

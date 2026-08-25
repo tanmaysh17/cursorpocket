@@ -4,16 +4,17 @@
 
 ## 0.4.1 — 2026-08-24
 
-- Made successful `main` builds automatically queue the signed-release pipeline, require a new documented version before merge, and safely resume partial publication, so each app merge becomes a verified GitHub Release and live update manifest without manual tagging.
+- Made successful `main` builds automatically queue the release pipeline, require a new documented version before merge, and safely resume partial publication, so each app merge becomes a GitHub Release and live update manifest without manual tagging.
 - Removed superseded logo iterations, obsolete vector marks, duplicate application-state icons, and generated per-size PNG intermediates; the repository now keeps four approved brand masters plus the final assets consumed by Windows and the public site.
 - Promoted brand logo #1—the transparent-cursor orbit—into the installed Windows app across the tray, taskbar, Start, command panel, installer, and splash surfaces; recording state remains explicit through the tray tooltip, cursor companion, and recording HUD.
 - Enlarged logo #1 to fill the tray and taskbar icon canvases, with an optically larger orbit in the 16–64 px Windows frames, and to render at 40 px in command mode and the persistent window title bar; the app now sets its taskbar icon explicitly from the installed brand asset.
 - Fixed the cursor companion's ready indicator so its documented bright green core remains visible in light and dark themes instead of being darkened or consumed by its contrast ring.
 - Added a first-run field guide with live theme support, all seven mnemonic commands, shortcut readiness, a real command-mode rehearsal, persistent completion, and a Settings entry to rerun it.
-- Added a signed tag-release gate so friend-facing GitHub releases cannot silently publish unsigned Windows installers.
-- Added a private GitHub update flow with daily throttling, manual checks, explicit approval, hash and Windows publisher validation, active-work protection, quiet installation, and relaunch.
+- Added a tag-release gate with installed-payload verification, build provenance, hashes, notices, and manifest validation before a friend-facing GitHub Release can publish.
+- Added a private GitHub update flow with daily throttling, manual checks, explicit approval, approved-origin and exact hash/size validation, active-work protection, quiet installation, and relaunch.
 - Added a responsive GitHub Pages product, privacy, installation, and support site with no analytics, cookies, external fonts, or app-content upload.
-- Replaced PFX release secrets with Azure Artifact Signing over GitHub OIDC, made the signed per-user Setup EXE the sole public app download, and added hashes, provenance, installed-payload verification, and a static update manifest.
+- Made the per-user Setup EXE the sole public app download and added hashes, GitHub build provenance, installed-payload verification, and a static update manifest. Releases are intentionally unsigned so the open-source distribution remains free and needs no Azure subscription.
+- Documented the one-time manual 0.4.1 install required to move early signature-enforcing builds onto the free unsigned update channel; later updates remain automatic.
 - Centralized application and installer versions in `native/Version.props` and versioned onboarding completion for safe future revisions.
 
 - Added camera effects to the self-view: background blur, background replacement (three bundled backgrounds or your own image), face touch-up, and brightness, warmth, and contrast. Everything runs on-device — the person mask comes from a hash-pinned local model, and no frame or derived data leaves the machine.

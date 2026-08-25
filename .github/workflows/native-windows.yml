@@ -108,7 +108,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  queue-signed-release:
+  queue-release:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: [validate-release-version, build-test-package]
     runs-on: ubuntu-latest
@@ -161,22 +161,21 @@ jobs:
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "should-dispatch=true" >> $env:GITHUB_OUTPUT
-      - name: Queue the signed release workflow
+      - name: Queue the release workflow
         if: ${{ steps.release.outputs.should-dispatch == 'true' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run native-windows.yml --ref "${{ steps.release.outputs.tag }}"
 
-  signed-release:
+  publish-release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: windows-2022
     timeout-minutes: 60
-    environment: release
     permissions:
       contents: write
-      id-token: write
       attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -204,83 +203,20 @@ jobs:
       - name: Test native services and compatibility
         shell: pwsh
         run: dotnet test native/CursorPocket.Tests/CursorPocket.Tests.csproj -c Release --no-restore
-      - name: Publish unsigned application payload
+      - name: Publish application payload
         shell: pwsh
         run: ./native/build-native.ps1 -SkipRestore -SkipTests -SkipFfmpeg -SkipInstaller -SkipPortableArchive -SkipMsix
-      - name: Sign in to Azure with GitHub OIDC
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Sign CursorPocket application binaries
-        uses: azure/artifact-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files: |
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.exe
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.dll
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.Core.dll
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
-      - name: Build installer from signed payload
+      - name: Build installer
         shell: pwsh
         run: ./native/build-installer.ps1
-      - name: Sign installer
-        uses: azure/artifact-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files: ${{ github.workspace }}\artifacts\CursorPocket-Setup-x64.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
-      - name: Verify publisher, timestamp, and installed payload
+      - name: Verify installer and installed payload
         shell: pwsh
         run: |
-          $signed = @(
-            "artifacts/CursorPocket-win-x64/CursorPocket.exe",
-            "artifacts/CursorPocket-win-x64/CursorPocket.dll",
-            "artifacts/CursorPocket-win-x64/CursorPocket.Core.dll",
-            "artifacts/CursorPocket-Setup-x64.exe"
-          )
-          foreach ($path in $signed) {
-            $signature = Get-AuthenticodeSignature -LiteralPath $path
-            if ($signature.Status -ne "Valid") { throw "$path signature is $($signature.Status): $($signature.StatusMessage)" }
-            $publisher = $signature.SignerCertificate.GetNameInfo('SimpleName', $false)
-            if ($publisher -ne "Tanmay Sharma") { throw "$path has unexpected publisher '$publisher'." }
-            if ($null -eq $signature.TimeStamperCertificate) { throw "$path is missing a trusted timestamp." }
+          if (-not (Test-Path -LiteralPath "artifacts/CursorPocket-Setup-x64.exe")) {
+            throw "The installer was not built."
           }
           $installRoot = Join-Path $env:RUNNER_TEMP "CursorPocket-installed"
           $installer = (Resolve-Path "artifacts/CursorPocket-Setup-x64.exe").Path
@@ -288,15 +224,15 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Installed-build verification failed with exit code $($process.ExitCode)." }
           $publishedHash = (Get-FileHash artifacts/CursorPocket-win-x64/CursorPocket.exe -Algorithm SHA256).Hash
           $installedHash = (Get-FileHash (Join-Path $installRoot "CursorPocket.exe") -Algorithm SHA256).Hash
-          if ($publishedHash -ne $installedHash) { throw "The installer payload does not match the signed application." }
-      - name: Create hashes and private update manifest
+          if ($publishedHash -ne $installedHash) { throw "The installer payload does not match the published application." }
+      - name: Create hashes and update manifest
         shell: pwsh
         run: ./tools/New-UpdateManifest.ps1 -InstallerPath artifacts/CursorPocket-Setup-x64.exe -Tag $env:GITHUB_REF_NAME
       - name: Attest installer provenance
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: artifacts/CursorPocket-Setup-x64.exe
-      - name: Publish signed GitHub release
+      - name: Publish GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -336,7 +272,7 @@ jobs:
 
   deploy-release-pages:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    needs: signed-release
+    needs: publish-release
     runs-on: ubuntu-latest
     environment:
       name: github-pages

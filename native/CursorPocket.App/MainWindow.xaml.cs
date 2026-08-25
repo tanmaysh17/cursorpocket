@@ -936,7 +936,7 @@ public sealed partial class MainWindow : Window
             _receipts.Show(new ReceiptRequest(
                 null,
                 $"Downloading CursorPocket {update.Version}",
-                "The signed installer is being verified before anything changes.",
+                "The installer hash is being verified before anything changes.",
                 LifetimeOverride: TimeSpan.FromSeconds(6),
                 VisualKind: ReceiptVisualKind.Information));
             var downloaded = await App.Services.Updates.DownloadAsync(update);
