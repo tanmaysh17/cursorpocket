@@ -173,9 +173,27 @@
       "mode": "RGBA"
     },
     {
+      "path": "site/assets/catch-field.png",
+      "width": 1536,
+      "height": 1024,
+      "mode": "RGBA"
+    },
+    {
       "path": "site/assets/mark.png",
       "width": 128,
       "height": 128,
+      "mode": "RGBA"
+    },
+    {
+      "path": "site/assets/motion-wordmark.png",
+      "width": 1200,
+      "height": 236,
+      "mode": "RGBA"
+    },
+    {
+      "path": "site/assets/pocket-mark.png",
+      "width": 438,
+      "height": 512,
       "mode": "RGBA"
     }
   ]

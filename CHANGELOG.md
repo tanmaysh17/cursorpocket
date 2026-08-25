@@ -4,7 +4,7 @@
 
 ## 0.4.3 — 2026-08-25
 
-- Expanded the public site with detailed annotation, video recording, and Library capability previews, plus practical guidance for each workflow on the Support page.
+- Expanded the public site with detailed annotation, video recording, and Library capability previews, practical Support guidance, and the approved cyclone, orbit, pocket, and motion-wordmark brand assets.
 
 ## 0.4.2 — 2026-08-25
 

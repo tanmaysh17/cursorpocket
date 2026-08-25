@@ -24,7 +24,7 @@
 
   <main>
     <section class="hero shell">
-      <div>
+      <div class="hero-copy">
         <div class="eyebrow">Local-first capture for Windows</div>
         <h1>Keep the moment. Stay in the flow.</h1>
         <p class="lede">Screenshots, recordings, audio notes, selected text, and links—one shortcut away, saved on your PC.</p>
@@ -35,18 +35,22 @@
         <p class="requirements">Windows 10 version 2004 or newer · x64 · Per-user install · No account</p>
       </div>
 
-      <div class="command-field" aria-label="CursorPocket command mode preview">
-        <div class="command-head"><span class="live">Ready</span><span class="mono">Ctrl Shift Space</span></div>
-        <div class="command-list">
-          <div class="command active"><span class="glyph" aria-hidden="true">▣</span><span class="label">Screenshot</span><span class="key">S</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">●</span><span class="label">Video</span><span class="key">V</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">↻</span><span class="label">Repeat video</span><span class="key">⇧V</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">≈</span><span class="label">Audio note</span><span class="key">A</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">T</span><span class="label">Highlighted text</span><span class="key">T</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">↗</span><span class="label">Current link</span><span class="key">L</span></div>
-          <div class="command"><span class="glyph" aria-hidden="true">⌁</span><span class="label">Library</span><span class="key">O</span></div>
+      <div class="brand-field">
+        <img class="catch-field-art" src="assets/catch-field.png" alt="" aria-hidden="true">
+        <div class="command-field" aria-label="CursorPocket command mode preview">
+          <div class="command-head"><span class="command-brand"><img src="assets/mark.png" alt=""><span>CursorPocket</span></span><span class="live">Ready</span><span class="mono">Ctrl Shift Space</span></div>
+          <div class="command-list">
+            <div class="command active"><span class="glyph" aria-hidden="true">▣</span><span class="label">Screenshot</span><span class="key">S</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">●</span><span class="label">Video</span><span class="key">V</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">↻</span><span class="label">Repeat video</span><span class="key">⇧V</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">≈</span><span class="label">Audio note</span><span class="key">A</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">T</span><span class="label">Highlighted text</span><span class="key">T</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">↗</span><span class="label">Current link</span><span class="key">L</span></div>
+            <div class="command"><span class="glyph" aria-hidden="true">⌁</span><span class="label">Library</span><span class="key">O</span></div>
+          </div>
+          <svg class="cursor" viewBox="0 0 40 54" aria-hidden="true"><path d="M3 2 36 31 22 32l9 18-9 4-8-19-11 11V2Z" fill="#49de93" stroke="#09110d" stroke-width="3" stroke-linejoin="round"/></svg>
         </div>
-        <svg class="cursor" viewBox="0 0 40 54" aria-hidden="true"><path d="M3 2 36 31 22 32l9 18-9 4-8-19-11 11V2Z" fill="#49de93" stroke="#09110d" stroke-width="3" stroke-linejoin="round"/></svg>
+        <p class="brand-field-caption"><span>Catch now.</span> Find it later.</p>
       </div>
     </section>
 
@@ -134,6 +138,7 @@
                 <li><strong>Act without hunting.</strong> Open, mark up, copy a path, reveal the file, or move one or many captures to the Recycle Bin.</li>
               </ul>
               <p class="capability-note">Arrow keys navigate, <span class="inline-key">Enter</span> opens, and <span class="inline-key">Space</span> plays or pauses.</p>
+              <div class="pocket-promise"><img src="assets/pocket-mark.png" alt=""><p><strong>Quiet capture, kept on this computer.</strong><span>The pocket mark means saved locally and ready when you come back.</span></p></div>
             </div>
             <div class="product-frame library-frame" role="img" aria-label="Illustration of the CursorPocket Library with capture filters, item list, and media preview">
               <div class="frame-title"><span>Everything you caught</span><span class="frame-status">24 captures</span></div>
@@ -150,7 +155,7 @@
   </main>
 
   <footer class="site-footer">
-    <div class="footer-inner shell"><span>CursorPocket · Made for Windows by Tanmay Sharma</span><div class="footer-links"><a href="privacy.html">Privacy</a><a href="support.html">Support</a><a href="https://github.com/tanmaysh17/cursorpocket">GitHub</a></div></div>
+    <div class="footer-inner shell"><div class="footer-signature"><img src="assets/motion-wordmark.png" alt="CursorPocket"><span>Made for Windows by Tanmay Sharma</span></div><div class="footer-links"><a href="privacy.html">Privacy</a><a href="support.html">Support</a><a href="https://github.com/tanmaysh17/cursorpocket">GitHub</a></div></div>
   </footer>
 </body>
 </html>
