@@ -1,0 +1,67 @@
+name: macOS Preview
+
+on:
+  push:
+    branches: [main, "codex/**"]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-preview:
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal macOS app
+        run: ./macos/build-macos.sh
+      - name: Verify app bundle
+        run: |
+          test -x artifacts/CursorPocket.app/Contents/MacOS/CursorPocket
+          test "$(lipo -archs artifacts/CursorPocket.app/Contents/MacOS/CursorPocket)" = "x86_64 arm64" || \
+            test "$(lipo -archs artifacts/CursorPocket.app/Contents/MacOS/CursorPocket)" = "arm64 x86_64"
+          codesign --verify --deep --strict artifacts/CursorPocket.app
+          ditto -x -k artifacts/CursorPocket-macOS-universal.zip "$RUNNER_TEMP/unpacked"
+          test -x "$RUNNER_TEMP/unpacked/CursorPocket.app/Contents/MacOS/CursorPocket"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursorPocket-macOS-preview
+          path: artifacts/CursorPocket-macOS-universal.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-macos-preview:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: build-macos-preview
+    runs-on: macos-14
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal macOS app
+        run: ./macos/build-macos.sh
+      - name: Attest app provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: artifacts/CursorPocket-macOS-universal.zip
+      - name: Publish macOS preview to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in {1..60}; do
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              gh release upload "$GITHUB_REF_NAME" artifacts/CursorPocket-macOS-universal.zip --clobber
+              exit 0
+            fi
+            echo "Waiting for the Windows release job to create $GITHUB_REF_NAME ($attempt/60)..."
+            sleep 15
+          done
+          echo "Timed out waiting for GitHub Release $GITHUB_REF_NAME" >&2
+          exit 1

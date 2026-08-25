@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.4 — 2026-08-26
+
+- Added a native SwiftUI macOS app for Apple silicon and Intel Macs with interactive region/window screenshots saved locally to `Documents/CursorPocket Captures`; it requests Screen Recording access only when capture is used.
+- Added macOS CI packaging, universal-binary verification, ad-hoc signing, provenance attestation, and tagged GitHub Release publication as `CursorPocket-macOS-universal.zip`.
+- Documented the macOS preview's support boundary, local build, distribution, and first-launch Gatekeeper behavior.
+
 ## 0.4.3 — 2026-08-25
 
 - Expanded the public site with detailed annotation, video recording, and Library capability previews, plus practical guidance for each workflow on the Support page.

@@ -2,6 +2,8 @@
 
 CursorPocket is a local-first Windows capture utility. A tiny green cursor mark follows the pointer, giving you quick access to screenshots, video, audio notes, selected text, and the current browser link. It turns red while audio or video is recording.
 
+A universal native macOS app is also attached to each GitHub Release. Its first supported workflow is interactive region/window screenshots saved locally in `Documents/CursorPocket Captures`; video, audio, annotation, and the cursor companion still rely on Windows APIs and are not yet available on Mac. Download `CursorPocket-macOS-universal.zip` for Apple silicon or Intel Macs. macOS asks for Screen Recording access when you make the first capture; CursorPocket requests no microphone, camera, accessibility, or automation access.
+
 Everything is saved to one organized folder on your computer. CursorPocket has no account, analytics, cloud upload, or AI service.
 
 ## The everyday workflow
@@ -133,6 +135,16 @@ This produces the self-contained app under `artifacts\CursorPocket-win-x64`. Wit
 For another person, the only supported public artifact is `CursorPocket-Setup-x64.exe`: it installs per user, requires no administrator access, and includes the self-contained runtime and FFmpeg. Download it from the [CursorPocket site](https://tanmaysh17.github.io/cursorpocket/) or the latest GitHub Release. Releases are intentionally unsigned so this open-source project can publish entirely through GitHub's free public-repository infrastructure. Windows may therefore show **Unknown publisher** or a Microsoft Defender SmartScreen warning; verify that the download came from this repository before choosing **More info → Run anyway**. The release workflow still installs and checks the finished artifact in CI, publishes SHA-256 hashes, and attests its GitHub build provenance.
 
 Release configuration and the exact version/tag procedure are documented in [RELEASING.md](RELEASING.md).
+
+## macOS build
+
+The macOS edition is a small native SwiftUI application supporting Apple silicon and Intel Macs on macOS 13 or newer. It currently captures an interactively selected region or window to PNG and opens the saved file in Finder. Build its universal, ad-hoc-signed app archive on macOS with:
+
+```bash
+./macos/build-macos.sh
+```
+
+The script produces `artifacts/CursorPocket-macOS-universal.zip`. GitHub Actions builds and verifies it on pull requests and attaches it to each tagged GitHub Release. It is not notarized, so macOS may require **Control-click → Open** on first launch. The first screenshot also prompts for macOS Screen Recording permission.
 
 ## Develop locally
 
