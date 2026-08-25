@@ -47,6 +47,14 @@ while ($true) {
     }
 }
 
+# Older builds shipped a duplicate recording application icon. The app now
+# keeps one stable installed identity, so remove that retired payload when an
+# existing installation is upgraded in place.
+$obsoleteRecordingIcon = Join-Path $installDir "Assets\AppIconRecording.ico"
+if (Test-Path -LiteralPath $obsoleteRecordingIcon) {
+    Remove-Item -LiteralPath $obsoleteRecordingIcon -Force
+}
+
 $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $installedExe

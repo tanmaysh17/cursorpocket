@@ -21,7 +21,7 @@ The canonical main application logo is `assets/brand/main-logo.png`: the green-a
 
 ### Secondary pocket mark
 
-`assets/brand/brand-logo-02-pocket-v3-transparent.png` is brand logo #2: a ready-green capture loop tucked behind a simple single-panel teal pocket, with the cursor held inside the captured field. Its pocket and return loop form one uninterrupted flowing upper boundary—never a sharp peak, separate raised lip, rim, or edge stripe. The transparent master is the reusable asset; `brand-logo-02-pocket-v3.png` retains the deep-pine presentation ground. Use it when the local, kept, and recoverable side of CursorPocket should lead.
+`assets/brand/brand-logo-02-pocket-v3-transparent.png` is brand logo #2: a ready-green capture loop tucked behind a simple single-panel teal pocket, with the cursor held inside the captured field. Its pocket and return loop form one uninterrupted flowing upper boundary—never a sharp peak, separate raised lip, rim, or edge stripe. Use this transparent master when the local, kept, and recoverable side of CursorPocket should lead; add the Pine presentation ground at composition time.
 
 ### Motion wordmark
 
@@ -101,32 +101,23 @@ The current completed transparent hero master is `assets/brand/imagery/cursorpoc
 | --- | --- |
 | `assets/brand/main-logo.png` | Canonical transparent main app logo |
 | `assets/brand/brand-logo-02-pocket-v3-transparent.png` | Canonical transparent secondary pocket logo |
-| `assets/brand/brand-logo-02-pocket-v3.png` | Secondary pocket logo on deep-pine ground |
 | `assets/brand/brand-logo-03-wordmark-transparent.png` | Transparent reversed motion wordmark for dark surfaces |
-| `assets/brand/logo-mark.svg` | Default ready mark |
-| `assets/brand/logo-mark-recording.svg` | Recording mark with negative-space cursor |
-| `assets/brand/logo-lockup.svg` | Flat lockup for light surfaces |
-| `assets/brand/logo-lockup-reversed.svg` | Flat lockup for dark surfaces |
-| `assets/brand/app-icon*.svg` | Vector application state icons |
-| `assets/brand/tray-*.svg` | Hand-simplified 24 px tray masters |
 | `assets/brand/icons/` | Fourteen product-specific SVG glyphs |
 | `assets/brand/icon-set.svg` | Glyph contact sheet |
 | `assets/brand/imagery/cursorpocket-catch-field-v2-transparent.png` | Completed high-resolution transparent catch-field hero |
-| `assets/brand/imagery/cursorpocket-catch-field.png` | Brand hero artwork |
 | `assets/brand/export/` | Generated PNG and ICO deliverables |
-| `assets/brand/export/brand-board.png` | Rebuilt 2400 × 1800 brand board using all approved masters |
-| `assets/brand/export/logo-mark*.png` | Pixel-identical primary, ready, and recording master exports |
-| `assets/brand/export/wordmark*.png` | Transparent wordmark and dark/light presentation exports |
-| `assets/brand/export/logo-lockup*.png` | Transparent, dark, light, ready, and stacked signature lockups |
-| `assets/brand/export/catch-field*.png` | Transparent and deep-pine hero deliverables |
-| `assets/brand/export/app-icon-*.png` | Ready and recording application tiles from 16–1024 px |
-| `assets/brand/export/tray-*.png` | Ready and recording transparent tray marks from 16–64 px |
-| `assets/brand/export/CursorPocket*.ico` | Eight-frame ready and recording Windows icon files |
+| `assets/brand/export/brand-board.png` | Current 2400 × 1800 brand board using all approved masters |
+| `assets/brand/export/wordmark-on-*.png` | Dark and light wordmark presentation exports |
+| `assets/brand/export/logo-lockup*.png` | Current horizontal and stacked signature lockups |
+| `assets/brand/export/catch-field-on-dark.png` | Deep-pine hero presentation |
+| `assets/brand/export/CursorPocket.ico` | Eight-frame Windows application icon |
+| `assets/brand/export/CursorPocket-tray-*.ico` | Six-frame Windows tray resources |
 | `assets/brand/export/brand-assets-manifest.json` | Source and deliverable dimensions/modes for automated consumers |
 | `assets/brand/brand-tokens.json` | Machine-readable colour and shape tokens |
+| `site/assets/mark.png` | Current web favicon and navigation mark |
 | `tools/make_brand_assets.py` | Deterministic raster/ICO export pipeline |
 
-The export generator treats `main-logo.png`, `brand-logo-02-pocket-v3-transparent.png`, `brand-logo-03-wordmark-transparent.png`, and `imagery/cursorpocket-catch-field-v2-transparent.png` as read-only approved masters. Their direct exports are pixel-identical; only presentation backgrounds, lockup composition, and requested size reductions are derived.
+The export generator treats `main-logo.png`, `brand-logo-02-pocket-v3-transparent.png`, `brand-logo-03-wordmark-transparent.png`, and `imagery/cursorpocket-catch-field-v2-transparent.png` as the only approved raster masters. Presentation backgrounds, lockups, Windows icons, and the site mark are derived from them. Per-size PNG intermediates and duplicate ready/recording application icons are intentionally not retained.
 
 Regenerate production exports with:
 
@@ -139,4 +130,4 @@ python .\tools\make_brand_assets.py
 
 `python tools/make_brand_assets.py` now stages the approved identity directly into the WinUI runtime assets. Brand logo #1 supplies the executable, taskbar, title bar, command-panel header, Start/MSIX, installer, splash, and tray mark in every state. The pocket remains available as a secondary brand illustration. `native/build-native.ps1` refuses to publish if either tray-state resource or the application assets are missing.
 
-Verify the ready and recording marks at 16, 20, 24, 32, 48, and 256 px on the active Windows display scale before release.
+Verify the stable application mark at 16, 20, 24, 32, 48, and 256 px on the active Windows display scale before release.

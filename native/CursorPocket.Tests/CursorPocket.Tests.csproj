@@ -87,7 +87,6 @@
     <None Include="..\build-native.ps1" Link="Fixtures\build-native.ps1.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\packaging\AppxManifest.xml" Link="Fixtures\AppxManifest.xml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\AppIcon.ico" Link="Fixtures\Brand\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\CursorPocket.App\Assets\AppIconRecording.ico" Link="Fixtures\Brand\AppIconRecording.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\TrayReady.ico" Link="Fixtures\Brand\TrayReady.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\TrayRecording.ico" Link="Fixtures\Brand\TrayRecording.ico" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\CursorPocketLogo.png" Link="Fixtures\Brand\CursorPocketLogo.png" CopyToOutputDirectory="PreserveNewest" />

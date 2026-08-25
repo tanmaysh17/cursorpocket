@@ -726,6 +726,8 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("AppWindow.SetTitleBarIcon(iconPath)", code, StringComparison.Ordinal);
         Assert.Contains("IconFilename: \"{app}\\Assets\\AppIcon.ico\"", installer, StringComparison.Ordinal);
         Assert.Contains("$shortcut.IconLocation = \"$installedIcon,0\"", localInstall, StringComparison.Ordinal);
+        Assert.Contains("Assets\\AppIconRecording.ico", localInstall, StringComparison.Ordinal);
+        Assert.Contains("Remove-Item -LiteralPath $obsoleteRecordingIcon", localInstall, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -737,7 +739,6 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("Get-ChildItem -LiteralPath $targetDir -Filter \"*.pri\"", script, StringComparison.Ordinal);
         Assert.Contains("$requiredWinUiResources", script, StringComparison.Ordinal);
         Assert.Contains("Assets\\AppIcon.ico", script, StringComparison.Ordinal);
-        Assert.Contains("Assets\\AppIconRecording.ico", script, StringComparison.Ordinal);
         Assert.Contains("Assets\\TrayReady.ico", script, StringComparison.Ordinal);
         Assert.Contains("Assets\\TrayRecording.ico", script, StringComparison.Ordinal);
         Assert.Contains("\"SplashScreen\"", script, StringComparison.Ordinal);

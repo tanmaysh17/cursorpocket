@@ -13,6 +13,7 @@ BRAND = ROOT / "assets" / "brand"
 IMAGERY = BRAND / "imagery"
 EXPORT = BRAND / "export"
 NATIVE_ASSETS = ROOT / "native" / "CursorPocket.App" / "Assets"
+SITE_ASSETS = ROOT / "site" / "assets"
 
 PRIMARY_SOURCE = BRAND / "main-logo.png"
 READY_SOURCE = BRAND / "brand-logo-02-pocket-v3-transparent.png"
@@ -27,7 +28,7 @@ RECORDING = (255, 89, 100, 255)
 LINK = (122, 167, 255, 255)
 MIST = (142, 160, 153, 255)
 
-APP_SIZES = (16, 20, 24, 32, 44, 48, 64, 128, 150, 256, 310, 512, 1024)
+APP_ICON_SIZES = (16, 20, 24, 32, 48, 64, 128, 256)
 TRAY_SIZES = (16, 20, 24, 32, 48, 64)
 
 
@@ -228,7 +229,7 @@ def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
 
 def make_brand_board(
     primary_mark: Image.Image,
-    ready_mark: Image.Image,
+    pocket_mark: Image.Image,
     wordmark: Image.Image,
     hero: Image.Image,
 ) -> Image.Image:
@@ -241,7 +242,7 @@ def make_brand_board(
     meta_font = font(24)
 
     primary = content_crop(primary_mark, 10)
-    ready = content_crop(ready_mark, 10)
+    pocket = content_crop(pocket_mark, 10)
     signature = content_crop(wordmark, 10)
 
     draw.text((105, 62), "PRIMARY SIGNATURE", font=label_font, fill=MIST)
@@ -251,15 +252,15 @@ def make_brand_board(
     draw.text((690, 475), "Catch now. Find it later.", font=display_font, fill=PAPER)
     draw.text((694, 555), "Quiet capture, kept on this computer.", font=body_font, fill=MIST)
 
-    draw.text((105, 665), "STATE MARKS", font=label_font, fill=MIST)
-    paste_center(canvas, ready, (105, 705, 475, 1080))
-    paste_center(canvas, primary, (505, 705, 875, 1080))
-    draw.text((144, 1093), "READY / SAVED", font=label_font, fill=READY)
-    draw.text((540, 1093), "RECORDING", font=label_font, fill=RECORDING)
+    draw.text((105, 665), "MARK SYSTEM", font=label_font, fill=MIST)
+    paste_center(canvas, primary, (105, 705, 475, 1080))
+    paste_center(canvas, pocket, (505, 705, 875, 1080))
+    draw.text((144, 1093), "APP IDENTITY", font=label_font, fill=READY)
+    draw.text((540, 1093), "POCKET ILLUSTRATION", font=label_font, fill=FOLD)
 
-    draw.text((1020, 735), "One identity, two explicit states.", font=title_font, fill=PAPER)
-    draw.text((1020, 810), "The pocket holds the capture. The orbit signals live recording.", font=body_font, fill=MIST)
-    draw.text((1020, 862), "Colour changes with meaning; silhouette reinforces it without colour.", font=body_font, fill=MIST)
+    draw.text((1020, 735), "One stable identity, one supporting metaphor.", font=title_font, fill=PAPER)
+    draw.text((1020, 810), "The orbit is the installed mark. The pocket explains local keeping.", font=body_font, fill=MIST)
+    draw.text((1020, 862), "Recording state lives in product feedback, not a second app logo.", font=body_font, fill=MIST)
     draw.text((1020, 952), "Pocket + Orbit", font=display_font, fill=PAPER)
     draw.text((1024, 1035), "gesture  /  cursor  /  catch  /  local receipt  /  live state", font=meta_font, fill=MIST)
 
@@ -304,15 +305,16 @@ def make_wide_tile(ready_mark: Image.Image, wordmark: Image.Image) -> Image.Imag
     return canvas
 
 
-def write_ico(frame_paths: dict[int, Path], path: Path) -> None:
+def write_ico(frames_by_size: dict[int, Image.Image], path: Path) -> None:
     """Write a PNG-backed ICO without resampling any reviewed per-size frame."""
     path.parent.mkdir(parents=True, exist_ok=True)
     frames: list[tuple[int, bytes]] = []
-    for size, frame_path in sorted(frame_paths.items()):
-        with Image.open(frame_path) as image:
-            if image.size != (size, size):
-                raise ValueError(f"ICO frame has the wrong dimensions: {frame_path}")
-        frames.append((size, frame_path.read_bytes()))
+    for size, image in sorted(frames_by_size.items()):
+        if image.size != (size, size):
+            raise ValueError(f"ICO frame has the wrong dimensions: {size}px")
+        buffer = BytesIO()
+        image.save(buffer, "PNG", optimize=True)
+        frames.append((size, buffer.getvalue()))
 
     header = struct.pack("<HHH", 0, 1, len(frames))
     offset = len(header) + len(frames) * 16
@@ -378,7 +380,6 @@ def sync_native_runtime_assets(
     primary_mark: Image.Image,
     wordmark: Image.Image,
     app_icon: Path,
-    recording_app_icon: Path,
     tray_ready_icon: Path,
     tray_recording_icon: Path,
 ) -> list[Path]:
@@ -403,7 +404,6 @@ def sync_native_runtime_assets(
 
     icon_sources = {
         "AppIcon.ico": app_icon,
-        "AppIconRecording.ico": recording_app_icon,
         "TrayReady.ico": tray_ready_icon,
         "TrayRecording.ico": tray_recording_icon,
     }
@@ -412,6 +412,35 @@ def sync_native_runtime_assets(
         write_bytes_if_changed(target, source.read_bytes())
         written.append(target)
     return written
+
+
+def sync_site_asset(taskbar_mark: Image.Image) -> Path:
+    """Keep the public site favicon/navigation mark on the current app logo."""
+    SITE_ASSETS.mkdir(parents=True, exist_ok=True)
+    target = SITE_ASSETS / "mark.png"
+    save_png(make_taskbar_unplated(taskbar_mark, 128), target)
+    return target
+
+
+def remove_superseded_exports() -> None:
+    """Remove generated intermediates retired from the public deliverable set."""
+    stale_names = {
+        "CursorPocket-recording.ico",
+        "catch-field-transparent.png",
+        "logo-lockup-ready-on-dark.png",
+        "logo-mark-ready.png",
+        "logo-mark-recording.png",
+        "logo-mark.png",
+        "wordmark-transparent.png",
+    }
+    for path in EXPORT.iterdir():
+        if (
+            path.name in stale_names
+            or path.match("app-icon-*.png")
+            or path.match("tray-ready-*.png")
+            or path.match("tray-recording-*.png")
+        ):
+            path.unlink()
 
 
 def export_manifest(
@@ -441,6 +470,7 @@ def export_manifest(
 
 def main() -> None:
     EXPORT.mkdir(parents=True, exist_ok=True)
+    remove_superseded_exports()
 
     primary_master = load_master(PRIMARY_SOURCE)
     ready_master = load_master(READY_SOURCE)
@@ -461,20 +491,11 @@ def main() -> None:
         exported.append(path)
         return path
 
-    # Exact approved masters, copied into the deliverables directory without
-    # recoloring, redrawing, or geometry changes.
-    png(primary_master, "logo-mark.png")
-    png(ready_master, "logo-mark-ready.png")
-    png(primary_master, "logo-mark-recording.png")
-    png(wordmark_master, "wordmark-transparent.png")
-    png(hero_master, "catch-field-transparent.png")
-
     png(make_wordmark_panel(wordmark_light, PINE), "wordmark-on-dark.png")
     png(make_wordmark_panel(wordmark_dark, PAPER), "wordmark-on-light.png")
     png(make_horizontal_lockup(primary, wordmark_light, None), "logo-lockup-transparent.png")
     png(make_horizontal_lockup(primary, wordmark_light, PINE), "logo-lockup-on-dark.png")
     png(make_horizontal_lockup(primary, wordmark_dark, PAPER), "logo-lockup-on-light.png")
-    png(make_horizontal_lockup(ready, wordmark_light, PINE), "logo-lockup-ready-on-dark.png")
     png(make_stacked_lockup(primary, wordmark_light, None), "logo-stacked-transparent.png")
     png(make_stacked_lockup(primary, wordmark_light, PINE), "logo-stacked-on-dark.png")
 
@@ -482,39 +503,30 @@ def main() -> None:
     hero_on_dark.alpha_composite(hero_master)
     png(hero_on_dark, "catch-field-on-dark.png")
 
-    app_frames: dict[int, Path] = {}
-    recording_frames: dict[int, Path] = {}
+    app_frames: dict[int, Image.Image] = {}
     taskbar_primary = make_taskbar_mark(primary)
-    for size in APP_SIZES:
+    for size in APP_ICON_SIZES:
         # Brand logo #1 is the installed application identity in every state.
         # Preserve its outer field and negative-space cursor as transparency.
         if size <= 64:
             app = make_taskbar_unplated(taskbar_primary, size)
-            recording_app = make_taskbar_unplated(taskbar_primary, size)
         else:
             app = make_unplated(primary, size)
-            recording_app = make_unplated(primary, size)
-        app_frames[size] = png(app, f"app-icon-{size}.png")
-        recording_frames[size] = png(recording_app, f"app-icon-recording-{size}.png")
+        app_frames[size] = app
 
-    ico_sizes = (16, 20, 24, 32, 48, 64, 128, 256)
     cursorpocket_ico = EXPORT / "CursorPocket.ico"
-    recording_ico = EXPORT / "CursorPocket-recording.ico"
-    write_ico({size: app_frames[size] for size in ico_sizes}, cursorpocket_ico)
-    write_ico({size: recording_frames[size] for size in ico_sizes}, recording_ico)
-    exported.extend((cursorpocket_ico, recording_ico))
+    write_ico(app_frames, cursorpocket_ico)
+    exported.append(cursorpocket_ico)
 
-    tray_ready_frames: dict[int, Path] = {}
-    tray_recording_frames: dict[int, Path] = {}
+    tray_frames: dict[int, Image.Image] = {}
     for size in TRAY_SIZES:
         # Tooltips carry state; both resources retain logo #1 as the tray identity.
-        tray_ready_frames[size] = png(make_tray_primary(size), f"tray-ready-{size}.png")
-        tray_recording_frames[size] = png(make_tray_primary(size), f"tray-recording-{size}.png")
+        tray_frames[size] = make_tray_primary(size)
 
     tray_ready_ico = EXPORT / "CursorPocket-tray-ready.ico"
     tray_recording_ico = EXPORT / "CursorPocket-tray-recording.ico"
-    write_ico(tray_ready_frames, tray_ready_ico)
-    write_ico(tray_recording_frames, tray_recording_ico)
+    write_ico(tray_frames, tray_ready_ico)
+    write_ico(tray_frames, tray_recording_ico)
     exported.extend((tray_ready_ico, tray_recording_ico))
 
     png(make_brand_board(primary, ready, wordmark_light, hero), "brand-board.png")
@@ -523,10 +535,10 @@ def main() -> None:
         primary,
         wordmark_light,
         cursorpocket_ico,
-        recording_ico,
         tray_ready_ico,
         tray_recording_ico,
     )
+    runtime.append(sync_site_asset(taskbar_primary))
 
     export_manifest(
         {
