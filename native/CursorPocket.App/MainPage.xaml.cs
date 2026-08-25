@@ -254,8 +254,8 @@ public sealed partial class MainPage : Page
     private void MaximizePreview_Click(object sender, RoutedEventArgs eventArgs)
     {
         var maximized = ListColumn.Width.Value > 0;
-        ListColumn.Width = maximized ? new GridLength(0) : new GridLength(4, GridUnitType.Star);
-        ListColumn.MinWidth = maximized ? 0 : 240;
+        ListColumn.Width = maximized ? new GridLength(0) : new GridLength(35, GridUnitType.Star);
+        ListColumn.MinWidth = maximized ? 0 : 280;
         MaximizePreviewIcon.Glyph = maximized ? "" : "";
         ToolTipService.SetToolTip(MaximizePreviewButton, maximized ? "Show the capture list" : "Fill the window with the preview");
     }
