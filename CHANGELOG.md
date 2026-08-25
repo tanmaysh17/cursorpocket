@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.2 — 2026-08-25
+
+- Expanded the public site with detailed annotation, video recording, and Library capability previews, plus practical guidance for each workflow on the Support page.
+
 ## 0.4.1 — 2026-08-24
 
 - Made successful `main` builds automatically queue the release pipeline, require a new documented version before merge, and safely resume partial publication, so each app merge becomes a GitHub Release and live update manifest without manual tagging.
