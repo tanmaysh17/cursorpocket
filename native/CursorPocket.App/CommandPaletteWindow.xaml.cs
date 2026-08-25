@@ -2,6 +2,7 @@ using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
@@ -15,8 +16,12 @@ namespace CursorPocket_App;
 public sealed partial class CommandPaletteWindow : Window
 {
     // Command mode reopens wherever the user last put it and never moves on its own.
-    private const int PanelWidth = 296;
-    private const int PanelHeight = 340;
+    private const int RegularWidth = 304;
+    private const int RegularHeight = 438;
+    private const int ShortWidth = 520;
+    private const int ShortHeight = 308;
+    private const int ScreenshotWidth = 304;
+    private const int ScreenshotHeight = 294;
     private const int PanelMargin = 22;
 
     private readonly DispatcherTimer _timeout = new() { Interval = TimeSpan.FromSeconds(30) };
@@ -26,11 +31,21 @@ public sealed partial class CommandPaletteWindow : Window
     private bool _dragging;
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
+    private bool _paletteLoaded;
+    private bool _twoColumn;
+    private long _lastTimeoutReset;
+    private readonly List<Button> _primaryButtons = [];
+    private readonly List<Button> _screenshotButtons = [];
+    private readonly List<TextBlock> _keyLabels = [];
+    private readonly List<FontIcon> _kindGlyphs = [];
 
     public CommandPaletteWindow()
     {
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.Transient);
+        BuildCommands();
         WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         _timeout.Tick += (_, _) => HidePalette();
         _commandKeys.Invoked += CommandKeys_Invoked;
         Activated += (_, _) =>
@@ -47,11 +62,12 @@ public sealed partial class CommandPaletteWindow : Window
         // Wherever the user last dragged it, on the pointer's display. Acrylic keeps
         // the source readable behind it, which is what the full-screen desktop
         // snapshot used to be for.
-        ApplySavedPlacement();
-        PaletteHint.Text = string.IsNullOrWhiteSpace(App.Services.Settings.VideoMicrophoneName)
-            ? "Press one key · Esc closes"
-            : $"A uses {App.Services.Settings.VideoMicrophoneName} · Esc closes";
         if (initialMode == "screenshot") ShowScreenshotCommands(); else ShowPrimaryCommands();
+        ApplySavedPlacement();
+        if (_paletteLoaded && App.AnimationsEnabled)
+        {
+            PulseStoryboard.Begin();
+        }
         _commandKeys.SetEnabled(true);
         AppWindow.Show(false);
         Activate();
@@ -61,10 +77,22 @@ public sealed partial class CommandPaletteWindow : Window
     {
         var settings = App.Services.Settings;
         var work = WindowPlacement.MonitorUnderPointer(true);
+        var scale = WindowPlacement.ScaleFor(this);
+        var logicalHeight = (work.Bottom - work.Top) / Math.Max(1, scale);
+        _twoColumn = !_screenshotMode && logicalHeight < 470;
+        ArrangeCommands();
+        var desiredWidth = _screenshotMode ? ScreenshotWidth : _twoColumn ? ShortWidth : RegularWidth;
+        var desiredHeight = _screenshotMode ? ScreenshotHeight : _twoColumn ? ShortHeight : RegularHeight;
+        var layout = TransientWindowLayoutPolicy.Resolve(
+            ToBounds(work),
+            desiredWidth,
+            desiredHeight,
+            scale,
+            PanelMargin);
         var placement = CommandPanelPlacement.Resolve(
             ToBounds(work),
-            PixelWidth(),
-            PixelHeight(),
+            layout.Bounds.Width,
+            layout.Bounds.Height,
             settings.CommandPanelAnchorX,
             settings.CommandPanelAnchorY,
             PixelMargin());
@@ -178,29 +206,22 @@ public sealed partial class CommandPaletteWindow : Window
 
     private static CaptureBounds ToBounds(NativeMethods.Rect rect) => new(rect.Left, rect.Top, rect.Right, rect.Bottom);
 
-    private int PixelWidth() => WindowPlacement.ToPixels(this, PanelWidth);
-    private int PixelHeight() => WindowPlacement.ToPixels(this, PanelHeight);
     private int PixelMargin() => WindowPlacement.ToPixels(this, PanelMargin);
 
     public long SourceWindow { get; private set; }
-    public event EventHandler<string>? CommandRequested;
+    public event EventHandler<CaptureActionId>? CommandRequested;
     public event EventHandler? PaletteHidden;
 
     private void Command_Click(object sender, RoutedEventArgs eventArgs)
     {
         ResetTimeout();
-        if (sender is not FrameworkElement { Tag: string command })
+        if (sender is not FrameworkElement { Tag: CaptureActionId command })
         {
             return;
         }
-        if (command == "screenshot")
+        if (command == CaptureActionId.Screenshot)
         {
             ShowScreenshotCommands();
-            return;
-        }
-        if (command == "back")
-        {
-            ShowPrimaryCommands();
             return;
         }
         Request(command);
@@ -226,35 +247,35 @@ public sealed partial class CommandPaletteWindow : Window
             if (_screenshotMode) ShowPrimaryCommands(); else HidePalette();
             return true;
         }
-        var command = _screenshotMode ? key switch
+        CaptureActionId? command = _screenshotMode ? key switch
         {
-            VirtualKey.R => "region",
-            VirtualKey.W => "window",
-            VirtualKey.D => "display",
-            VirtualKey.A => "all-displays",
-            VirtualKey.P => "previous-region",
+            VirtualKey.R => CaptureActionId.Region,
+            VirtualKey.W => CaptureActionId.Window,
+            VirtualKey.D => CaptureActionId.Display,
+            VirtualKey.A => CaptureActionId.AllDisplays,
+            VirtualKey.P => CaptureActionId.PreviousRegion,
             _ => null,
         } : key switch
         {
-            VirtualKey.S => "screenshot",
-            VirtualKey.V => shiftDown ? "repeat-video" : "video",
-            VirtualKey.A => "audio",
-            VirtualKey.T => "text",
-            VirtualKey.L => "link",
-            VirtualKey.O => "library",
+            VirtualKey.S => CaptureActionId.Screenshot,
+            VirtualKey.V => shiftDown ? CaptureActionId.RepeatVideo : CaptureActionId.Video,
+            VirtualKey.A => CaptureActionId.Audio,
+            VirtualKey.T => CaptureActionId.Text,
+            VirtualKey.L => CaptureActionId.Link,
+            VirtualKey.O => CaptureActionId.Library,
             _ => null,
         };
         if (command is null)
         {
             return false;
         }
-        if (command == "screenshot")
+        if (command == CaptureActionId.Screenshot)
         {
             ShowScreenshotCommands();
         }
         else
         {
-            Request(command);
+            Request(command.Value);
         }
         return true;
     }
@@ -265,7 +286,8 @@ public sealed partial class CommandPaletteWindow : Window
         PrimaryCommands.Visibility = Visibility.Collapsed;
         ScreenshotCommands.Visibility = Visibility.Visible;
         PaletteTitle.Text = "Which part of the screen?";
-        PaletteHint.Text = "Keys are sequential, never held together";
+        PaletteHint.Text = "Press R, W, D, A, or P · Esc goes back";
+        ApplySavedPlacement();
         RegionCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
@@ -275,20 +297,21 @@ public sealed partial class CommandPaletteWindow : Window
         _screenshotMode = false;
         ScreenshotCommands.Visibility = Visibility.Collapsed;
         PrimaryCommands.Visibility = Visibility.Visible;
-        PaletteTitle.Text = "What do you want to catch?";
-        PaletteHint.Text = "Press one key · Esc closes";
+        PaletteTitle.Text = "What do you want to capture?";
+        PaletteHint.Text = "Choose a command or press its key · Esc closes";
+        ApplySavedPlacement();
         ScreenshotCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
     }
 
-    private void Request(string command)
+    private void Request(CaptureActionId command)
     {
         _timeout.Stop();
         // Library is a persistent surface the user explicitly asked to open;
         // restoring the source after the palette closes would immediately
         // bury it again. Transient capture commands still return to source.
-        _restoreSourceOnClose = command != "library";
-        if (command == "library")
+        _restoreSourceOnClose = command != CaptureActionId.Library;
+        if (command == CaptureActionId.Library)
         {
             CommandRequested?.Invoke(this, command);
             HidePalette();
@@ -305,11 +328,15 @@ public sealed partial class CommandPaletteWindow : Window
     {
         _timeout.Stop();
         _timeout.Start();
+        _lastTimeoutReset = Environment.TickCount64;
     }
 
     private void HidePalette()
     {
         _timeout.Stop();
+        // The palette window stays alive between activations, so a Forever
+        // storyboard left running would keep animating an invisible surface.
+        if (_paletteLoaded) PulseStoryboard.Stop();
         _commandKeys.SetEnabled(false);
         AppWindow.Hide();
         if (_restoreSourceOnClose)
@@ -323,19 +350,172 @@ public sealed partial class CommandPaletteWindow : Window
     {
         if (!_dragging)
         {
-            ResetTimeout();
+            // Restarting a DispatcherTimer on every pointer move is pure overhead
+            // when the window it guards closes after thirty seconds.
+            if (Environment.TickCount64 - _lastTimeoutReset >= 1000)
+            {
+                ResetTimeout();
+            }
             return;
         }
         eventArgs.Handled = true;
         var (pointerX, pointerY) = WindowPlacement.PointerPosition();
         Root_PointerMovedWhileDragging(pointerX, pointerY);
     }
+
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
-        PulseStoryboard.Begin();
+        _paletteLoaded = true;
+        if (App.AnimationsEnabled) PulseStoryboard.Begin();
         FocusCommandSurface();
     }
     private void FocusCommandSurface() => (_screenshotMode ? RegionCommand : ScreenshotCommand).Focus(FocusState.Programmatic);
     private void Close_Click(object sender, RoutedEventArgs eventArgs) => HidePalette();
-    private void LibraryPulse_Click(object sender, RoutedEventArgs eventArgs) => Request("library");
+    private void LibraryPulse_Click(object sender, RoutedEventArgs eventArgs) => Request(CaptureActionId.Library);
+
+    private void BuildCommands()
+    {
+        foreach (var descriptor in CaptureActionCatalog.Primary)
+        {
+            var button = CreateCommandButton(descriptor, compactTile: false);
+            _primaryButtons.Add(button);
+            PrimaryCommands.Children.Add(button);
+        }
+        foreach (var descriptor in CaptureActionCatalog.ScreenshotChoices)
+        {
+            var button = CreateCommandButton(descriptor, compactTile: true);
+            if (descriptor.Id == CaptureActionId.Region) RegionCommand = button;
+            _screenshotButtons.Add(button);
+            ScreenshotCommands.Children.Add(button);
+        }
+        var back = new Button
+        {
+            MinHeight = 68,
+            Style = (Style)Application.Current.Resources["PocketCommandRow"],
+            Content = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = "Esc", FontFamily = new FontFamily("Cascadia Mono"), FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center },
+                    new TextBlock { Text = "Back", Style = (Style)Application.Current.Resources["PocketCaptionText"], HorizontalAlignment = HorizontalAlignment.Center },
+                },
+            },
+        };
+        AutomationProperties.SetName(back, "Back to command mode. Escape.");
+        back.Click += (_, _) => ShowPrimaryCommands();
+        _screenshotButtons.Add(back);
+        ScreenshotCommands.Children.Add(back);
+        ScreenshotCommand = (Button)PrimaryCommands.Children[0];
+        ArrangeCommands();
+        RefreshCommandColors();
+    }
+
+    private Button ScreenshotCommand { get; set; } = null!;
+    private Button RegionCommand { get; set; } = null!;
+
+    private Button CreateCommandButton(CaptureActionDescriptor descriptor, bool compactTile)
+    {
+        var button = new Button
+        {
+            Tag = descriptor.Id,
+            MinHeight = compactTile ? 68 : 40,
+            Style = (Style)Application.Current.Resources["PocketCommandRow"],
+        };
+        AutomationProperties.SetName(button, $"{descriptor.Title}. {descriptor.Description}. Key {descriptor.Key}.");
+        button.Click += Command_Click;
+        if (compactTile)
+        {
+            var keyLabel = new TextBlock
+            {
+                Text = descriptor.Key,
+                FontFamily = new FontFamily("Cascadia Mono"),
+                FontSize = 14,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                IsTextScaleFactorEnabled = false,
+            };
+            _keyLabels.Add(keyLabel);
+            button.Content = new StackPanel
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Spacing = 3,
+                Children =
+                {
+                    keyLabel,
+                    new TextBlock
+                    {
+                        Text = descriptor.Title,
+                        Style = (Style)Application.Current.Resources["PocketCaptionText"],
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextAlignment = TextAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        MaxLines = 2,
+                    },
+                },
+            };
+            return button;
+        }
+
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(58) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var key = new TextBlock
+        {
+            Text = descriptor.Key,
+            FontFamily = new FontFamily("Cascadia Mono"),
+            FontSize = 12,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsTextScaleFactorEnabled = false,
+        };
+        _keyLabels.Add(key);
+        var label = new TextBlock { Text = descriptor.Title, Style = (Style)Application.Current.Resources["PocketBodyStrongText"], VerticalAlignment = VerticalAlignment.Center };
+        var glyph = new FontIcon { Glyph = descriptor.Glyph, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+        _kindGlyphs.Add(glyph);
+        Grid.SetColumn(label, 1);
+        Grid.SetColumn(glyph, 2);
+        grid.Children.Add(key);
+        grid.Children.Add(label);
+        grid.Children.Add(glyph);
+        button.Content = grid;
+        return button;
+    }
+
+    private void ArrangeCommands()
+    {
+        PrimaryCommands.RowDefinitions.Clear();
+        PrimaryCommands.ColumnDefinitions.Clear();
+        var columns = _twoColumn ? 2 : 1;
+        for (var column = 0; column < columns; column++) PrimaryCommands.ColumnDefinitions.Add(new ColumnDefinition());
+        var rows = (int)Math.Ceiling(_primaryButtons.Count / (double)columns);
+        for (var row = 0; row < rows; row++) PrimaryCommands.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        for (var index = 0; index < _primaryButtons.Count; index++)
+        {
+            Grid.SetRow(_primaryButtons[index], index / columns);
+            Grid.SetColumn(_primaryButtons[index], index % columns);
+        }
+
+        if (ScreenshotCommands.ColumnDefinitions.Count == 0)
+        {
+            for (var column = 0; column < 3; column++) ScreenshotCommands.ColumnDefinitions.Add(new ColumnDefinition());
+            for (var row = 0; row < 2; row++) ScreenshotCommands.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (var index = 0; index < _screenshotButtons.Count; index++)
+            {
+                Grid.SetRow(_screenshotButtons[index], index / 3);
+                Grid.SetColumn(_screenshotButtons[index], index % 3);
+            }
+        }
+    }
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => RefreshCommandColors();
+
+    private void RefreshCommandColors()
+    {
+        foreach (var key in _keyLabels) key.Foreground = App.Theme.Brush("PocketGreen");
+        foreach (var glyph in _kindGlyphs) glyph.Foreground = App.Theme.Brush("PocketInkDim");
+    }
 }
+

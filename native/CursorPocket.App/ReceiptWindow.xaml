@@ -4,104 +4,52 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Capture saved">
-    <!--  Opaque and strokeless for the same reason as the HUD: the rounded region is cut
-          by the window itself, so a border would leave an artefact behind it.  -->
     <Grid
-        Background="#FF141E1A"
+        x:Name="Root"
+        Background="{ThemeResource PocketTransientSurface}"
+        KeyDown="Root_KeyDown"
         PointerEntered="Root_PointerEntered"
         PointerExited="Root_PointerExited">
-        <Border
-            Padding="14"
-            Background="#FF141E1A"
-            BorderThickness="0"
-            CornerRadius="16">
-            <Grid ColumnSpacing="12">
+        <Border Padding="16" Background="{ThemeResource PocketTransientSurface}" CornerRadius="16">
+            <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="68" />
+                    <ColumnDefinition Width="72" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border
-                    Width="68"
-                    Height="68"
-                    VerticalAlignment="Top"
-                    Background="#FF0A120F"
-                    CornerRadius="10">
+                <Border Width="72" Height="72" VerticalAlignment="Top" Background="{ThemeResource PocketSunken}" CornerRadius="10">
                     <Grid>
-                        <Image
-                            x:Name="PreviewImage"
-                            Stretch="UniformToFill"
-                            Visibility="Collapsed" />
-                        <FontIcon
-                            x:Name="ReceiptIcon"
-                            FontSize="22"
-                            Foreground="{StaticResource PocketGreen}"
-                            Glyph="&#xE73E;" />
+                        <Image x:Name="PreviewImage" Stretch="UniformToFill" Visibility="Collapsed" />
+                        <FontIcon x:Name="ReceiptIcon" FontSize="22" Foreground="{ThemeResource PocketGreen}" Glyph="&#xE73E;" />
                     </Grid>
                 </Border>
-                <Grid Grid.Column="1">
+                <Grid Grid.Column="1" RowSpacing="8">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <StackPanel Spacing="3">
-                        <TextBlock
-                            x:Name="ReceiptTitle"
-                            MaxWidth="252"
-                            HorizontalAlignment="Left"
-                            Style="{StaticResource PocketBodyStrongText}"
-                            Text="Capture saved"
-                            TextTrimming="CharacterEllipsis" />
-                        <TextBlock
-                            x:Name="ReceiptDetail"
-                            MaxWidth="252"
-                            Style="{StaticResource PocketNumericText}"
-                            Text="Saved locally"
-                            TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="ReceiptTitle" MaxWidth="300" Style="{StaticResource PocketBodyStrongText}" Text="Capture saved" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="ReceiptDetail" Grid.Row="1" MaxWidth="300" Style="{StaticResource PocketCaptionText}" Text="Saved locally" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6">
+                        <Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" />
+                        <Button x:Name="EditButton" Click="Edit_Click" Content="Mark up" Style="{StaticResource PocketQuietButton}" />
+                        <Button x:Name="RevealButton" Click="Reveal_Click" Content="Show in folder" Style="{StaticResource PocketGhostButton}" />
                     </StackPanel>
-                    <StackPanel
-                        Grid.Row="2"
-                        Orientation="Horizontal"
-                        Spacing="6">
-                        <Button
-                            x:Name="OpenButton"
-                            MinHeight="32"
-                            Click="Open_Click"
-                            Content="Open"
-                            Style="{StaticResource PocketPrimaryButton}"
-                            ToolTipService.ToolTip="Ctrl+Alt+O" />
-                        <Button
-                            x:Name="RevealButton"
-                            MinHeight="32"
-                            Click="Reveal_Click"
-                            Content="Reveal"
-                            Style="{StaticResource PocketQuietButton}"
-                            ToolTipService.ToolTip="Ctrl+Alt+R" />
-                        <Button
-                            MinHeight="32"
-                            Click="Library_Click"
-                            Content="Library"
-                            Style="{StaticResource PocketGhostButton}"
-                            ToolTipService.ToolTip="Ctrl+Alt+L" />
-                    </StackPanel>
-                    <!--  The receipt never takes focus, so the keys are the only way to
-                          act on it without reaching for the mouse. Say so.  -->
-                    <TextBlock
-                        x:Name="ReceiptKeysHint"
-                        Grid.Row="3"
-                        Margin="0,7,0,0"
-                        FontFamily="Cascadia Mono"
-                        FontSize="10"
-                        Foreground="{StaticResource PocketMuted}"
-                        Text="Ctrl+Alt · O open · R reveal · L library · X dismiss" />
                 </Grid>
+                <Button
+                    x:Name="DismissButton"
+                    Grid.Column="2"
+                    Width="36"
+                    Height="36"
+                    Click="Dismiss_Click"
+                    Style="{StaticResource PocketIconButton}"
+                    ToolTipService.ToolTip="Dismiss · Esc"
+                    AutomationProperties.Name="Dismiss receipt">
+                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                </Button>
             </Grid>
         </Border>
-        <!-- Hovering pauses the auto-close timer, so the receipt needs an explicit
-             way out rather than only the 12 second countdown. -->
-        <Button x:Name="DismissButton" Click="Dismiss_Click" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,5,5,0" Width="26" Height="26" Padding="0" CornerRadius="8" Background="#FF1B2723" BorderThickness="0" ToolTipService.ToolTip="Dismiss" AutomationProperties.Name="Dismiss this receipt">
-            <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="{StaticResource PocketMuted}" />
-        </Button>
     </Grid>
 </Window>
+

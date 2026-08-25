@@ -22,19 +22,10 @@
                 <TextBlock Style="{StaticResource PocketDisplayText}" Text="Before you record" />
                 <TextBlock Style="{StaticResource PocketCaptionText}" Text="Nothing is captured until you press start." />
             </StackPanel>
-            <Button
-                HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Click="Cancel_Click"
-                Style="{StaticResource PocketIconButton}"
-                ToolTipService.ToolTip="Cancel">
-                <FontIcon FontSize="14" Glyph="&#xE711;" />
-            </Button>
         </Grid>
 
-        <!--  The three decisions read straight down the left column, in the order they are
-              numbered. The right column answers the only question the numbers cannot:
-              what will actually end up in the file.  -->
+        <!-- The left inspector is the only scrolling region. The fixed preview and
+             footer keep framing, readiness, and Start visible at every scale. -->
         <Grid
             Grid.Row="1"
             Margin="0,20"
@@ -45,17 +36,15 @@
             </Grid.ColumnDefinitions>
 
             <ScrollViewer
-                x:Name="OptionsScroll"
+                x:Name="OptionsPanel"
                 HorizontalScrollBarVisibility="Disabled"
-                VerticalScrollBarVisibility="Visible">
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                VerticalScrollMode="Auto">
                 <StackPanel Margin="0,0,8,0" Spacing="12">
-                    <Border Style="{StaticResource PocketCard}">
+                    <Border Background="Transparent">
                         <StackPanel Padding="16" Spacing="12">
                             <StackPanel Orientation="Horizontal" Spacing="10">
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    Style="{StaticResource PocketNumericText}"
-                                    Text="01" />
                                 <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Screen" />
                             </StackPanel>
                             <ComboBox
@@ -72,7 +61,7 @@
                                 <FontIcon
                                     VerticalAlignment="Center"
                                     FontSize="13"
-                                    Foreground="{StaticResource PocketMuted}"
+                                    Foreground="{ThemeResource PocketMuted}"
                                     Glyph="&#xE7F4;" />
                                 <TextBlock
                                     x:Name="SourceSummary"
@@ -83,14 +72,10 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource PocketCard}">
+                    <Border Background="Transparent" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                         <StackPanel Padding="16" Spacing="12">
                             <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock
-                                        VerticalAlignment="Center"
-                                        Style="{StaticResource PocketNumericText}"
-                                        Text="02" />
                                     <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Microphone" />
                                 </StackPanel>
                                 <ToggleSwitch
@@ -117,8 +102,8 @@
                                     x:Name="MicrophoneLevel"
                                     Height="6"
                                     VerticalAlignment="Center"
-                                    Background="{StaticResource PocketSunken}"
-                                    Foreground="{StaticResource PocketGreen}"
+                                    Background="{ThemeResource PocketSunken}"
+                                    Foreground="{ThemeResource PocketGreen}"
                                     Maximum="1"
                                     Minimum="0"
                                     Value="0" />
@@ -155,7 +140,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource PocketCard}">
+                    <Border Background="Transparent" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                         <Grid Padding="16">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -164,10 +149,6 @@
                             </Grid.RowDefinitions>
                             <Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock
-                                        VerticalAlignment="Center"
-                                        Style="{StaticResource PocketNumericText}"
-                                        Text="03" />
                                     <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Camera" />
                                 </StackPanel>
                                 <ToggleSwitch
@@ -191,6 +172,8 @@
                                     DisplayMemberPath="Name"
                                     SelectionChanged="CameraBox_SelectionChanged"
                                     AutomationProperties.Name="Camera" />
+                                <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Camera appearance" />
+                                <StackPanel Spacing="12">
                                 <StackPanel
                                     x:Name="CameraSourceNotice"
                                     Orientation="Horizontal"
@@ -199,7 +182,7 @@
                                     <FontIcon
                                         VerticalAlignment="Top"
                                         FontSize="14"
-                                        Foreground="{StaticResource PocketMuted}"
+                                        Foreground="{ThemeResource PocketMuted}"
                                         Glyph="&#xE7BA;" />
                                     <TextBlock
                                         x:Name="CameraSourceNoticeText"
@@ -280,7 +263,7 @@
                                     <FontIcon
                                         VerticalAlignment="Top"
                                         FontSize="14"
-                                        Foreground="{StaticResource PocketMuted}"
+                                        Foreground="{ThemeResource PocketMuted}"
                                         Glyph="&#xE7BA;" />
                                     <TextBlock
                                         Style="{StaticResource PocketCaptionText}"
@@ -368,6 +351,7 @@
                                         Style="{StaticResource PocketNumericText}"
                                         Text="0" />
                                 </Grid>
+                                </StackPanel>
                             </StackPanel>
                             <TextBlock
                                 x:Name="CameraStatus"
@@ -378,20 +362,8 @@
                         </Grid>
                     </Border>
 
-                    <Expander
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch"
-                        Expanding="MoreOptions_Expanding">
-                        <Expander.Header>
-                            <StackPanel Padding="0,4">
-                                <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="More recording options" />
-                                <TextBlock
-                                    Margin="0,2,0,0"
-                                    Style="{StaticResource PocketMetaText}"
-                                    Text="Pointer, frame rate, countdown" />
-                            </StackPanel>
-                        </Expander.Header>
-                        <StackPanel Padding="0,12,0,4" Spacing="12">
+                    <StackPanel Padding="16,12,16,4" Spacing="12">
+                            <TextBlock Style="{StaticResource PocketSubtitleText}" Text="Recording options" />
                             <ToggleSwitch
                                 x:Name="PointerToggle"
                                 Header="Include the Windows pointer"
@@ -413,8 +385,7 @@
                                 <ComboBoxItem Content="3 seconds" Tag="3" />
                                 <ComboBoxItem Content="5 seconds" Tag="5" />
                             </ComboBox>
-                        </StackPanel>
-                    </Expander>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
 
@@ -425,7 +396,7 @@
             <Border
                 Grid.Column="1"
                 Background="#FF0F171C"
-                BorderBrush="{StaticResource PocketLineStrong}"
+                BorderBrush="{ThemeResource PocketLineStrong}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource PocketCardCorner}">
                 <Grid x:Name="FramingWell" CornerRadius="{StaticResource PocketCardCorner}">
@@ -455,7 +426,7 @@
                         <TextBlock
                             x:Name="FramingLabel"
                             Style="{StaticResource PocketTagText}"
-                            Text="FULL DISPLAY" />
+                            Text="Full display" />
                     </Border>
                     <TextBlock
                         x:Name="CameraSlotLabel"
@@ -484,7 +455,7 @@
                                 <TextBlock
                                     x:Name="MicrophoneTag"
                                     Style="{StaticResource PocketTagText}"
-                                    Text="MIC ON" />
+                                    Text="Mic on" />
                             </Border>
                             <Border Style="{StaticResource PocketTagBorder}">
                                 <TextBlock
@@ -508,7 +479,7 @@
                     Width="6"
                     Height="6"
                     VerticalAlignment="Center"
-                    Fill="{StaticResource PocketMuted}" />
+                    Fill="{ThemeResource PocketMuted}" />
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock
                         x:Name="ReadinessTitle"
@@ -548,3 +519,4 @@
         </Grid>
     </Grid>
 </Window>
+

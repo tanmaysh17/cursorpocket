@@ -12,17 +12,30 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="Root">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="AppTitleBar" Title="CursorPocket">
-            <TitleBar.IconSource>
-                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
-            </TitleBar.IconSource>
-        </TitleBar>
+        <Grid x:Name="AppTitleBar" Height="48" Background="Transparent">
+            <StackPanel
+                Margin="10,0,0,0"
+                VerticalAlignment="Center"
+                IsHitTestVisible="False"
+                Orientation="Horizontal"
+                Spacing="10">
+                <Image
+                    Width="40"
+                    Height="40"
+                    Source="ms-appx:///Assets/CursorPocketLogo.png"
+                    Stretch="Uniform" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Style="{StaticResource PocketSubtitleText}"
+                    Text="CursorPocket" />
+            </StackPanel>
+        </Grid>
 
         <Frame x:Name="RootFrame" Grid.Row="1" />
     </Grid>

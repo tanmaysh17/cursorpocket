@@ -3,8 +3,19 @@ using CursorPocket.Core.Services;
 
 namespace CursorPocket.Core.Models;
 
+public enum AppThemeMode
+{
+    System,
+    Light,
+    Dark,
+}
+
 public sealed record AppSettings
 {
+    [JsonPropertyName("theme_mode")]
+    [JsonConverter(typeof(JsonStringEnumConverter<AppThemeMode>))]
+    public AppThemeMode ThemeMode { get; init; } = AppThemeMode.System;
+
     [JsonPropertyName("capture_dir")]
     public string CaptureDirectory { get; init; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
@@ -25,6 +36,15 @@ public sealed record AppSettings
 
     [JsonPropertyName("onboarding_seen")]
     public bool OnboardingSeen { get; init; }
+
+    [JsonPropertyName("onboarding_version")]
+    public int OnboardingVersion { get; init; }
+
+    [JsonPropertyName("automatically_check_for_updates")]
+    public bool AutomaticallyCheckForUpdates { get; init; } = true;
+
+    [JsonPropertyName("last_update_check_at")]
+    public DateTimeOffset? LastUpdateCheckAt { get; init; }
 
     [JsonPropertyName("panel_geometry")]
     public string PanelGeometry { get; init; } = string.Empty;

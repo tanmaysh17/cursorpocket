@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="CursorPocket_App.OnboardingPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:core="using:CursorPocket.Core.Models"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded"
+    mc:Ignorable="d">
+
+    <Page.Resources>
+        <Style x:Key="TourStepButton" TargetType="Button" BasedOn="{StaticResource PocketButtonBase}">
+            <Setter Property="MinHeight" Value="56" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style x:Key="TourCommandRow" TargetType="Border">
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="BorderBrush" Value="{ThemeResource PocketLine}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+        </Style>
+    </Page.Resources>
+
+    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+        <Grid
+            x:Name="TourLayout"
+            MaxWidth="1120"
+            MinHeight="520"
+            Padding="32,28,32,32"
+            HorizontalAlignment="Center"
+            ColumnSpacing="32">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="RailColumn" Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition x:Name="CompactContentRow" Height="0" />
+            </Grid.RowDefinitions>
+
+            <StackPanel x:Name="TourRail" Spacing="22">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Width="32" Height="32" Style="{StaticResource PocketChipLarge}">
+                            <Path Width="11" Height="16" Style="{StaticResource PocketCursorMark}" />
+                        </Border>
+                        <TextBlock VerticalAlignment="Center" Style="{StaticResource PocketSubtitleText}" Text="CursorPocket" />
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource PocketMetaText}" Text="First-run field guide" />
+                </StackPanel>
+
+                <StackPanel Spacing="4">
+                    <Button x:Name="WelcomeStepButton" Tag="0" Click="Step_Click" Style="{StaticResource TourStepButton}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border x:Name="WelcomeStepMark" Width="22" Height="22" CornerRadius="11" BorderThickness="1">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Style="{StaticResource PocketNumericText}" Text="1" />
+                            </Border>
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource PocketBodyStrongText}" Text="Meet CursorPocket" />
+                        </Grid>
+                    </Button>
+                    <Rectangle Width="1" Height="12" Margin="25,0,0,0" HorizontalAlignment="Left" Fill="{ThemeResource PocketLine}" />
+                    <Button x:Name="ActivateStepButton" Tag="1" Click="Step_Click" Style="{StaticResource TourStepButton}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border x:Name="ActivateStepMark" Width="22" Height="22" CornerRadius="11" BorderThickness="1">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Style="{StaticResource PocketNumericText}" Text="2" />
+                            </Border>
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource PocketBodyStrongText}" Text="Open command mode" />
+                        </Grid>
+                    </Button>
+                    <Rectangle Width="1" Height="12" Margin="25,0,0,0" HorizontalAlignment="Left" Fill="{ThemeResource PocketLine}" />
+                    <Button x:Name="RehearseStepButton" Tag="2" Click="Step_Click" Style="{StaticResource TourStepButton}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border x:Name="RehearseStepMark" Width="22" Height="22" CornerRadius="11" BorderThickness="1">
+                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" Style="{StaticResource PocketNumericText}" Text="3" />
+                            </Border>
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource PocketBodyStrongText}" Text="Try it once" />
+                        </Grid>
+                    </Button>
+                </StackPanel>
+
+                <Button
+                    MinHeight="40"
+                    HorizontalAlignment="Left"
+                    AutomationProperties.Name="Skip the welcome tour"
+                    Click="Skip_Click"
+                    Content="Skip tour"
+                    Style="{StaticResource PocketGhostButton}" />
+            </StackPanel>
+
+            <Grid x:Name="TourContent" Grid.Column="1" RowSpacing="24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel MaxWidth="700" HorizontalAlignment="Left" Spacing="8">
+                    <TextBlock x:Name="StepEyebrow" Style="{StaticResource PocketMetaText}" />
+                    <TextBlock x:Name="StepTitle" Style="{StaticResource PocketDisplayText}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="StepDescription" MaxWidth="620" Style="{StaticResource PocketCaptionText}" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- One changing instrument over the window backdrop: the cursor field is
+                     the tour's signature, not a collection of decorative cards. -->
+                <Border
+                    Grid.Row="1"
+                    MinHeight="300"
+                    Padding="24"
+                    Background="{ThemeResource PocketSurface}"
+                    BorderBrush="{ThemeResource PocketLineStrong}"
+                    BorderThickness="1"
+                    CornerRadius="16">
+                    <Grid>
+                        <Grid x:Name="WelcomeField">
+                            <Canvas MinHeight="250">
+                                <Rectangle Canvas.Left="20" Canvas.Top="24" Width="420" Height="1" Fill="{ThemeResource PocketLine}" />
+                                <Rectangle Canvas.Left="72" Canvas.Top="24" Width="1" Height="170" Fill="{ThemeResource PocketLine}" />
+                                <Ellipse Canvas.Left="64" Canvas.Top="186" Width="17" Height="17" Fill="{ThemeResource PocketGreen}" />
+                                <Path Canvas.Left="342" Canvas.Top="86" Width="20" Height="29" Fill="{ThemeResource PocketInk}" Style="{StaticResource PocketCursorMark}" />
+                            </Canvas>
+                            <StackPanel Margin="104,64,32,32" VerticalAlignment="Center" Spacing="10">
+                                <TextBlock Style="{StaticResource PocketTitleText}" Text="Lives beside your work" />
+                                <TextBlock MaxWidth="420" Style="{StaticResource PocketCaptionText}" Text="The green cursor companion means ready. Red always means a recording is live." TextWrapping="Wrap" />
+                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal" Spacing="10">
+                                    <Border Padding="10,6" Background="{ThemeResource PocketGreenSoft}" CornerRadius="7">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Local files" />
+                                    </Border>
+                                    <Border Padding="10,6" BorderBrush="{ThemeResource PocketLine}" BorderThickness="1" CornerRadius="7">
+                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="No account" />
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="ActivationField" Visibility="Collapsed" ColumnSpacing="18">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Width="210" VerticalAlignment="Center" Spacing="12">
+                                <TextBlock Style="{StaticResource PocketMetaText}" Text="From any app" />
+                                <Border Padding="16,12" Background="{ThemeResource PocketGreenSoft}" BorderBrush="{ThemeResource PocketGreen}" BorderThickness="1" CornerRadius="10">
+                                    <TextBlock x:Name="ShortcutText" HorizontalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="Ctrl+Shift+Space" />
+                                </Border>
+                                <TextBlock x:Name="ShortcutStatus" Style="{StaticResource PocketCaptionText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Border Grid.Column="1" BorderBrush="{ThemeResource PocketLine}" BorderThickness="1" CornerRadius="10">
+                                <ItemsControl ItemsSource="{x:Bind Commands}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="core:CaptureActionDescriptor">
+                                            <Border Style="{StaticResource TourCommandRow}">
+                                                <Grid ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                    <FontIcon VerticalAlignment="Center" FontSize="15" Foreground="{ThemeResource PocketInkDim}" Glyph="{x:Bind Glyph}" />
+                                                    <TextBlock Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource PocketBodyStrongText}" Text="{x:Bind Title}" />
+                                                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Style="{StaticResource PocketNumericText}" Text="{x:Bind Key}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Border>
+                        </Grid>
+
+                        <Grid x:Name="RehearsalField" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center" Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Ellipse Width="10" Height="10" Fill="{ThemeResource PocketGreen}" />
+                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Ready to capture" />
+                                </StackPanel>
+                                <TextBlock MaxWidth="430" Style="{StaticResource PocketCaptionText}" Text="Open command mode, then press S for a screenshot. Esc always backs out without capturing." TextWrapping="Wrap" />
+                                <StackPanel Margin="0,8,0,0" Orientation="Horizontal" Spacing="10">
+                                    <Button MinHeight="44" Click="TryCommand_Click" Content="Open command mode" Style="{StaticResource PocketPrimaryButton}" />
+                                    <Button MinHeight="44" Click="OpenFolder_Click" Content="Open capture folder" Style="{StaticResource PocketQuietButton}" />
+                                </StackPanel>
+                                <StackPanel Margin="0,8,0,0" Spacing="2">
+                                    <CheckBox
+                                        x:Name="StartWithWindowsCheckBox"
+                                        MinHeight="36"
+                                        AutomationProperties.HelpText="CursorPocket starts hidden in the notification area."
+                                        Content="Start CursorPocket when I sign in" />
+                                    <CheckBox
+                                        x:Name="ShowCompanionCheckBox"
+                                        MinHeight="36"
+                                        AutomationProperties.HelpText="Shows the small ready indicator beside the pointer."
+                                        Content="Show the cursor companion" />
+                                </StackPanel>
+                            </StackPanel>
+                            <Grid Grid.Column="1" Width="150" Height="150" Margin="24,0,8,0">
+                                <Ellipse Stroke="{ThemeResource PocketLine}" StrokeThickness="1" />
+                                <Ellipse Width="92" Height="92" Stroke="{ThemeResource PocketLineStrong}" StrokeThickness="1" />
+                                <Ellipse Width="14" Height="14" Fill="{ThemeResource PocketGreen}" />
+                                <Path Width="18" Height="26" Margin="38,34,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" Fill="{ThemeResource PocketInk}" Style="{StaticResource PocketCursorMark}" />
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="2">
+                    <Button x:Name="BackButton" MinHeight="40" HorizontalAlignment="Left" Click="Back_Click" Content="Back" Style="{StaticResource PocketGhostButton}" />
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="NextButton" MinHeight="44" Click="Next_Click" Content="Continue" Style="{StaticResource PocketPrimaryButton}" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <VisualStateManager.VisualStateGroups>
+                <VisualStateGroup>
+                    <VisualState x:Name="Regular" />
+                    <VisualState x:Name="Compact">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="0" />
+                        </VisualState.StateTriggers>
+                        <VisualState.Setters>
+                            <Setter Target="RailColumn.Width" Value="0" />
+                            <Setter Target="TourRail.Visibility" Value="Collapsed" />
+                            <Setter Target="TourContent.(Grid.Column)" Value="0" />
+                            <Setter Target="TourContent.(Grid.Row)" Value="0" />
+                            <Setter Target="TourContent.(Grid.ColumnSpan)" Value="2" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Wide">
+                        <VisualState.StateTriggers>
+                            <AdaptiveTrigger MinWindowWidth="860" />
+                        </VisualState.StateTriggers>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+        </Grid>
+    </ScrollViewer>
+</Page>

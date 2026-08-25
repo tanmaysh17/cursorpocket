@@ -14,6 +14,7 @@ internal static class NativeMethods
     internal const uint MonitorDefaultToNearest = 2;
     internal const uint WmHotkey = 0x0312;
     internal const uint WmClose = 0x0010;
+    internal const uint WmQuit = 0x0012;
     internal const uint WmDestroy = 0x0002;
     internal const uint WmLButtonUp = 0x0202;
     internal const int WmLButtonDown = 0x0201;
@@ -282,6 +283,14 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool UpdateLayeredWindow(nint hwnd, nint destinationDc, ref Point destination, ref NativeSize size, nint sourceDc, ref Point source, uint colorKey, ref BlendFunction blend, uint flags);
 
+    /// <summary>
+    /// UpdateLayeredWindow with a null destination: repaints the surface without also
+    /// moving the window, which SetWindowPos already owns.
+    /// </summary>
+    [DllImport("user32.dll", EntryPoint = "UpdateLayeredWindow", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UpdateLayeredWindowInPlace(nint hwnd, nint destinationDc, nint destination, ref NativeSize size, nint sourceDc, ref Point source, uint colorKey, ref BlendFunction blend, uint flags);
+
     [DllImport("user32.dll")]
     internal static extern nint GetDC(nint hwnd);
 
@@ -333,6 +342,10 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern bool PostMessage(nint hwnd, uint message, nuint wParam, nint lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool PostThreadMessage(uint threadId, uint message, nuint wParam, nint lParam);
 
     [DllImport("kernel32.dll")]
     internal static extern nint GetModuleHandle(string? moduleName);

@@ -1,4 +1,5 @@
 using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket.Core.Storage;
 
 namespace CursorPocket.Tests;
@@ -120,7 +121,52 @@ public sealed class SettingsStoreTests : IDisposable
 
         Assert.True(actual.VideoCameraEnabled);
         Assert.Equal("Win+Alt+Space", actual.ActivationShortcut);
-        Assert.False(File.Exists(path + ".tmp"));
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task OnboardingCompletionPersistsAcrossLaunches()
+    {
+        var path = Path.Combine(_root, "onboarding", "settings.json");
+        var store = new SettingsStore(path);
+
+        Assert.False((await store.LoadAsync()).OnboardingSeen);
+
+        await store.SaveAsync(new AppSettings { OnboardingSeen = true });
+
+        Assert.True((await store.LoadAsync()).OnboardingSeen);
+    }
+
+    [Fact]
+    public async Task Legacy_onboarding_completion_migrates_to_the_current_version()
+    {
+        var path = Path.Combine(_root, "onboarding-migration.json");
+        Directory.CreateDirectory(_root);
+        await File.WriteAllTextAsync(path, "{\"onboarding_seen\":true}");
+
+        var settings = await new SettingsStore(path).LoadAsync();
+
+        Assert.Equal(OnboardingFlow.CurrentVersion, settings.OnboardingVersion);
+        Assert.True(settings.OnboardingSeen);
+    }
+
+    [Fact]
+    public async Task Update_checks_default_on_and_persist_the_last_success()
+    {
+        var path = Path.Combine(_root, "updates.json");
+        var checkedAt = new DateTimeOffset(2026, 8, 23, 12, 30, 0, TimeSpan.Zero);
+        var store = new SettingsStore(path);
+
+        Assert.True((await store.LoadAsync()).AutomaticallyCheckForUpdates);
+        await store.SaveAsync(new AppSettings
+        {
+            AutomaticallyCheckForUpdates = false,
+            LastUpdateCheckAt = checkedAt,
+        });
+        var reloaded = await store.LoadAsync();
+
+        Assert.False(reloaded.AutomaticallyCheckForUpdates);
+        Assert.Equal(checkedAt, reloaded.LastUpdateCheckAt);
     }
 
     public void Dispose()

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">CursorPocket recording mark</title>
+  <desc id="desc">A green and teal orbit around a coral recording disc, with the cursor cut out as negative space.</desc>
+  <defs><mask id="cursor-cut"><rect width="256" height="256" fill="white"/><path d="M106 91v82l20-20 34 61 19-11-34-60h30z" fill="black"/></mask></defs>
+  <g mask="url(#cursor-cut)">
+    <circle cx="118" cy="135" r="76" fill="none" stroke="#2B6F63" stroke-width="31"/>
+    <path d="M56 178A76 76 0 0 1 173 72" fill="none" stroke="#36E58C" stroke-width="31" stroke-linecap="round"/>
+    <circle cx="118" cy="135" r="38" fill="#FF5964"/>
+  </g>
+  <g fill="#FF5964"><rect x="183" y="27" width="12" height="34" rx="6" transform="rotate(16 189 44)"/><rect x="207" y="42" width="12" height="38" rx="6" transform="rotate(43 213 61)"/><rect x="220" y="76" width="34" height="12" rx="6"/></g>
+</svg>

@@ -38,6 +38,7 @@ public sealed partial class CameraSelfViewWindow : Window
     private CameraSelfViewWindow()
     {
         InitializeComponent();
+        App.Theme.Register(this, Root, SurfaceRole.CaptureOverlay);
         // Not click-through: the user drags this to reposition their camera mid
         // recording, which needs pointer input. It stays small so the area it takes
         // out of the demonstration is minimal, and it never takes activation.

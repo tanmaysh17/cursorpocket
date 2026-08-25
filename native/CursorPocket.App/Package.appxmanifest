@@ -11,7 +11,7 @@
   <Identity
     Name="4FCBCE28-018B-436B-9A53-558D2FF43689"
     Publisher="CN=Tanmay Sharma"
-    Version="1.0.0.0" />
+    Version="0.4.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="4FCBCE28-018B-436B-9A53-558D2FF43689" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

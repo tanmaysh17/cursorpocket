@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">CursorPocket</title>
+  <rect width="64" height="64" rx="15" fill="#0b1511"/>
+  <path d="M15 35v11c0 7 5 11 12 11h18c7 0 12-4 12-11V35H45v10H27V35H15Z" fill="#49de93"/>
+  <path d="m22 7 28 24-13 1 7 17-9 4-7-17-8 9 2-38Z" fill="#49de93" stroke="#0b1511" stroke-width="3" stroke-linejoin="round"/>
+</svg>

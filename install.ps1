@@ -6,16 +6,15 @@ param(
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$sourceExe = Join-Path $projectRoot "dist\CursorPocket.exe"
-$sourceFfmpeg = Join-Path $projectRoot "dist\ffmpeg.exe"
-$sourceFfmpegLicense = Join-Path $projectRoot "dist\FFMPEG-LICENSE.txt"
-$sourceNotices = Join-Path $projectRoot "dist\THIRD_PARTY_NOTICES.md"
-if (-not (Test-Path -LiteralPath $sourceExe) -or -not (Test-Path -LiteralPath $sourceFfmpeg)) {
-    throw "Build CursorPocket first: powershell -ExecutionPolicy Bypass -File .\build.ps1"
+$sourceRoot = Join-Path $projectRoot "artifacts\CursorPocket-win-x64"
+$sourceExe = Join-Path $sourceRoot "CursorPocket.exe"
+if (-not (Test-Path -LiteralPath $sourceExe) -or -not (Test-Path -LiteralPath (Join-Path $sourceRoot "ffmpeg.exe"))) {
+    throw "Build CursorPocket first: powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1"
 }
 
 $installDir = Join-Path $env:LOCALAPPDATA "Programs\CursorPocket"
 $installedExe = Join-Path $installDir "CursorPocket.exe"
+$installedIcon = Join-Path $installDir "Assets\AppIcon.ico"
 $startMenuDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs"
 $shortcutPath = Join-Path $startMenuDir "CursorPocket.lnk"
 $managedPaths = @($sourceExe, $installedExe)
@@ -38,10 +37,7 @@ New-Item -ItemType Directory -Path $startMenuDir -Force | Out-Null
 $copyDeadline = [DateTime]::UtcNow.AddSeconds(5)
 while ($true) {
     try {
-        Copy-Item -LiteralPath $sourceExe -Destination $installedExe -Force
-        Copy-Item -LiteralPath $sourceFfmpeg -Destination (Join-Path $installDir "ffmpeg.exe") -Force
-        Copy-Item -LiteralPath $sourceFfmpegLicense -Destination (Join-Path $installDir "FFMPEG-LICENSE.txt") -Force
-        Copy-Item -LiteralPath $sourceNotices -Destination (Join-Path $installDir "THIRD_PARTY_NOTICES.md") -Force
+        Copy-Item -Path (Join-Path $sourceRoot "*") -Destination $installDir -Recurse -Force
         break
     } catch [System.IO.IOException] {
         if ([DateTime]::UtcNow -ge $copyDeadline) {
@@ -55,7 +51,7 @@ $wshShell = New-Object -ComObject WScript.Shell
 $shortcut = $wshShell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = $installedExe
 $shortcut.WorkingDirectory = $installDir
-$shortcut.IconLocation = "$installedExe,0"
+$shortcut.IconLocation = "$installedIcon,0"
 $shortcut.Description = "Capture screenshots, screen walkthroughs, audio, selected text, and webpages"
 $shortcut.Save()
 
@@ -64,7 +60,7 @@ New-Item -Path $runKey -Force | Out-Null
 New-ItemProperty `
     -Path $runKey `
     -Name "CursorPocket" `
-    -Value ('"{0}"' -f $installedExe) `
+    -Value ('"{0}" --background' -f $installedExe) `
     -PropertyType String `
     -Force | Out-Null
 
@@ -100,4 +96,4 @@ if ($taskbarPinned) {
     Write-Host "Taskbar shortcut: Windows requires a manual pin" -ForegroundColor Yellow
     Write-Host "Open Start, search CursorPocket, right-click it, and choose Pin to taskbar."
 }
-Write-Host "Windows may initially place the green tray icon under the ^ overflow menu."
+Write-Host "Windows may initially place the CursorPocket tray icon under the ^ overflow menu."

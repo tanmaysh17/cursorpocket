@@ -34,14 +34,7 @@ For text, highlight what you want, open CursorPocket, and press `T`. CursorPocke
 
 Every capture can be dealt with without touching the mouse.
 
-A receipt appears after each capture and never steals focus, so its actions are on global keys while it is showing:
-
-| Key | Action |
-| --- | --- |
-| `Ctrl + Alt + O` | Open, or play a recording |
-| `Ctrl + Alt + R` | Reveal in the capture folder |
-| `Ctrl + Alt + L` | Open the Library |
-| `Ctrl + Alt + X` | Dismiss the receipt |
+A receipt appears after each capture without stealing focus. Its labelled Open, Play, Mark up, and Show in folder actions can be clicked or reached after focusing the receipt. A focused receipt closes with `Escape`; it never registers global action keys that could interfere with another application.
 
 Inside the Library, ordinary keys work because the window has focus:
 
@@ -113,19 +106,31 @@ Open **Settings** from the top-right of the capture window or from the tray menu
 - choose whether screen walkthroughs start with microphone, webcam, and a countdown.
 - choose the default display/region/window source, 30 or 60 fps, pointer inclusion, and webcam layout.
 
-The installer offers startup at sign-in; portable builds leave it off until you enable it. CursorPocket uses the current Windows user's startup setting and does not require administrator access.
+The final welcome step and Settings both offer startup at sign-in. CursorPocket keeps that choice in one app setting, applies it for the current Windows user, and does not require administrator access.
+
+## First launch
+
+A normal first launch opens a short field guide that explains the cursor companion, confirms the registered global shortcut, shows the seven mnemonic command keys, and opens the real command surface for a rehearsal. It can be skipped and rerun later from **Settings → Help → Run tour**. Background startup stays silent.
+
+## Private updates
+
+CursorPocket reads one static release file from `https://tanmaysh17.github.io/cursorpocket/update.json` at most once every 24 hours. The check sends no installation ID, capture information, settings, or analytics, and it fails silently when offline. Disable it or run a manual check under **Settings → Updates**.
+
+When a newer signed release is available, CursorPocket asks before downloading. It verifies the exact SHA-256, trusted Authenticode signature, publisher, Windows requirement, and version before launching the installer. Installation waits until recording, capture, and annotation work is finished.
 
 ## Native Windows build
 
-The current application is a native .NET 8 / WinUI 3 x64 build. It is self-contained, unpackaged, and does not require Python on the destination PC.
+The current application is a native .NET 8 / WinUI 3 x64 build. It is self-contained and does not require Python on the destination PC.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\native\build-native.ps1
 ```
 
-This creates `artifacts\CursorPocket-portable-win-x64.zip`. If Inno Setup 6 is installed it also creates `artifacts\CursorPocket-Setup-x64.exe`. The installer adds CursorPocket to Start, offers sign-in startup, and leaves taskbar pinning to Windows; search for CursorPocket in Start and choose **Pin to taskbar**.
+This produces the self-contained app under `artifacts\CursorPocket-win-x64`. With Inno Setup 6 installed it also creates `artifacts\CursorPocket-Setup-x64.exe`. Portable ZIP and MSIX outputs remain optional development artifacts and can be skipped with `-SkipPortableArchive` and `-SkipMsix`.
 
-Internal builds are currently unsigned, so Windows can display a publisher warning. The GitHub workflow has an optional signing stage for a future certificate.
+For another person, the only supported public artifact is `CursorPocket-Setup-x64.exe`: it installs per user, requires no administrator access, and includes the self-contained runtime and FFmpeg. Download it from the [CursorPocket site](https://tanmaysh17.github.io/cursorpocket/) or the latest GitHub Release. Tagged releases use Azure Artifact Signing through GitHub OIDC, verify the publisher and timestamp, install the finished artifact in CI, and refuse to publish any unsigned build. A new signing identity may still show a temporary SmartScreen reputation warning; confirm the publisher is **Tanmay Sharma** and never install a certificate manually.
+
+Release configuration and the exact version/tag procedure are documented in [RELEASING.md](RELEASING.md).
 
 ## Develop locally
 
@@ -139,22 +144,9 @@ dotnet test .\native\CursorPocket.Tests\CursorPocket.Tests.csproj -c Debug
 
 The native app preserves the existing `settings.json`, capture root, dated folders, `captures.jsonl`, and ordinary PNG/WAV/MP4/TXT/URL files. It never moves or rewrites existing captures.
 
-### Python behavioral reference
+### Historical implementation
 
-The previous Python implementation remains in the repository as a parity reference during the native transition. It is not included in the final native artifacts.
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.\.venv\Scripts\python.exe main.py
-```
-
-Run the automated checks with:
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe main.py --self-test
-```
+The unsupported pre-native Python source is retained under `legacy-python/` for archaeology only. It is not tested, packaged, or released. The WinUI 3 application under `native/` is the sole maintained product path.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packaging.
 
@@ -163,5 +155,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packa
 - Screenshots happen only after an explicit capture action.
 - The screen, microphone, and webcam are accessed only after you explicitly start a capture; active recording is shown with a red cursor and recording HUD.
 - CursorPocket never records keystrokes or continuously records the screen.
+- The optional update check reads one public GitHub Pages JSON file daily and sends no custom identifiers or content. The app remains fully usable offline.
 - Text is copied only from the selection you explicitly highlighted. Link capture briefly reads the active supported browser's address bar. Both actions use the Windows clipboard and replace its current contents with the captured text or URL.
 - This project focuses on fast local capture. It does not reproduce Clicky's AI assistant or screen-reading features.

@@ -8,6 +8,7 @@ namespace CursorPocket_App.Services;
 
 public sealed class ScreenshotCaptureService(CaptureStore store) : ICaptureService
 {
+    private readonly CaptureTransaction _transaction = new(store);
     public Task<CaptureRecord> CaptureDisplayAsync(CancellationToken cancellationToken = default)
     {
         NativeMethods.GetCursorPos(out var cursor);
@@ -48,23 +49,25 @@ public sealed class ScreenshotCaptureService(CaptureStore store) : ICaptureServi
         {
             throw new ArgumentException("Screenshot selection is empty.", nameof(bounds));
         }
-        var reservation = store.Reserve(CaptureKind.Screenshot, ".png");
-        using (var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb))
-        using (var graphics = Graphics.FromImage(bitmap))
-        {
-            graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-            bitmap.Save(reservation.AbsolutePath, ImageFormat.Png);
-        }
-        return await store.RegisterExistingAsync(
-            CaptureKind.Screenshot,
-            reservation.AbsolutePath,
-            $"Screenshot · {bounds.Width} × {bounds.Height}",
-            new Dictionary<string, object?>
+        var result = await _transaction.CommitAsync(
+            new CaptureTransactionRequest(
+                CaptureKind.Screenshot,
+                ".png",
+                $"Screenshot · {bounds.Width} × {bounds.Height}",
+                new Dictionary<string, object?>
+                {
+                    ["bounds"] = new[] { bounds.Left, bounds.Top, bounds.Right, bounds.Bottom },
+                    ["width"] = bounds.Width,
+                    ["height"] = bounds.Height,
+                }),
+            (temporaryPath, token) => Task.Run(() =>
             {
-                ["bounds"] = new[] { bounds.Left, bounds.Top, bounds.Right, bounds.Bottom },
-                ["width"] = bounds.Width,
-                ["height"] = bounds.Height,
-            },
+                using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+                using var graphics = Graphics.FromImage(bitmap);
+                graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+                bitmap.Save(temporaryPath, ImageFormat.Png);
+            }, token),
             cancellationToken);
+        return result.Record;
     }
 }

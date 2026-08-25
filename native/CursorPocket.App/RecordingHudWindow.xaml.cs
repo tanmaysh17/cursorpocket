@@ -12,9 +12,10 @@ public sealed partial class RecordingHudWindow : Window
     // One fixed window size for both states. Closed, it is pushed up so only the
     // bottom strip is on screen; open, it sits flush at the top. Only the position
     // changes, never the size.
-    private const int PanelWidth = 300;
-    private const int PanelHeight = 96;
-    private const int StripHeight = 32;
+    private const int PanelWidth = 360;
+    private const int PanelHeight = 108;
+    private const int StripHeight = 40;
+    private static WeakReference<RecordingHudWindow>? _current;
 
     private readonly Func<bool, Task> _stop;
     private readonly IDisposable _escapeLease;
@@ -22,10 +23,9 @@ public sealed partial class RecordingHudWindow : Window
     private readonly List<Rectangle> _collapsedBars = [];
     private readonly List<Rectangle> _expandedBars = [];
     private readonly bool _hasAudio;
-    // Polls the pointer so the drawer opens as it approaches rather than only once it
-    // lands on the strip, and steps the slide, which composition cannot drive for a
-    // top-level window.
-    private readonly DispatcherTimer _drawer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    // The timer runs only while the top-level window is moving. Pointer and focus
+    // events choose the target instead of polling the desktop sixty times a second.
+    private readonly DispatcherTimer _drawer = new() { Interval = TimeSpan.FromMilliseconds(33) };
     private readonly System.Diagnostics.Stopwatch _frameClock = System.Diagnostics.Stopwatch.StartNew();
     private int _panelLeft;
     private int _pixelWidth;
@@ -43,13 +43,15 @@ public sealed partial class RecordingHudWindow : Window
         _stop = stop;
         _hasAudio = hasAudio;
         InitializeComponent();
+        _current = new WeakReference<RecordingHudWindow>(this);
+        App.Theme.Register(this, Root, SurfaceRole.Hud);
+        App.Theme.ThemeChanged += Theme_ThemeChanged;
         ModeText.Text = mode;
         DeviceText.Text = device;
         WindowPlacement.ConfigureUtilityWindow(this);
         BuildMeters();
         ApplySize();
         _drawer.Tick += Drawer_Tick;
-        _drawer.Start();
         _escapeLease = App.Services.EscapeHotkey.Capture(() =>
             DispatcherQueue.TryEnqueue(async () => await StopAsync(false)));
         var ready = App.Services.Recording.State == RecordingState.Recording;
@@ -65,7 +67,9 @@ public sealed partial class RecordingHudWindow : Window
             _drawer.Stop();
             _drawer.Tick -= Drawer_Tick;
             _escapeLease.Dispose();
+            App.Theme.ThemeChanged -= Theme_ThemeChanged;
             Unsubscribe();
+            if (_current?.TryGetTarget(out var current) == true && ReferenceEquals(current, this)) _current = null;
         };
     }
 
@@ -82,6 +86,28 @@ public sealed partial class RecordingHudWindow : Window
             : $"Screen · mic {(options.IncludeMicrophone ? "on" : "off")} · camera off";
         var window = new RecordingHudWindow("Screen recording", detail, options.IncludeMicrophone, stop);
         window.AppWindow.Show(false);
+    }
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
+    {
+        var brush = App.Theme.Brush("PocketGreen");
+        foreach (var bar in _collapsedBars.Concat(_expandedBars)) bar.Fill = brush;
+    });
+
+    public static void NotifyPointerMoved(int x, int y)
+    {
+        if (_current?.TryGetTarget(out var window) == true)
+        {
+            window.NotifyPointerMovedCore(x, y);
+        }
+    }
+
+    private void NotifyPointerMovedCore(int x, int y)
+    {
+        var approach = x >= _panelLeft - 28 && x <= _panelLeft + _pixelWidth + 28
+            && y >= _openTop && y <= _openTop + StripPixels() + 52;
+        if (approach) SetDrawerTarget(1);
+        else if (!_focusWithin) SetDrawerTarget(0);
     }
 
     /// <summary>
@@ -127,17 +153,7 @@ public sealed partial class RecordingHudWindow : Window
         RadiusX = width / 2,
         RadiusY = width / 2,
         VerticalAlignment = VerticalAlignment.Center,
-        Fill = new LinearGradientBrush
-        {
-            StartPoint = new Windows.Foundation.Point(0.5, 0),
-            EndPoint = new Windows.Foundation.Point(0.5, 1),
-            GradientStops =
-            {
-                new GradientStop { Offset = 0, Color = Windows.UI.Color.FromArgb(0x8A, 0x43, 0xE0, 0x8D) },
-                new GradientStop { Offset = 0.5, Color = Windows.UI.Color.FromArgb(0xFF, 0x7C, 0xF5, 0xB4) },
-                new GradientStop { Offset = 1, Color = Windows.UI.Color.FromArgb(0x8A, 0x43, 0xE0, 0x8D) },
-            },
-        },
+        Fill = App.Theme.Brush("PocketGreen"),
     };
 
     private void RenderMeters()
@@ -165,32 +181,35 @@ public sealed partial class RecordingHudWindow : Window
         }
     }
 
-    private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => _target = 1;
-    private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) { }
+    private void Root_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) => SetDrawerTarget(1);
+    private void Root_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs eventArgs) { if (!_focusWithin) SetDrawerTarget(0); }
     // Keyboard users reach the actions without a pointer ever entering the pill.
-    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) { _focusWithin = true; _target = 1; }
-    private void Root_LostFocus(object sender, RoutedEventArgs eventArgs) => _focusWithin = false;
+    private void Root_GotFocus(object sender, RoutedEventArgs eventArgs) { _focusWithin = true; SetDrawerTarget(1); }
+    private void Root_LostFocus(object sender, RoutedEventArgs eventArgs) { _focusWithin = false; SetDrawerTarget(0); }
+
+    private void SetDrawerTarget(double target)
+    {
+        _target = target;
+        if (!App.AnimationsEnabled)
+        {
+            _drawer.Stop();
+            _progress = target;
+            ApplyProgress();
+            return;
+        }
+        _frameClock.Restart();
+        if (!_drawer.IsEnabled) _drawer.Start();
+    }
 
     private void Drawer_Tick(object? sender, object eventArgs)
     {
         var elapsed = _frameClock.Elapsed.TotalMilliseconds;
         _frameClock.Restart();
 
-        // Open while the pointer is near, or while focus is inside the drawer so a
-        // keyboard user does not have it close under them. Proximity is measured
-        // against the on-screen strip, not the window, most of which is above the
-        // top edge while closed.
-        var (pointerX, pointerY) = WindowPlacement.PointerPosition();
-        var visibleTop = _appliedTop + (_pixelHeight - (_openTop - _closedTop) - StripPixels());
-        var visible = new CaptureBounds(_panelLeft, Math.Max(0, visibleTop), _panelLeft + _pixelWidth, _appliedTop + _pixelHeight);
-        // Focus is tracked explicitly rather than queried: FocusManager reports the
-        // last focused element even when the window is inactive, which would pin the
-        // drawer open for the rest of the recording.
-        _target = DrawerAnimation.IsPointerNear(visible, pointerX, pointerY) || _focusWithin ? 1 : 0;
-
         var next = DrawerAnimation.Advance(_progress, _target, elapsed);
         if (Math.Abs(next - _progress) < 0.0001)
         {
+            _drawer.Stop();
             return;
         }
         _progress = next;

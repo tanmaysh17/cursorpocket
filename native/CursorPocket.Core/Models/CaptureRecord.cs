@@ -27,11 +27,17 @@ public sealed record CaptureRecord
     [JsonPropertyName("metadata")]
     public Dictionary<string, JsonElement> Metadata { get; init; } = [];
 
-    [JsonIgnore]
-    public CaptureKind CaptureKind => CaptureKindExtensions.ParseStorageValue(Kind);
+    // Both of these are read from filter predicates and from several list bindings
+    // per row, and DateTimeOffset.TryParse is culture-aware and expensive. Parse
+    // each string once per record instead of once per read.
+    private CaptureKind? _captureKind;
+    private DateTimeOffset? _created;
 
     [JsonIgnore]
-    public DateTimeOffset Created => DateTimeOffset.TryParse(CreatedAt, out var value)
+    public CaptureKind CaptureKind => _captureKind ??= CaptureKindExtensions.ParseStorageValue(Kind);
+
+    [JsonIgnore]
+    public DateTimeOffset Created => _created ??= DateTimeOffset.TryParse(CreatedAt, out var value)
         ? value
         : DateTimeOffset.MinValue;
 }
