@@ -2,9 +2,14 @@
 
 ## Unreleased
 
-## 0.4.2 — 2026-08-25
+## 0.4.3 — 2026-08-25
 
 - Expanded the public site with detailed annotation, video recording, and Library capability previews, plus practical guidance for each workflow on the Support page.
+
+## 0.4.2 — 2026-08-25
+
+- Moved update checks from the order-sensitive GitHub Pages mirror to the latest GitHub Release manifest, while retaining a main-branch Pages deployment for v0.4.1 compatibility.
+- Made release publication explicitly queue that compatibility deployment after the Release asset exists, avoiding tag protection and same-run Pages artifact retry failures.
 
 ## 0.4.1 — 2026-08-24
 
