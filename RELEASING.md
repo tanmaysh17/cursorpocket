@@ -34,7 +34,7 @@ Do not share the local installer as a public release; it is unsigned.
 
 ## Publish
 
-Merge the stable version and changelog heading to `main`. After the ordinary Windows build and tests pass, the workflow creates the matching annotated tag and explicitly queues the existing signed-release job. The tag step is idempotent: rerunning it resumes dispatch when the tag already points to the same `main` commit, but rejects reusing a released version for newer code.
+Every app PR must advance `native/Version.props` to a stable version and add the matching changelog heading; CI rejects a reused or missing version before merge. After the ordinary Windows build and tests pass on `main`, the workflow creates the matching annotated tag and explicitly queues the signed-release job. Tagging, Release asset upload, and manifest deployment are safe to rerun after a partial failure, while a released version cannot be reused for newer code.
 
 For recovery or a deliberately manual release, create and push the matching annotated tag yourself:
 

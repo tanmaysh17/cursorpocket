@@ -4,7 +4,7 @@
 
 ## 0.4.1 — 2026-08-24
 
-- Made successful `main` builds automatically queue the existing signed-release pipeline, so a documented stable version becomes a verified GitHub Release and live update manifest without a separate manual tagging step.
+- Made successful `main` builds automatically queue the signed-release pipeline, require a new documented version before merge, and safely resume partial publication, so each app merge becomes a verified GitHub Release and live update manifest without manual tagging.
 - Removed superseded logo iterations, obsolete vector marks, duplicate application-state icons, and generated per-size PNG intermediates; the repository now keeps four approved brand masters plus the final assets consumed by Windows and the public site.
 - Promoted brand logo #1—the transparent-cursor orbit—into the installed Windows app across the tray, taskbar, Start, command panel, installer, and splash surfaces; recording state remains explicit through the tray tooltip, cursor companion, and recording HUD.
 - Enlarged logo #1 to fill the tray and taskbar icon canvases, with an optically larger orbit in the 16–64 px Windows frames, and to render at 40 px in command mode and the persistent window title bar; the app now sets its taskbar icon explicitly from the installed brand asset.

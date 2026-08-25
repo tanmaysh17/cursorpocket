@@ -155,13 +155,17 @@ public sealed class ApplicationUpdateTests : IDisposable
         var versionProps = ReadRepositoryFile("native", "Version.props");
         var changelog = ReadRepositoryFile("CHANGELOG.md");
 
+        Assert.Contains("validate-release-version:", workflow, StringComparison.Ordinal);
+        Assert.Contains("Version $version is not newer than $baseVersion", workflow, StringComparison.Ordinal);
         Assert.Contains("queue-signed-release:", workflow, StringComparison.Ordinal);
-        Assert.Contains("needs: build-test-package", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [validate-release-version, build-test-package]", workflow, StringComparison.Ordinal);
         Assert.Contains("actions: write", workflow, StringComparison.Ordinal);
         Assert.Contains("gh workflow run native-windows.yml --ref", workflow, StringComparison.Ordinal);
         Assert.Contains("refs/tags/$tag^{commit}", workflow, StringComparison.Ordinal);
         Assert.Contains("git rev-parse origin/main", workflow, StringComparison.Ordinal);
         Assert.Contains("should-dispatch == 'true'", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh release upload $env:GITHUB_REF_NAME @assets --clobber", workflow, StringComparison.Ordinal);
+        Assert.Equal(2, workflow.Split("overwrite: true", StringSplitOptions.None).Length - 1);
 
         var version = System.Xml.Linq.XDocument.Parse(versionProps)
             .Descendants("CursorPocketVersion")
