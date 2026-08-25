@@ -106,9 +106,9 @@ public sealed class ApplicationUpdateTests : IDisposable
     }
 
     [Fact]
-    public async Task Download_requires_exact_hash_size_and_publisher()
+    public async Task Download_requires_exact_hash_and_size_and_optionally_checks_publisher()
     {
-        var payload = Encoding.UTF8.GetBytes("signed installer fixture");
+        var payload = Encoding.UTF8.GetBytes("installer fixture");
         var sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(payload));
         var update = Update(payload.Length, sha);
 
@@ -117,6 +117,14 @@ public sealed class ApplicationUpdateTests : IDisposable
             verifier: new StubVerifier(true, "Tanmay Sharma"));
         var downloaded = await valid.DownloadAndVerifyAsync(update, "Tanmay Sharma");
         Assert.Equal(payload, await File.ReadAllBytesAsync(downloaded.InstallerPath));
+
+        var unsignedVerifier = new TrackingVerifier(false, "Unsigned");
+        using var unsigned = Service(
+            new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }),
+            verifier: unsignedVerifier);
+        var unsignedDownload = await unsigned.DownloadAndVerifyAsync(update, expectedPublisher: null);
+        Assert.Equal(payload, await File.ReadAllBytesAsync(unsignedDownload.InstallerPath));
+        Assert.Equal(0, unsignedVerifier.CallCount);
 
         using var wrongPublisher = Service(
             new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) }),
@@ -146,6 +154,39 @@ public sealed class ApplicationUpdateTests : IDisposable
 
         Assert.True(stable > preview);
         Assert.True(older < stable);
+    }
+
+    [Fact]
+    public void Main_build_queues_a_stable_free_release_for_the_declared_version()
+    {
+        var workflow = ReadRepositoryFile(".github", "workflows", "native-windows.yml");
+        var versionProps = ReadRepositoryFile("native", "Version.props");
+        var changelog = ReadRepositoryFile("CHANGELOG.md");
+
+        Assert.Contains("validate-release-version:", workflow, StringComparison.Ordinal);
+        Assert.Contains("Version $version is not newer than $baseVersion", workflow, StringComparison.Ordinal);
+        Assert.Contains("git tag --list $tag", workflow, StringComparison.Ordinal);
+        Assert.Contains("queue-release:", workflow, StringComparison.Ordinal);
+        Assert.Contains("publish-release:", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [validate-release-version, build-test-package]", workflow, StringComparison.Ordinal);
+        Assert.Contains("actions: write", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh workflow run native-windows.yml --ref", workflow, StringComparison.Ordinal);
+        Assert.Contains("refs/tags/$tag^{commit}", workflow, StringComparison.Ordinal);
+        Assert.Contains("git rev-parse origin/main", workflow, StringComparison.Ordinal);
+        Assert.Contains("should-dispatch == 'true'", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh release upload $env:GITHUB_REF_NAME @assets --clobber", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("azure/", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("AZURE_", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Get-AuthenticodeSignature", workflow, StringComparison.Ordinal);
+        Assert.Equal(2, workflow.Split("overwrite: true", StringSplitOptions.None).Length - 1);
+
+        var version = System.Xml.Linq.XDocument.Parse(versionProps)
+            .Descendants("CursorPocketVersion")
+            .Single()
+            .Value;
+        Assert.True(ReleaseVersion.TryParse(version, out var release));
+        Assert.Null(release.Prerelease);
+        Assert.Contains($"## {version} ", changelog, StringComparison.Ordinal);
     }
 
     private ApplicationUpdateService Service(
@@ -180,6 +221,17 @@ public sealed class ApplicationUpdateTests : IDisposable
         new Uri("https://github.com/tanmaysh17/cursorpocket/releases/latest"),
         DateTimeOffset.UtcNow);
 
+    private static string ReadRepositoryFile(params string[] pathParts)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "native", "Version.props")))
+        {
+            directory = directory.Parent;
+        }
+        Assert.NotNull(directory);
+        return File.ReadAllText(Path.Combine([directory.FullName, .. pathParts]));
+    }
+
     private static HttpResponseMessage JsonResponse(ApplicationUpdateManifest manifest)
     {
         var response = new HttpResponseMessage(HttpStatusCode.OK)
@@ -202,6 +254,18 @@ public sealed class ApplicationUpdateTests : IDisposable
                 valid,
                 publisher,
                 valid ? null : $"The installer is signed by '{publisher}', not '{expectedPublisher}'."));
+    }
+
+    private sealed class TrackingVerifier(bool valid, string publisher) : IInstallerSignatureVerifier
+    {
+        private int _callCount;
+        public int CallCount => Volatile.Read(ref _callCount);
+
+        public Task<InstallerVerificationResult> VerifyAsync(string path, string expectedPublisher, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _callCount);
+            return Task.FromResult(new InstallerVerificationResult(valid, publisher));
+        }
     }
 
     private sealed class StubHandler : HttpMessageHandler

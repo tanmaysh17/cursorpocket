@@ -186,9 +186,9 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - The friend-facing path is one per-user `CursorPocket-Setup-x64.exe` linked from the CursorPocket GitHub Pages site and hosted by GitHub Releases. ZIP and MSIX builds are development artifacts, not competing public choices.
 - Automatic checks are on by default and read only the static project `update.json` at most once every 24 hours. They transmit no custom identifier, settings, capture metadata, or analytics and fail silently offline. Settings exposes the current version, last state, opt-out, and a manual Check now action.
 - An available update uses the ordinary receipt coordinator with labelled Download and install, Release notes, and Later actions. Nothing downloads without approval. Update UI inherits the current app theme and uses the update glyph as information, not a new decorative colour.
-- The installer is accepted only when its size and SHA-256 match the manifest, its Authenticode chain and timestamp are trusted, its publisher is Tanmay Sharma, its Windows floor is satisfied, and its version is newer. A mismatch changes nothing and produces an actionable error.
+- The installer is accepted only from this project's HTTPS GitHub Release path and only when its size and SHA-256 match the manifest, its Windows floor is satisfied, and its version is newer. A mismatch changes nothing and produces an actionable error.
 - Installation never begins during recording, capture, preflight, region selection, or annotation. It uses the recording lifecycle and application shutdown path, preserves captures and settings, and relaunches only after a successful update install.
-- Public tags are stable, match the centralized version exactly, and are release-blocked until GitHub OIDC Artifact Signing, signature verification, installed-payload verification, provenance, hashes, notices, and the Pages manifest all succeed.
+- Public tags are stable, match the centralized version exactly, and are release-blocked until installed-payload verification, GitHub build provenance, hashes, notices, and the Pages manifest all succeed.
 
 ## Brand mark
 
@@ -213,6 +213,7 @@ Four rules above are overridden by explicit product decision on one surface each
 | Separation comes from the opaque surface, radius, and restrained shadow | Exported backdrops render a layered drop shadow under the image | The exported artwork only. No app chrome gains a shadow stack, and `ThemeShadow` is still absent everywhere. |
 | Default tooltip delay | Instant tooltips | The annotation toolbar only. |
 | `Escape` in annotation cancels without losing the original | `Escape` is two-stage: an armed tool returns to Select, and Select closes | The end state is unchanged — nothing is ever lost — but it can take two presses. The status strip says so after the first, and creation tools return to Select on their own, so most first presses *are* the closing press. |
+| Public installers are code-signed | Releases are intentionally unsigned to keep this open-source project free | Windows may show Unknown publisher or SmartScreen. The supported download remains the repository's GitHub Release asset, protected by exact size/SHA-256 validation, CI installation checks, and GitHub provenance. Signing can be restored later without redesigning the updater. |
 
 ## Design acceptance gate
 
@@ -237,7 +238,7 @@ The design-consultation gate requires all of the following before release:
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
-- automatic update checks can be disabled, never block offline startup, and cannot install an untrusted, corrupt, older, or wrong-publisher artifact;
+- automatic update checks can be disabled, never block offline startup, and cannot install an off-repository, corrupt, older, or incompatible artifact;
 - every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
 - no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;
 - a drawn mark and the saved PNG are the same shape, at every display scale;

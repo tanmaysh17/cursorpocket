@@ -12,8 +12,60 @@ permissions:
   contents: read
 
 jobs:
+  validate-release-version:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a new stable release version
+        shell: pwsh
+        run: |
+          git fetch --tags origin main
+          if ($LASTEXITCODE -ne 0) { throw "Could not refresh main and release tags." }
+
+          [xml]$props = Get-Content native/Version.props -Raw
+          $version = [string]$props.Project.PropertyGroup.CursorPocketVersion
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Every app change must declare a stable semantic version; found '$version'."
+          }
+
+          $baseRef = if ($env:GITHUB_REF -eq 'refs/heads/main') {
+            '${{ github.event.before }}'
+          } else {
+            'origin/main'
+          }
+          if ($baseRef -match '^0+$') { $baseRef = 'HEAD^' }
+          $baseXml = (git show "${baseRef}:native/Version.props") -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "Could not read the prior release version from $baseRef." }
+          [xml]$baseProps = $baseXml
+          $baseVersion = [string]$baseProps.Project.PropertyGroup.CursorPocketVersion
+          $versionNumber = [version]$version
+          $baseNumber = [version]($baseVersion -replace '-.*$', '')
+          $baseIsPrerelease = $baseVersion.Contains('-')
+          if ($versionNumber -lt $baseNumber -or ($versionNumber -eq $baseNumber -and -not $baseIsPrerelease)) {
+            throw "Version $version is not newer than $baseVersion. Bump native/Version.props and add its CHANGELOG heading before merge."
+          }
+
+          $heading = "^## $([regex]::Escape($version))(?:\s|$)"
+          if (-not (Select-String -Path CHANGELOG.md -Pattern $heading)) {
+            throw "CHANGELOG.md needs a release heading for $version before merge."
+          }
+
+          $tag = "v$version"
+          $tagExists = $null -ne (git tag --list $tag)
+          if ($tagExists) {
+            $existingCommit = (git rev-parse "refs/tags/$tag^{commit}").Trim()
+            if (-not ($env:GITHUB_REF -eq 'refs/heads/main' -and $existingCommit -eq $env:GITHUB_SHA)) {
+              throw "Release tag $tag already exists. Bump native/Version.props before this change can merge."
+            }
+          }
+
   build-test-package:
     if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    needs: validate-release-version
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
@@ -56,15 +108,74 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  signed-release:
+  queue-release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: [validate-release-version, build-test-package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate and tag the stable version
+        id: release
+        shell: pwsh
+        run: |
+          git fetch --tags origin main
+          if ($LASTEXITCODE -ne 0) { throw "Could not refresh main and release tags." }
+          $currentMain = (git rev-parse origin/main).Trim()
+          if ($currentMain -ne $env:GITHUB_SHA) {
+            Write-Host "A newer main commit exists. Its successful build will queue the release."
+            "should-dispatch=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          [xml]$props = Get-Content native/Version.props -Raw
+          $version = [string]$props.Project.PropertyGroup.CursorPocketVersion
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Main must declare a stable semantic version before it can be released; found '$version'."
+          }
+          $tag = "v$version"
+          $heading = "^## $([regex]::Escape($version))(?:\s|$)"
+          if (-not (Select-String -Path CHANGELOG.md -Pattern $heading)) {
+            throw "CHANGELOG.md needs a release heading for $version before main can publish it."
+          }
+
+          $existingCommit = git rev-parse -q --verify "refs/tags/$tag^{commit}"
+          if ($LASTEXITCODE -eq 0) {
+            if ($existingCommit.Trim() -ne $env:GITHUB_SHA) {
+              throw "Release tag $tag already points to $existingCommit. Bump native/Version.props before merging more changes to main."
+            }
+            Write-Host "Reusing $tag at the current main commit after an interrupted dispatch."
+          }
+          else {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a $tag -m "CursorPocket $version"
+            if ($LASTEXITCODE -ne 0) { throw "Could not create release tag $tag." }
+            git push origin $tag
+            if ($LASTEXITCODE -ne 0) { throw "Could not push release tag $tag." }
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "should-dispatch=true" >> $env:GITHUB_OUTPUT
+      - name: Queue the release workflow
+        if: ${{ steps.release.outputs.should-dispatch == 'true' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run native-windows.yml --ref "${{ steps.release.outputs.tag }}"
+
+  publish-release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: windows-2022
     timeout-minutes: 60
-    environment: release
     permissions:
       contents: write
-      id-token: write
       attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -92,83 +203,20 @@ jobs:
       - name: Test native services and compatibility
         shell: pwsh
         run: dotnet test native/CursorPocket.Tests/CursorPocket.Tests.csproj -c Release --no-restore
-      - name: Publish unsigned application payload
+      - name: Publish application payload
         shell: pwsh
         run: ./native/build-native.ps1 -SkipRestore -SkipTests -SkipFfmpeg -SkipInstaller -SkipPortableArchive -SkipMsix
-      - name: Sign in to Azure with GitHub OIDC
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Sign CursorPocket application binaries
-        uses: azure/artifact-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files: |
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.exe
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.dll
-            ${{ github.workspace }}\artifacts\CursorPocket-win-x64\CursorPocket.Core.dll
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
-      - name: Build installer from signed payload
+      - name: Build installer
         shell: pwsh
         run: ./native/build-installer.ps1
-      - name: Sign installer
-        uses: azure/artifact-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
-          files: ${{ github.workspace }}\artifacts\CursorPocket-Setup-x64.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          exclude-environment-credential: true
-          exclude-workload-identity-credential: true
-          exclude-managed-identity-credential: true
-          exclude-shared-token-cache-credential: true
-          exclude-visual-studio-credential: true
-          exclude-visual-studio-code-credential: true
-          exclude-azure-cli-credential: false
-          exclude-azure-powershell-credential: true
-          exclude-azure-developer-cli-credential: true
-          exclude-interactive-browser-credential: true
-      - name: Verify publisher, timestamp, and installed payload
+      - name: Verify installer and installed payload
         shell: pwsh
         run: |
-          $signed = @(
-            "artifacts/CursorPocket-win-x64/CursorPocket.exe",
-            "artifacts/CursorPocket-win-x64/CursorPocket.dll",
-            "artifacts/CursorPocket-win-x64/CursorPocket.Core.dll",
-            "artifacts/CursorPocket-Setup-x64.exe"
-          )
-          foreach ($path in $signed) {
-            $signature = Get-AuthenticodeSignature -LiteralPath $path
-            if ($signature.Status -ne "Valid") { throw "$path signature is $($signature.Status): $($signature.StatusMessage)" }
-            $publisher = $signature.SignerCertificate.GetNameInfo('SimpleName', $false)
-            if ($publisher -ne "Tanmay Sharma") { throw "$path has unexpected publisher '$publisher'." }
-            if ($null -eq $signature.TimeStamperCertificate) { throw "$path is missing a trusted timestamp." }
+          if (-not (Test-Path -LiteralPath "artifacts/CursorPocket-Setup-x64.exe")) {
+            throw "The installer was not built."
           }
           $installRoot = Join-Path $env:RUNNER_TEMP "CursorPocket-installed"
           $installer = (Resolve-Path "artifacts/CursorPocket-Setup-x64.exe").Path
@@ -176,43 +224,55 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Installed-build verification failed with exit code $($process.ExitCode)." }
           $publishedHash = (Get-FileHash artifacts/CursorPocket-win-x64/CursorPocket.exe -Algorithm SHA256).Hash
           $installedHash = (Get-FileHash (Join-Path $installRoot "CursorPocket.exe") -Algorithm SHA256).Hash
-          if ($publishedHash -ne $installedHash) { throw "The installer payload does not match the signed application." }
-      - name: Create hashes and private update manifest
+          if ($publishedHash -ne $installedHash) { throw "The installer payload does not match the published application." }
+      - name: Create hashes and update manifest
         shell: pwsh
         run: ./tools/New-UpdateManifest.ps1 -InstallerPath artifacts/CursorPocket-Setup-x64.exe -Tag $env:GITHUB_REF_NAME
       - name: Attest installer provenance
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: artifacts/CursorPocket-Setup-x64.exe
-      - name: Publish signed GitHub release
+      - name: Publish GitHub release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME `
-            artifacts/CursorPocket-Setup-x64.exe `
-            artifacts/SHA256SUMS.txt `
-            artifacts/update.json `
-            artifacts/CursorPocket-win-x64/THIRD_PARTY_NOTICES.md `
-            artifacts/CursorPocket-win-x64/FFMPEG-LICENSE.txt `
-            --verify-tag `
-            --generate-notes `
-            --title "CursorPocket $env:GITHUB_REF_NAME"
+          $assets = @(
+            'artifacts/CursorPocket-Setup-x64.exe'
+            'artifacts/SHA256SUMS.txt'
+            'artifacts/update.json'
+            'artifacts/CursorPocket-win-x64/THIRD_PARTY_NOTICES.md'
+            'artifacts/CursorPocket-win-x64/FFMPEG-LICENSE.txt'
+          )
+          gh release view $env:GITHUB_REF_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:GITHUB_REF_NAME @assets --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Could not refresh the existing release assets." }
+          }
+          else {
+            gh release create $env:GITHUB_REF_NAME @assets `
+              --verify-tag `
+              --generate-notes `
+              --title "CursorPocket $env:GITHUB_REF_NAME"
+            if ($LASTEXITCODE -ne 0) { throw "Could not create the GitHub Release." }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: cursorpocket-update-manifest
           path: artifacts/update.json
+          overwrite: true
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: CursorPocket-private-symbols-${{ github.ref_name }}
           path: artifacts/CursorPocket-symbols
           if-no-files-found: error
+          overwrite: true
           retention-days: 30
 
   deploy-release-pages:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    needs: signed-release
+    needs: publish-release
     runs-on: ubuntu-latest
     environment:
       name: github-pages
