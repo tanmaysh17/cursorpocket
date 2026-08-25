@@ -56,6 +56,66 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  queue-signed-release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: build-test-package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate and tag the stable version
+        id: release
+        shell: pwsh
+        run: |
+          git fetch --tags origin main
+          if ($LASTEXITCODE -ne 0) { throw "Could not refresh main and release tags." }
+          $currentMain = (git rev-parse origin/main).Trim()
+          if ($currentMain -ne $env:GITHUB_SHA) {
+            Write-Host "A newer main commit exists. Its successful build will queue the release."
+            "should-dispatch=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          [xml]$props = Get-Content native/Version.props -Raw
+          $version = [string]$props.Project.PropertyGroup.CursorPocketVersion
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Main must declare a stable semantic version before it can be released; found '$version'."
+          }
+          $tag = "v$version"
+          $heading = "^## $([regex]::Escape($version))(?:\s|$)"
+          if (-not (Select-String -Path CHANGELOG.md -Pattern $heading)) {
+            throw "CHANGELOG.md needs a release heading for $version before main can publish it."
+          }
+
+          $existingCommit = git rev-parse -q --verify "refs/tags/$tag^{commit}"
+          if ($LASTEXITCODE -eq 0) {
+            if ($existingCommit.Trim() -ne $env:GITHUB_SHA) {
+              throw "Release tag $tag already points to $existingCommit. Bump native/Version.props before merging more changes to main."
+            }
+            Write-Host "Reusing $tag at the current main commit after an interrupted dispatch."
+          }
+          else {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a $tag -m "CursorPocket $version"
+            if ($LASTEXITCODE -ne 0) { throw "Could not create release tag $tag." }
+            git push origin $tag
+            if ($LASTEXITCODE -ne 0) { throw "Could not push release tag $tag." }
+          }
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "should-dispatch=true" >> $env:GITHUB_OUTPUT
+      - name: Queue the signed release workflow
+        if: ${{ steps.release.outputs.should-dispatch == 'true' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run native-windows.yml --ref "${{ steps.release.outputs.tag }}"
+
   signed-release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     runs-on: windows-2022

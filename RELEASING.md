@@ -34,7 +34,9 @@ Do not share the local installer as a public release; it is unsigned.
 
 ## Publish
 
-Create and push an annotated tag matching the stable version exactly:
+Merge the stable version and changelog heading to `main`. After the ordinary Windows build and tests pass, the workflow creates the matching annotated tag and explicitly queues the existing signed-release job. The tag step is idempotent: rerunning it resumes dispatch when the tag already points to the same `main` commit, but rejects reusing a released version for newer code.
+
+For recovery or a deliberately manual release, create and push the matching annotated tag yourself:
 
 ```powershell
 git tag -a v0.4.0 -m "CursorPocket 0.4.0"

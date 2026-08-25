@@ -148,6 +148,30 @@ public sealed class ApplicationUpdateTests : IDisposable
         Assert.True(older < stable);
     }
 
+    [Fact]
+    public void Main_build_queues_a_stable_signed_release_for_the_declared_version()
+    {
+        var workflow = ReadRepositoryFile(".github", "workflows", "native-windows.yml");
+        var versionProps = ReadRepositoryFile("native", "Version.props");
+        var changelog = ReadRepositoryFile("CHANGELOG.md");
+
+        Assert.Contains("queue-signed-release:", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: build-test-package", workflow, StringComparison.Ordinal);
+        Assert.Contains("actions: write", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh workflow run native-windows.yml --ref", workflow, StringComparison.Ordinal);
+        Assert.Contains("refs/tags/$tag^{commit}", workflow, StringComparison.Ordinal);
+        Assert.Contains("git rev-parse origin/main", workflow, StringComparison.Ordinal);
+        Assert.Contains("should-dispatch == 'true'", workflow, StringComparison.Ordinal);
+
+        var version = System.Xml.Linq.XDocument.Parse(versionProps)
+            .Descendants("CursorPocketVersion")
+            .Single()
+            .Value;
+        Assert.True(ReleaseVersion.TryParse(version, out var release));
+        Assert.Null(release.Prerelease);
+        Assert.Contains($"## {version} ", changelog, StringComparison.Ordinal);
+    }
+
     private ApplicationUpdateService Service(
         HttpMessageHandler handler,
         Func<DateTimeOffset>? clock = null,
@@ -179,6 +203,17 @@ public sealed class ApplicationUpdateTests : IDisposable
         new Version(10, 0, 19041),
         new Uri("https://github.com/tanmaysh17/cursorpocket/releases/latest"),
         DateTimeOffset.UtcNow);
+
+    private static string ReadRepositoryFile(params string[] pathParts)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "native", "Version.props")))
+        {
+            directory = directory.Parent;
+        }
+        Assert.NotNull(directory);
+        return File.ReadAllText(Path.Combine([directory.FullName, .. pathParts]));
+    }
 
     private static HttpResponseMessage JsonResponse(ApplicationUpdateManifest manifest)
     {
