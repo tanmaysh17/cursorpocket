@@ -66,7 +66,6 @@
                 <Grid x:Name="LibraryPanel" Padding="28,22,28,18">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
@@ -110,56 +109,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <Border
-                        Grid.Row="1"
-                        Margin="0,20,0,16"
-                        Padding="3"
-                        HorizontalAlignment="Left"
-                        Background="{ThemeResource PocketSunken}"
-                        BorderBrush="{ThemeResource PocketLine}"
-                        BorderThickness="1"
-                        CornerRadius="10">
-                        <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="All">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="All" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AllCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Screenshots">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="Screenshots" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.ScreenshotCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Video">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="Video" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.VideoCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Audio">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="Audio" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AudioCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Text">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="Text" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.TextCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                            <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Links">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <TextBlock Text="Links" />
-                                    <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.LinkCount, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
-                    <Grid Grid.Row="2" ColumnSpacing="16">
+                    <Grid Grid.Row="1" Margin="0,20,0,0" ColumnSpacing="16">
                         <!--  At the 720 px minimum window there is not enough width for both
                               panes without truncating every title, so the detail pane gives
                               way and the list takes the room. Double-tap still opens a
@@ -188,40 +138,77 @@
                                     </VisualState.Setters>
                                 </VisualState>
                             </VisualStateGroup>
-                            <VisualStateGroup>
-                                <VisualState x:Name="DetailShort">
-                                    <VisualState.StateTriggers>
-                                        <AdaptiveTrigger MinWindowHeight="0" />
-                                    </VisualState.StateTriggers>
-                                    <VisualState.Setters>
-                                        <Setter Target="DetailFacts.Visibility" Value="Collapsed" />
-                                        <Setter Target="DetailWell.MinHeight" Value="0" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                                <VisualState x:Name="DetailTall">
-                                    <VisualState.StateTriggers>
-                                        <AdaptiveTrigger MinWindowHeight="660" />
-                                    </VisualState.StateTriggers>
-                                    <VisualState.Setters>
-                                        <Setter Target="DetailFacts.Visibility" Value="Visible" />
-                                        <!--  A preview too small to judge is not a preview. With the
-                                              room a 660 px window has, the well gets a real floor.  -->
-                                        <Setter Target="DetailWell.MinHeight" Value="260" />
-                                    </VisualState.Setters>
-                                </VisualState>
-                            </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                         <Grid.ColumnDefinitions>
-                            <!--  The preview takes the larger share: at 4*/6* a screenshot is
-                                  big enough to judge, which is the point of having a preview.
-                                  DetailColumn collapses in the narrow state; preview-only mode
-                                  instead spans DetailPane across both columns so Open still works.  -->
-                            <ColumnDefinition Width="4*" MinWidth="240" />
-                            <ColumnDefinition x:Name="DetailColumn" Width="6*" MinWidth="308" />
+                            <!--  The preview gets almost two thirds of a wide Library. Filters
+                                  stay with the list instead of reserving a blank row over the
+                                  preview. DetailColumn collapses in the narrow state; preview-only
+                                  mode spans DetailPane across both columns.  -->
+                            <ColumnDefinition Width="35*" MinWidth="280" />
+                            <ColumnDefinition x:Name="DetailColumn" Width="65*" MinWidth="308" />
                         </Grid.ColumnDefinitions>
 
-                        <Border x:Name="ListPane" Style="{StaticResource PocketCard}">
-                            <Grid>
+                        <Grid x:Name="ListPane">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <ScrollViewer
+                                Margin="0,0,0,12"
+                                HorizontalScrollBarVisibility="Hidden"
+                                HorizontalScrollMode="Enabled"
+                                VerticalScrollBarVisibility="Disabled"
+                                VerticalScrollMode="Disabled">
+                                <Border
+                                    Padding="3"
+                                    HorizontalAlignment="Left"
+                                    Background="{ThemeResource PocketSunken}"
+                                    BorderBrush="{ThemeResource PocketLine}"
+                                    BorderThickness="1"
+                                    CornerRadius="10">
+                                    <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="All">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="All" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AllCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Screenshots">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="Screenshots" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.ScreenshotCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Video">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="Video" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.VideoCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Audio">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="Audio" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AudioCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Text">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="Text" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.TextCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Links">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <TextBlock Text="Links" />
+                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.LinkCount, Mode=OneWay}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </ScrollViewer>
+
+                            <Border Grid.Row="1" Style="{StaticResource PocketCard}">
+                                <Grid>
                                 <ListView
                                     x:Name="CaptureList"
                                     Padding="6"
@@ -323,18 +310,18 @@
                                         Content="Make the first capture"
                                         Style="{StaticResource PocketPrimaryButton}" />
                                 </StackPanel>
-                            </Grid>
-                        </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
 
                         <Border
                             x:Name="DetailPane"
                             Grid.Column="1"
                             Style="{StaticResource PocketCard}">
-                            <Grid Padding="16">
+                            <Grid Padding="12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="*" />
-                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <!--  The header carries the maximize toggle: the preview is the
@@ -345,15 +332,15 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="6">
+                                    <StackPanel Spacing="4">
                                         <TextBlock x:Name="DetailKind" Style="{StaticResource PocketLabelText}" Text="Capture preview" />
                                         <TextBlock
                                             x:Name="DetailTitle"
-                                            MaxLines="2"
+                                            MaxLines="1"
                                             Style="{StaticResource PocketSubtitleText}"
                                             Text="Choose something from your library"
                                             TextTrimming="CharacterEllipsis"
-                                            TextWrapping="Wrap" />
+                                            TextWrapping="NoWrap" />
                                     </StackPanel>
                                     <Button
                                         x:Name="MaximizePreviewButton"
@@ -369,25 +356,27 @@
                                 <Border
                                     x:Name="DetailWell"
                                     Grid.Row="1"
-                                    Margin="0,14"
-                                    MinHeight="260"
+                                    Margin="0,10,0,8"
+                                    MinHeight="0"
                                     Style="{StaticResource PocketWell}">
                                     <Grid>
                                         <Image
                                             x:Name="DetailImage"
-                                            Margin="8"
+                                            Margin="4"
                                             Stretch="Uniform"
                                             Visibility="Collapsed" />
-                                        <!--  Full transport controls: a recording is reviewed here, which
-                                              means scrubbing and speed, not just play.  -->
+                                        <!--  Compact mode preserves the full transport set while turning
+                                              WinUI's 96 px two-storey panel into a 48 px overlay.  -->
                                         <MediaPlayerElement
                                             x:Name="DetailPlayer"
                                             AreTransportControlsEnabled="True"
                                             AutoPlay="False"
+                                            Stretch="Uniform"
                                             Visibility="Collapsed">
                                             <MediaPlayerElement.TransportControls>
                                                 <MediaTransportControls
-                                                    IsCompact="False"
+                                                    Margin="0"
+                                                    IsCompact="True"
                                                     IsFastForwardButtonVisible="True"
                                                     IsFastForwardEnabled="True"
                                                     IsFastRewindButtonVisible="True"
@@ -405,7 +394,8 @@
                                                     IsVolumeButtonVisible="True"
                                                     IsVolumeEnabled="True"
                                                     IsZoomButtonVisible="True"
-                                                    IsZoomEnabled="True" />
+                                                    IsZoomEnabled="True"
+                                                    ShowAndHideAutomatically="True" />
                                             </MediaPlayerElement.TransportControls>
                                         </MediaPlayerElement>
                                         <StackPanel
@@ -450,116 +440,72 @@
                                     </Grid>
                                 </Border>
 
-                                <StackPanel x:Name="DetailFacts" Grid.Row="2">
-                                    <Grid Padding="0,7" ColumnSpacing="12">
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Kind" />
-                                        <TextBlock
-                                            x:Name="FactKind"
-                                            HorizontalAlignment="Right"
-                                            Style="{StaticResource PocketNumericText}"
-                                            Text="—" />
-                                    </Grid>
-                                    <Grid
-                                        Padding="0,7"
-                                        BorderBrush="{ThemeResource PocketLine}"
-                                        BorderThickness="0,1,0,0"
-                                        ColumnSpacing="12">
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Size" />
-                                        <TextBlock
-                                            x:Name="FactSize"
-                                            HorizontalAlignment="Right"
-                                            Style="{StaticResource PocketNumericText}"
-                                            Text="—" />
-                                    </Grid>
-                                    <Grid
-                                        Padding="0,7"
-                                        BorderBrush="{ThemeResource PocketLine}"
-                                        BorderThickness="0,1,0,0"
-                                        ColumnSpacing="12">
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="Saved" />
-                                        <TextBlock
-                                            x:Name="FactSaved"
-                                            HorizontalAlignment="Right"
-                                            Style="{StaticResource PocketNumericText}"
-                                            Text="—" />
-                                    </Grid>
-                                    <Grid
-                                        Padding="0,7"
-                                        BorderBrush="{ThemeResource PocketLine}"
-                                        BorderThickness="0,1,0,0"
-                                        ColumnSpacing="12">
-                                        <TextBlock Style="{StaticResource PocketMetaText}" Text="File" />
-                                        <TextBlock
-                                            x:Name="FactFile"
-                                            HorizontalAlignment="Right"
-                                            Style="{StaticResource PocketNumericText}"
-                                            Text="—"
-                                            TextTrimming="CharacterEllipsis" />
-                                    </Grid>
-                                </StackPanel>
-
-                                <Grid Grid.Row="3" Margin="0,14,0,0">
-                                    <StackPanel x:Name="DefaultActions" Orientation="Horizontal" Spacing="8">
-                                        <Button
-                                            x:Name="OpenButton"
-                                            Click="Open_Click"
-                                            Content="Open"
-                                            Style="{StaticResource PocketPrimaryButton}" />
-                                        <Button
-                                            Command="{x:Bind ViewModel.RevealSelectedCommand}"
-                                            Content="Reveal"
-                                            Style="{StaticResource PocketQuietButton}" />
-                                        <Button
-                                            x:Name="EditButton"
-                                            Click="Edit_Click"
-                                            Content="Mark up"
-                                            Style="{StaticResource PocketQuietButton}"
-                                            ToolTipService.ToolTip="Ctrl+E — saves an edited copy and leaves this one alone" />
-                                        <Button
-                                            Click="CopyPath_Click"
-                                            Style="{StaticResource PocketIconButton}"
-                                            ToolTipService.ToolTip="Copy file path">
-                                            <FontIcon FontSize="14" Glyph="&#xE8C8;" />
-                                        </Button>
-                                    </StackPanel>
-                                    <StackPanel
-                                        x:Name="TextEditActions"
-                                        Orientation="Horizontal"
-                                        Spacing="8"
-                                        Visibility="Collapsed">
-                                        <Button
-                                            x:Name="SaveTextButton"
-                                            Click="SaveText_Click"
-                                            Content="Save"
-                                            Style="{StaticResource PocketPrimaryButton}"
-                                            ToolTipService.ToolTip="Save text changes · Ctrl+S" />
-                                        <Button
-                                            Click="CancelTextEdit_Click"
-                                            Content="Cancel"
-                                            Style="{StaticResource PocketQuietButton}"
-                                            ToolTipService.ToolTip="Discard text changes · Escape" />
-                                    </StackPanel>
-                                    <!--  Named and click-handled rather than command-bound: with
-                                          extended selection the button also reports how many
-                                          captures the one press will move.  -->
-                                    <Button
-                                        x:Name="DeleteButton"
-                                        HorizontalAlignment="Right"
-                                        Click="DeleteSelected_Click"
-                                        Style="{StaticResource PocketDangerIconButton}"
-                                        ToolTipService.ToolTip="Move to Recycle Bin"
-                                        AutomationProperties.Name="Move selected captures to the Recycle Bin">
-                                        <StackPanel Orientation="Horizontal" Spacing="7">
-                                            <FontIcon FontSize="14" Glyph="&#xE74D;" />
-                                            <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" />
+                                <Grid x:Name="DetailFacts" Grid.Row="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <TextBlock Style="{StaticResource PocketMetaText}" Text="Kind" />
+                                            <TextBlock x:Name="FactKind" Style="{StaticResource PocketNumericText}" Text="—" />
                                         </StackPanel>
-                                    </Button>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
+                                            <TextBlock Style="{StaticResource PocketMetaText}" Text="Size" />
+                                            <TextBlock x:Name="FactSize" Style="{StaticResource PocketNumericText}" Text="—" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5">
+                                            <TextBlock Style="{StaticResource PocketMetaText}" Text="Saved" />
+                                            <TextBlock x:Name="FactSaved" Style="{StaticResource PocketNumericText}" Text="—" />
+                                        </StackPanel>
+                                        <Grid Grid.Column="3" ColumnSpacing="5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Style="{StaticResource PocketMetaText}" Text="File" />
+                                            <TextBlock x:Name="FactFile" Grid.Column="1" Style="{StaticResource PocketNumericText}" Text="—" TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </Grid>
+
+                                    <Grid Grid.Row="1" Margin="0,8,0,0">
+                                        <StackPanel x:Name="DefaultActions" Orientation="Horizontal" Spacing="8">
+                                            <Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" />
+                                            <Button Command="{x:Bind ViewModel.RevealSelectedCommand}" Content="Reveal" Style="{StaticResource PocketQuietButton}" />
+                                            <Button x:Name="EditButton" Click="Edit_Click" Content="Mark up" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Ctrl+E — saves an edited copy and leaves this one alone" />
+                                            <Button Click="CopyPath_Click" Style="{StaticResource PocketIconButton}" ToolTipService.ToolTip="Copy file path">
+                                                <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                            </Button>
+                                        </StackPanel>
+                                        <StackPanel x:Name="TextEditActions" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                                            <Button x:Name="SaveTextButton" Click="SaveText_Click" Content="Save" Style="{StaticResource PocketPrimaryButton}" ToolTipService.ToolTip="Save text changes · Ctrl+S" />
+                                            <Button Click="CancelTextEdit_Click" Content="Cancel" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Discard text changes · Escape" />
+                                        </StackPanel>
+                                        <Button
+                                            x:Name="DeleteButton"
+                                            HorizontalAlignment="Right"
+                                            Click="DeleteSelected_Click"
+                                            Style="{StaticResource PocketDangerIconButton}"
+                                            ToolTipService.ToolTip="Move to Recycle Bin"
+                                            AutomationProperties.Name="Move selected captures to the Recycle Bin">
+                                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                                <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                                                <TextBlock x:Name="DeleteCountText" Visibility="Collapsed" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
                                 </Grid>
                             </Grid>
                         </Border>
                     </Grid>
 
-                    <Grid Grid.Row="3" Margin="0,14,0,0" ColumnSpacing="8">
+                    <Grid Grid.Row="2" Margin="0,14,0,0" ColumnSpacing="8">
                         <StackPanel
                             VerticalAlignment="Center"
                             Orientation="Horizontal"
@@ -865,12 +811,47 @@
                 <!--  ============================ SETTINGS ============================  -->
                 <Grid x:Name="SettingsPanel" Visibility="Collapsed">
                     <ScrollViewer>
-                        <StackPanel
-                            MaxWidth="880"
+                        <Grid
+                            x:Name="SettingsContent"
                             Padding="28,22,28,28"
-                            HorizontalAlignment="Left"
-                            Spacing="6">
-                            <Grid>
+                            ColumnSpacing="16">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup>
+                                    <VisualState x:Name="SettingsSingleColumn">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="0" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="SettingsSecondColumn.Width" Value="0" />
+                                            <Setter Target="SettingsRightColumn.(Grid.Column)" Value="0" />
+                                            <Setter Target="SettingsRightColumn.(Grid.Row)" Value="2" />
+                                            <Setter Target="SettingsContent.ColumnSpacing" Value="0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="SettingsTwoColumns">
+                                        <VisualState.StateTriggers>
+                                            <AdaptiveTrigger MinWindowWidth="1280" />
+                                        </VisualState.StateTriggers>
+                                        <VisualState.Setters>
+                                            <Setter Target="SettingsSecondColumn.Width" Value="*" />
+                                            <Setter Target="SettingsRightColumn.(Grid.Column)" Value="1" />
+                                            <Setter Target="SettingsRightColumn.(Grid.Row)" Value="1" />
+                                            <Setter Target="SettingsContent.ColumnSpacing" Value="16" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition x:Name="SettingsSecondColumn" Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.ColumnSpan="2">
                                 <StackPanel>
                                     <TextBlock Style="{StaticResource PocketDisplayText}" Text="Settings" />
                                     <TextBlock Style="{StaticResource PocketCaptionText}" Text="Changes save automatically. Nothing here leaves this PC." />
@@ -881,7 +862,8 @@
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock
+                            <StackPanel x:Name="SettingsLeftColumn" Grid.Row="1" Spacing="6">
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Appearance" />
@@ -907,7 +889,7 @@
                                 </Grid>
                             </Border>
 
-                            <TextBlock
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Storage" />
@@ -938,7 +920,7 @@
                                 </Grid>
                             </Border>
 
-                            <TextBlock
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Activation" />
@@ -1069,9 +1051,11 @@
                                             AutomationProperties.Name="Start when I sign in" />
                                     </Grid>
                                 </StackPanel>
-                            </Border>
+                                </Border>
+                            </StackPanel>
 
-                            <TextBlock
+                            <StackPanel x:Name="SettingsRightColumn" Grid.Row="1" Grid.Column="1" Spacing="6">
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Recording defaults" />
@@ -1225,7 +1209,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Updates" />
@@ -1287,7 +1271,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Privacy" />
@@ -1301,7 +1285,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <TextBlock
+                                <TextBlock
                                 Margin="0,22,0,10"
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Help" />
@@ -1330,8 +1314,9 @@
                                     Click="RunWelcomeTour_Click"
                                     Content="Run tour"
                                     Style="{StaticResource PocketQuietButton}" />
-                            </Grid>
-                        </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
                     </ScrollViewer>
 
                 </Grid>
@@ -1339,4 +1324,3 @@
         </NavigationView>
     </Grid>
 </Page>
-
