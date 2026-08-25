@@ -4,7 +4,7 @@
 
 ## 0.4.5 — 2026-08-25
 
-- Refined the public-site hero so the complete catch-field cyclone remains visible, and paired the main orbit mark with the correct light- and dark-theme motion wordmarks in the header.
+- Refined the public-site hero so the complete catch-field cyclone remains visible, paired the main orbit mark with theme-correct motion wordmarks, and tightened the first viewport so the primary Download action stays on screen.
 - Made the unsigned-installer warning explicit before download, with exact SmartScreen continuation steps and a separate explanation for policy-enforced blocks where Windows does not offer Run anyway.
 
 ## 0.4.4 — 2026-08-25
