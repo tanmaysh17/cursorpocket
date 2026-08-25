@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.5 — 2026-08-25
+
+- Refined the public-site hero so the complete catch-field cyclone remains visible, and paired the main orbit mark with the correct light- and dark-theme motion wordmarks in the header.
+- Made the unsigned-installer warning explicit before download, with exact SmartScreen continuation steps and a separate explanation for policy-enforced blocks where Windows does not offer Run anyway.
+
 ## 0.4.4 — 2026-08-25
 
 - Expanded the public site with detailed annotation, video recording, and Library capability previews, practical Support guidance, and the approved cyclone, orbit, pocket, and motion-wordmark brand assets.

@@ -417,7 +417,8 @@ def sync_native_runtime_assets(
 def sync_site_assets(
     taskbar_mark: Image.Image,
     ready_mark: Image.Image,
-    wordmark: Image.Image,
+    wordmark_dark_surface: Image.Image,
+    wordmark_light_surface: Image.Image,
     hero: Image.Image,
 ) -> list[Path]:
     """Keep the public site on the approved brand masters at web-ready sizes."""
@@ -435,7 +436,8 @@ def sync_site_assets(
     return [
         mark_target,
         web_asset(ready_mark, "pocket-mark.png", (512, 512)),
-        web_asset(wordmark, "motion-wordmark.png", (1200, 400)),
+        web_asset(wordmark_dark_surface, "motion-wordmark.png", (1200, 400)),
+        web_asset(wordmark_light_surface, "motion-wordmark-light.png", (1200, 400)),
         web_asset(hero, "catch-field.png", (1536, 1024)),
     ]
 
@@ -556,7 +558,15 @@ def main() -> None:
         tray_ready_ico,
         tray_recording_ico,
     )
-    runtime.extend(sync_site_assets(taskbar_primary, ready, wordmark_light, hero_master))
+    runtime.extend(
+        sync_site_assets(
+            taskbar_primary,
+            ready,
+            wordmark_light,
+            wordmark_dark,
+            hero_master,
+        )
+    )
 
     export_manifest(
         {
