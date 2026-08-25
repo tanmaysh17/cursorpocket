@@ -414,12 +414,30 @@ def sync_native_runtime_assets(
     return written
 
 
-def sync_site_asset(taskbar_mark: Image.Image) -> Path:
-    """Keep the public site favicon/navigation mark on the current app logo."""
+def sync_site_assets(
+    taskbar_mark: Image.Image,
+    ready_mark: Image.Image,
+    wordmark: Image.Image,
+    hero: Image.Image,
+) -> list[Path]:
+    """Keep the public site on the approved brand masters at web-ready sizes."""
     SITE_ASSETS.mkdir(parents=True, exist_ok=True)
-    target = SITE_ASSETS / "mark.png"
-    save_png(make_taskbar_unplated(taskbar_mark, 128), target)
-    return target
+
+    def web_asset(image: Image.Image, filename: str, size: tuple[int, int]) -> Path:
+        fitted = image.copy()
+        fitted.thumbnail(size, Image.Resampling.LANCZOS)
+        target = SITE_ASSETS / filename
+        save_png(fitted, target)
+        return target
+
+    mark_target = SITE_ASSETS / "mark.png"
+    save_png(make_taskbar_unplated(taskbar_mark, 128), mark_target)
+    return [
+        mark_target,
+        web_asset(ready_mark, "pocket-mark.png", (512, 512)),
+        web_asset(wordmark, "motion-wordmark.png", (1200, 400)),
+        web_asset(hero, "catch-field.png", (1536, 1024)),
+    ]
 
 
 def remove_superseded_exports() -> None:
@@ -538,7 +556,7 @@ def main() -> None:
         tray_ready_ico,
         tray_recording_ico,
     )
-    runtime.append(sync_site_asset(taskbar_primary))
+    runtime.extend(sync_site_assets(taskbar_primary, ready, wordmark_light, hero_master))
 
     export_manifest(
         {
