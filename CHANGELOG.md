@@ -2,10 +2,15 @@
 
 ## Unreleased
 
+## 0.4.6 — 2026-08-25
+
+- Tightened the public-site hero so the primary Download action stays in the first viewport on common desktop and mobile sizes.
+- Added a first-install file-properties Unblock method alongside the SmartScreen continuation steps, with source verification and policy-enforced-block guidance.
+
 ## 0.4.5 — 2026-08-25
 
-- Refined the public-site hero so the complete catch-field cyclone remains visible, paired the main orbit mark with theme-correct motion wordmarks, and tightened the first viewport so the primary Download action stays on screen.
-- Made the unsigned-installer warning explicit before download, with exact file-properties Unblock and SmartScreen continuation steps plus a separate explanation for policy-enforced blocks.
+- Refined the public-site hero so the complete catch-field cyclone remains visible, and paired the main orbit mark with the correct light- and dark-theme motion wordmarks in the header.
+- Made the unsigned-installer warning explicit before download, with exact SmartScreen continuation steps and a separate explanation for policy-enforced blocks where Windows does not offer Run anyway.
 
 ## 0.4.4 — 2026-08-25
 
