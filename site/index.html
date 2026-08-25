@@ -14,6 +14,7 @@
     <nav class="nav shell" aria-label="Main navigation">
       <a class="brand" href="index.html"><img src="assets/mark.png" alt=""><span>CursorPocket</span></a>
       <div class="nav-links">
+        <a href="#capabilities">Features</a>
         <a href="support.html">Support</a>
         <a href="privacy.html">Privacy</a>
         <a class="button" href="https://github.com/tanmaysh17/cursorpocket/releases/latest/download/CursorPocket-Setup-x64.exe">Download</a>
@@ -57,14 +58,92 @@
           <p>CursorPocket’s mnemonic keys stay the same everywhere. The interface teaches them once, then gets out of your way.</p>
         </div>
         <div class="feature-grid">
-          <article class="feature"><span class="mono">S · R/W/D/A/P</span><h3>Precise screenshots</h3><p>Capture a region, window, display, every display, or the previous region, then mark it up immediately.</p></article>
-          <article class="feature"><span class="mono">V · SHIFT+V</span><h3>Recording with context</h3><p>Choose screen, microphone, camera, and appearance without losing the preview or the Start action.</p></article>
-          <article class="feature"><span class="mono">A · T · L</span><h3>More than pixels</h3><p>Keep a quick audio note, selected text, or the link you are already viewing in the same local Library.</p></article>
+          <article class="feature"><span class="mono">S · R/W/D/A/P</span><h3>Capture, then clarify</h3><p>Take a region, window, display, or multi-display shot. It opens ready to annotate at full resolution.</p><a class="text-link" href="#annotation">Explore annotation <span aria-hidden="true">↓</span></a></article>
+          <article class="feature"><span class="mono">V · SHIFT+V</span><h3>Record with context</h3><p>Choose the source, named microphone, camera, frame rate, and countdown before anything starts.</p><a class="text-link" href="#video">Explore video recording <span aria-hidden="true">↓</span></a></article>
+          <article class="feature"><span class="mono">O</span><h3>Find every capture</h3><p>Review screenshots, video, audio, text, and links together—with previews and playback built in.</p><a class="text-link" href="#library">Explore the Library <span aria-hidden="true">↓</span></a></article>
         </div>
         <div class="trust-line" aria-label="Privacy and installation summary">
           <div class="trust-item"><strong>Saved locally</strong><span>Captures stay in the folder you choose.</span></div>
           <div class="trust-item"><strong>No account or analytics</strong><span>No sign-in, tracking ID, or usage telemetry.</span></div>
           <div class="trust-item"><strong>Updates you approve</strong><span>A private daily check; downloading remains your choice.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section capability-section" id="capabilities">
+      <div class="shell">
+        <div class="section-intro">
+          <div class="eyebrow">From caught to useful</div>
+          <h2>The work after capture is built in.</h2>
+          <p>Explain a screenshot, record a walkthrough, and return to anything you saved without handing your work to another service.</p>
+        </div>
+
+        <div class="capability-list">
+          <article class="capability" id="annotation">
+            <div class="capability-copy">
+              <span class="capability-label mono">Screenshot annotation</span>
+              <h3>Make the point while it is still fresh.</h3>
+              <p>Every screenshot is copied immediately and opens at full resolution. Add a quick mark or turn it into a finished visual without leaving CursorPocket.</p>
+              <ul class="capability-points">
+                <li><strong>Mark up precisely.</strong> Use pen, highlight, arrows, lines, shapes, text, and numbered steps, with undo and redo.</li>
+                <li><strong>Reshape and protect.</strong> Crop, cut, add a flat backdrop, or use solid redaction when the hidden content must not be recoverable.</li>
+                <li><strong>Reuse what is on screen.</strong> Read text locally with Windows OCR, sample a colour, focus an area, or pin the image above your work.</li>
+              </ul>
+              <p class="capability-note">Crop, cut, and backdrop create a new capture, so the original stays untouched.</p>
+            </div>
+            <div class="product-frame annotation-frame" role="img" aria-label="Illustration of the CursorPocket annotation editor with visible tools, crop handles, and save controls">
+              <div class="frame-title"><span>Annotation</span><span class="frame-status">1920 × 1080</span></div>
+              <div class="annotation-layout">
+                <div class="tool-rail" aria-hidden="true"><span class="selected">↗ <b>A</b></span><span>— <b>L</b></span><span>✎ <b>P</b></span><span>▭ <b>R</b></span><span>T <b>T</b></span><span>▦ <b>C</b></span></div>
+                <div class="annotation-canvas" aria-hidden="true"><div class="capture-window"><span></span><span></span><span></span></div><div class="crop-corner crop-a"></div><div class="crop-corner crop-b"></div><svg viewBox="0 0 320 190"><path d="M74 132 C116 94 165 109 212 62"/><path d="M200 61 L218 59 L212 76"/></svg><span class="step-marker">1</span></div>
+                <div class="property-rail" aria-hidden="true"><span class="property-label">Ink</span><div class="swatches"><i></i><i></i><i></i></div><span class="property-label">Weight</span><div class="weight-line"></div><span class="mock-primary">Save</span></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="capability reverse" id="video">
+            <div class="capability-copy">
+              <span class="capability-label mono">Video recording</span>
+              <h3>See exactly what will be recorded.</h3>
+              <p>Preflight names the source and devices before the countdown. Record a clean screen walkthrough with narration and an optional camera self-view, then save a standard MP4 locally.</p>
+              <ul class="capability-points">
+                <li><strong>Set up with confidence.</strong> Choose a display, region, or window; confirm the microphone level and camera preview; include the pointer; and select 30 or 60 fps.</li>
+                <li><strong>Stay oriented while live.</strong> A red, always-readable HUD shows elapsed time, audio activity, active devices, Stop and save, and Discard.</li>
+                <li><strong>Keep the recording clean.</strong> CursorPocket’s command panel and recording HUD stay out of the saved video. Noise suppression and auto-leveling can clean up narration.</li>
+              </ul>
+              <p class="capability-note"><span class="recording-dot" aria-hidden="true"></span> Screen, microphone, and camera access begin only after you choose Start recording.</p>
+            </div>
+            <div class="product-frame recording-frame" role="img" aria-label="Illustration of video recording preflight with screen, microphone, camera, and recording controls">
+              <div class="frame-title"><span>Ready to record</span><span class="frame-status">MP4 · 60 FPS</span></div>
+              <div class="recording-layout">
+                <div class="decision-list" aria-hidden="true"><div><b>1</b><span>Screen<small>Display 1</small></span></div><div><b>2</b><span>Microphone<small>USB Microphone</small></span></div><div><b>3</b><span>Camera<small>Front camera</small></span></div></div>
+                <div class="record-preview" aria-hidden="true"><div class="preview-window"><span></span><span></span><span></span></div><div class="self-view">Camera</div><div class="audio-meter"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+              </div>
+              <div class="record-footer"><span class="mono">3 second countdown</span><span class="start-recording">Start recording</span></div>
+            </div>
+          </article>
+
+          <article class="capability" id="library">
+            <div class="capability-copy">
+              <span class="capability-label mono">Library</span>
+              <h3>Everything you caught, ready to use.</h3>
+              <p>Open the Library with <span class="inline-key">O</span> to browse every local capture newest first. It is a normal movable, resizable Windows window—not a cloud dashboard.</p>
+              <ul class="capability-points">
+                <li><strong>Filter at a glance.</strong> Switch between all captures, screenshots, video, audio, text, and links, with a live count for each.</li>
+                <li><strong>Preview without opening another app.</strong> Inspect images and text, or play video and audio with seek, volume, speed, repeat, skip, and full-window controls.</li>
+                <li><strong>Act without hunting.</strong> Open, mark up, copy a path, reveal the file, or move one or many captures to the Recycle Bin.</li>
+              </ul>
+              <p class="capability-note">Arrow keys navigate, <span class="inline-key">Enter</span> opens, and <span class="inline-key">Space</span> plays or pauses.</p>
+            </div>
+            <div class="product-frame library-frame" role="img" aria-label="Illustration of the CursorPocket Library with capture filters, item list, and media preview">
+              <div class="frame-title"><span>Everything you caught</span><span class="frame-status">24 captures</span></div>
+              <div class="filter-strip" aria-hidden="true"><span class="selected">All <b>24</b></span><span>Shots <b>12</b></span><span>Video <b>4</b></span><span>Audio <b>3</b></span></div>
+              <div class="library-layout" aria-hidden="true">
+                <div class="capture-list"><div class="selected"><i class="shot-thumb"></i><span>Screenshot<small>PNG · 1.8 MB</small></span></div><div><i class="video-thumb">▶</i><span>Walkthrough<small>MP4 · 28.4 MB</small></span></div><div><i class="wave-thumb">≈</i><span>Audio note<small>WAV · 3.1 MB</small></span></div></div>
+                <div class="library-preview"><div class="preview-art"><div class="preview-callout"></div></div><div class="preview-meta"><span>Screenshot</span><span class="mono">1920 × 1080 · PNG</span></div></div>
+              </div>
+            </div>
+          </article>
         </div>
       </div>
     </section>
