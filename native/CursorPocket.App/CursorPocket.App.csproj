@@ -38,7 +38,6 @@
     <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\AppIcon.ico" />
-    <Content Include="Assets\AppIconRecording.ico" />
     <Content Include="Assets\TrayReady.ico" />
     <Content Include="Assets\TrayRecording.ico" />
     <Content Include="Assets\CursorPocketLogo.png" />
