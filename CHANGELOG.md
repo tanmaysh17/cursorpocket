@@ -3,7 +3,7 @@
 ## Unreleased
 
 - Promoted brand logo #1—the transparent-cursor orbit—into the installed Windows app across the tray, taskbar, Start, command panel, installer, and splash surfaces; recording state remains explicit through the tray tooltip, cursor companion, and recording HUD.
-- Enlarged logo #1 to fill the tray and taskbar icon canvases and to render at 40 px in command mode and the persistent window title bar; the app now sets its taskbar icon explicitly from the installed brand asset.
+- Enlarged logo #1 to fill the tray and taskbar icon canvases, with an optically larger orbit in the 16–64 px Windows frames, and to render at 40 px in command mode and the persistent window title bar; the app now sets its taskbar icon explicitly from the installed brand asset.
 - Fixed the cursor companion's ready indicator so its documented bright green core remains visible in light and dark themes instead of being darkened or consumed by its contrast ring.
 - Added a first-run field guide with live theme support, all seven mnemonic commands, shortcut readiness, a real command-mode rehearsal, persistent completion, and a Settings entry to rerun it.
 - Added a signed tag-release gate so friend-facing GitHub releases cannot silently publish unsigned Windows installers.

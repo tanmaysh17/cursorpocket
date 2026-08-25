@@ -118,6 +118,73 @@ def make_unplated(mark: Image.Image, size: int) -> Image.Image:
     return canvas.resize((size, size), Image.Resampling.LANCZOS)
 
 
+def make_taskbar_mark(mark: Image.Image) -> Image.Image:
+    """Optically enlarge logo #1's orbit for Windows' fixed small-icon slot.
+
+    The three coral signal ticks extend the canonical artwork's bounds. A
+    straight contain-fit therefore makes the much more important orbit and
+    negative-space cursor look smaller than neighboring taskbar icons. Keep
+    the ticks at their approved size while enlarging the connected core for
+    the 16–64 px Windows frames only.
+    """
+    cropped = content_crop(mark)
+    width, height = cropped.size
+    source = cropped.load()
+    tick_mask = Image.new("L", cropped.size)
+    tick_pixels = tick_mask.load()
+
+    # The ticks are the only coral pixels in the upper-right corner. Preserve
+    # their antialiased alpha while leaving the coral focal disc with the core.
+    for y in range(round(height * 0.42)):
+        for x in range(round(width * 0.62), width):
+            red, green, blue, alpha = source[x, y]
+            if alpha and red > green * 1.35 and red > blue * 1.15:
+                tick_pixels[x, y] = alpha
+
+    core = cropped.copy()
+    core_alpha = core.getchannel("A")
+    core_alpha_pixels = core_alpha.load()
+    for y in range(height):
+        for x in range(width):
+            if tick_pixels[x, y]:
+                core_alpha_pixels[x, y] = 0
+    core.putalpha(core_alpha)
+
+    ticks = cropped.copy()
+    ticks.putalpha(tick_mask)
+
+    core_scale = 1.16
+    enlarged_core = core.resize(
+        (round(width * core_scale), round(height * core_scale)),
+        Image.Resampling.LANCZOS,
+    )
+    margin = round(max(width, height) * 0.12)
+    composition = Image.new("RGBA", (width + margin * 2, height + margin * 2))
+    composition.alpha_composite(
+        enlarged_core,
+        (
+            margin + (width - enlarged_core.width) // 2,
+            margin + (height - enlarged_core.height) // 2,
+        ),
+    )
+    composition.alpha_composite(ticks, (margin, margin))
+
+    return content_crop(composition)
+
+
+def make_taskbar_unplated(taskbar_mark: Image.Image, size: int) -> Image.Image:
+    supersample = 8
+    side = size * supersample
+    canvas = Image.new("RGBA", (side, side))
+    padding = max(1, round(side * 0.01))
+    paste_center(
+        canvas,
+        taskbar_mark,
+        (padding, padding, side - padding, side - padding),
+    )
+    return canvas.resize((size, size), Image.Resampling.LANCZOS)
+
+
 def make_wordmark_panel(wordmark: Image.Image, background: tuple[int, int, int, int]) -> Image.Image:
     canvas = Image.new("RGBA", (2400, 800), background)
     paste_center(canvas, wordmark, (100, 100, 2300, 700))
@@ -417,11 +484,16 @@ def main() -> None:
 
     app_frames: dict[int, Path] = {}
     recording_frames: dict[int, Path] = {}
+    taskbar_primary = make_taskbar_mark(primary)
     for size in APP_SIZES:
         # Brand logo #1 is the installed application identity in every state.
         # Preserve its outer field and negative-space cursor as transparency.
-        app = make_unplated(primary, size)
-        recording_app = make_unplated(primary, size)
+        if size <= 64:
+            app = make_taskbar_unplated(taskbar_primary, size)
+            recording_app = make_taskbar_unplated(taskbar_primary, size)
+        else:
+            app = make_unplated(primary, size)
+            recording_app = make_unplated(primary, size)
         app_frames[size] = png(app, f"app-icon-{size}.png")
         recording_frames[size] = png(recording_app, f"app-icon-recording-{size}.png")
 
