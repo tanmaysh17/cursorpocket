@@ -55,10 +55,12 @@ jobs:
           }
 
           $tag = "v$version"
-          $existingCommit = git rev-parse -q --verify "refs/tags/$tag^{commit}"
-          if ($LASTEXITCODE -eq 0 -and
-              -not ($env:GITHUB_REF -eq 'refs/heads/main' -and $existingCommit.Trim() -eq $env:GITHUB_SHA)) {
-            throw "Release tag $tag already exists. Bump native/Version.props before this change can merge."
+          $tagExists = $null -ne (git tag --list $tag)
+          if ($tagExists) {
+            $existingCommit = (git rev-parse "refs/tags/$tag^{commit}").Trim()
+            if (-not ($env:GITHUB_REF -eq 'refs/heads/main' -and $existingCommit -eq $env:GITHUB_SHA)) {
+              throw "Release tag $tag already exists. Bump native/Version.props before this change can merge."
+            }
           }
 
   build-test-package:

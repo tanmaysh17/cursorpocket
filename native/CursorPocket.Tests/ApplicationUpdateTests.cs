@@ -157,6 +157,7 @@ public sealed class ApplicationUpdateTests : IDisposable
 
         Assert.Contains("validate-release-version:", workflow, StringComparison.Ordinal);
         Assert.Contains("Version $version is not newer than $baseVersion", workflow, StringComparison.Ordinal);
+        Assert.Contains("git tag --list $tag", workflow, StringComparison.Ordinal);
         Assert.Contains("queue-signed-release:", workflow, StringComparison.Ordinal);
         Assert.Contains("needs: [validate-release-version, build-test-package]", workflow, StringComparison.Ordinal);
         Assert.Contains("actions: write", workflow, StringComparison.Ordinal);
