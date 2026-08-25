@@ -399,6 +399,12 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 .prose li + li { margin-top: 9px; }
 .prose code { overflow-wrap: anywhere; font-family: "Cascadia Mono", Consolas, monospace; font-size: 0.9em; color: var(--ink); }
 .notice { padding: 18px 20px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--ink); }
+.install-method { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); }
+.install-method h3 { margin-top: 8px; }
+.install-method > p { margin-top: 10px; }
+.install-method ol { margin: 18px 0 0; padding-left: 24px; }
+.method-label { color: var(--green); font-size: 12px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; }
+.install-method .method-note { margin-top: 16px; color: var(--muted); font-size: 13px; }
 .install-path { display: grid; gap: 1px; margin: 24px 0; border: 1px solid var(--line); background: var(--line); }
 .install-path > div { display: grid; grid-template-columns: 38px 1fr; gap: 14px; padding: 20px; background: var(--canvas); }
 .install-path p { margin: 0; }
