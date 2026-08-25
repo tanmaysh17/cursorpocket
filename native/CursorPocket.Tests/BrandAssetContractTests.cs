@@ -8,7 +8,6 @@ public sealed class BrandAssetContractTests
 {
     [Theory]
     [InlineData("AppIcon.ico", "16,20,24,32,48,64,128,256")]
-    [InlineData("AppIconRecording.ico", "16,20,24,32,48,64,128,256")]
     [InlineData("TrayReady.ico", "16,20,24,32,48,64")]
     [InlineData("TrayRecording.ico", "16,20,24,32,48,64")]
     public void Runtime_icons_contain_every_required_frame(string filename, string expectedCsv)
@@ -35,7 +34,6 @@ public sealed class BrandAssetContractTests
     }
 
     [Theory]
-    [InlineData("AppIcon.ico", "AppIconRecording.ico")]
     [InlineData("TrayReady.ico", "TrayRecording.ico")]
     public void Brand_logo_one_is_the_stable_installed_identity(string first, string second)
     {

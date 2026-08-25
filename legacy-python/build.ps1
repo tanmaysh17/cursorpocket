@@ -27,8 +27,9 @@ if ($LASTEXITCODE -ne 0) {
     --onefile `
     --windowed `
     --name CursorPocket `
-    --add-data "assets\cursorpocket-logo.png;assets" `
-    --icon assets\cursorpocket.ico `
+    --add-data "..\assets\brand\main-logo.png;assets\brand" `
+    --add-data "..\assets\brand\export\CursorPocket.ico;assets\brand\export" `
+    --icon ..\assets\brand\export\CursorPocket.ico `
     main.py
 if ($LASTEXITCODE -ne 0) {
     throw "PyInstaller failed with exit code $LASTEXITCODE. Close any running CursorPocket instance and rebuild."

@@ -6,12 +6,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 
-LOGO_ASSET = Path("assets") / "cursorpocket-logo.png"
-ICON_ASSET = Path("assets") / "cursorpocket.ico"
+LOGO_ASSET = Path("assets") / "brand" / "main-logo.png"
+ICON_ASSET = Path("assets") / "brand" / "export" / "CursorPocket.ico"
 
 
 def resource_path(relative: Path) -> Path:
-    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
     return root / relative
 
 
@@ -57,48 +57,14 @@ def _load_icon_frame(size: int) -> Image.Image | None:
         return None
 
 
-GROUND = (13, 20, 18)
-GREEN = (69, 224, 140)
-RED = (255, 95, 107)
-
-
 def tray_icon(recording: bool, size: int = 64) -> Image.Image:
-    """The mark, turned red end to end while recording.
+    """Return the stable application identity for every tray state.
 
-    A corner dot would swallow a 16 px tray icon, and recolouring matches what the
-    cursor companion does at the same moment, so both say the same thing.
+    The tooltip, cursor companion, and recording HUD communicate live state. The
+    installed brand mark itself no longer swaps or recolours between states.
     """
-    image = load_logo(size)
-    return _recolour(image, RED) if recording else image
-
-
-def _recolour(image: Image.Image, target: tuple[int, int, int]) -> Image.Image:
-    """Repaint the green in the mark, leaving the dark ground and alpha alone.
-
-    Every pixel is somewhere between the ground and the brand green, so the green
-    channel recovers how much of it is mark. Re-compositing at that same ratio
-    keeps anti-aliased edges clean instead of leaving a halo.
-    """
-    pixels = image.load()
-    if pixels is None:
-        return image
-    span = GREEN[1] - GROUND[1]
-    width, height = image.size
-    for x in range(width):
-        for y in range(height):
-            red, green, blue, alpha = pixels[x, y]
-            if alpha == 0:
-                continue
-            coverage = min(1.0, max(0.0, (green - GROUND[1]) / span))
-            if coverage == 0.0:
-                continue
-            pixels[x, y] = (
-                round(GROUND[0] + (target[0] - GROUND[0]) * coverage),
-                round(GROUND[1] + (target[1] - GROUND[1]) * coverage),
-                round(GROUND[2] + (target[2] - GROUND[2]) * coverage),
-                alpha,
-            )
-    return image
+    del recording
+    return load_logo(size)
 
 
 def _fallback_logo(size: int) -> Image.Image:

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Removed superseded logo iterations, obsolete vector marks, duplicate application-state icons, and generated per-size PNG intermediates; the repository now keeps four approved brand masters plus the final assets consumed by Windows and the public site.
 - Promoted brand logo #1—the transparent-cursor orbit—into the installed Windows app across the tray, taskbar, Start, command panel, installer, and splash surfaces; recording state remains explicit through the tray tooltip, cursor companion, and recording HUD.
 - Enlarged logo #1 to fill the tray and taskbar icon canvases, with an optically larger orbit in the 16–64 px Windows frames, and to render at 40 px in command mode and the persistent window title bar; the app now sets its taskbar icon explicitly from the installed brand asset.
 - Fixed the cursor companion's ready indicator so its documented bright green core remains visible in light and dark themes instead of being darkened or consumed by its contrast ring.
