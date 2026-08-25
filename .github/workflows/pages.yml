@@ -25,11 +25,11 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Preserve the latest signed update manifest
+      - name: Preserve the v0.4.1 compatibility update manifest
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download --pattern update.json --dir site || true
+        run: gh release download --pattern update.json --dir site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
