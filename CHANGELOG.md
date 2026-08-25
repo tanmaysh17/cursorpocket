@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.4.3 — 2026-08-25
+## 0.4.4 — 2026-08-25
 
 - Expanded the public site with detailed annotation, video recording, and Library capability previews, practical Support guidance, and the approved cyclone, orbit, pocket, and motion-wordmark brand assets.
 
