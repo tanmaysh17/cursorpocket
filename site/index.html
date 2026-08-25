@@ -12,7 +12,7 @@
 <body>
   <header class="site-header">
     <nav class="nav shell" aria-label="Main navigation">
-      <a class="brand" href="index.html"><img src="assets/mark.png" alt=""><span>CursorPocket</span></a>
+      <a class="brand" href="index.html"><img class="brand-mark" src="assets/mark.png" alt=""><picture class="brand-wordmark"><source media="(prefers-color-scheme: dark)" srcset="assets/motion-wordmark.png"><img src="assets/motion-wordmark-light.png" alt="CursorPocket"></picture></a>
       <div class="nav-links">
         <a href="#capabilities">Features</a>
         <a href="support.html">Support</a>
@@ -36,7 +36,10 @@
       </div>
 
       <div class="brand-field">
-        <img class="catch-field-art" src="assets/catch-field.png" alt="" aria-hidden="true">
+        <div class="catch-field-stage">
+          <img class="catch-field-art" src="assets/catch-field.png" alt="" aria-hidden="true">
+          <p class="brand-field-caption"><span>Catch now.</span> Find it later.</p>
+        </div>
         <div class="command-field" aria-label="CursorPocket command mode preview">
           <div class="command-head"><span class="command-brand"><img src="assets/mark.png" alt=""><span>CursorPocket</span></span><span class="live">Ready</span><span class="mono">Ctrl Shift Space</span></div>
           <div class="command-list">
@@ -50,7 +53,6 @@
           </div>
           <svg class="cursor" viewBox="0 0 40 54" aria-hidden="true"><path d="M3 2 36 31 22 32l9 18-9 4-8-19-11 11V2Z" fill="#49de93" stroke="#09110d" stroke-width="3" stroke-linejoin="round"/></svg>
         </div>
-        <p class="brand-field-caption"><span>Catch now.</span> Find it later.</p>
       </div>
     </section>
 

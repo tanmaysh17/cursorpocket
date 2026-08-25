@@ -185,6 +185,12 @@
       "mode": "RGBA"
     },
     {
+      "path": "site/assets/motion-wordmark-light.png",
+      "width": 1200,
+      "height": 236,
+      "mode": "RGBA"
+    },
+    {
       "path": "site/assets/motion-wordmark.png",
       "width": 1200,
       "height": 236,

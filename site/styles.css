@@ -88,11 +88,11 @@ button:focus-visible {
   gap: 11px;
   color: var(--ink);
   text-decoration: none;
-  font-weight: 680;
-  letter-spacing: -0.02em;
 }
 
-.brand img { width: 34px; height: 34px; }
+.brand-mark { width: 34px; height: 34px; flex: 0 0 auto; }
+.brand-wordmark { display: block; width: 142px; }
+.brand-wordmark img { display: block; width: 100%; height: auto; }
 
 .nav-links { display: flex; align-items: center; gap: 22px; }
 .nav-links a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 580; }
@@ -138,11 +138,10 @@ button:focus-visible {
 
 .brand-field {
   position: relative;
-  min-height: 610px;
   overflow: hidden;
   display: grid;
-  place-items: center;
-  padding: 74px 44px 54px;
+  gap: 16px;
+  padding: 16px;
   border: 1px solid rgba(246, 244, 236, 0.18);
   border-radius: 28px;
   background: #07130f;
@@ -150,21 +149,25 @@ button:focus-visible {
   isolation: isolate;
 }
 
+.catch-field-stage {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 3 / 2;
+  border-radius: 17px;
+  background: #07130f;
+}
+
 .catch-field-art {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: 57% center;
-  opacity: 0.88;
+  object-fit: contain;
 }
 
 .brand-field-caption {
   position: absolute;
-  right: 24px;
-  bottom: 14px;
+  right: 16px;
+  bottom: 10px;
   margin: 0;
   color: #cbd7d1;
   font-size: 13px;
@@ -211,6 +214,7 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 }
 
 .brand-field .command-field {
+  width: 100%;
   border-color: rgba(246, 244, 236, 0.24);
   background: rgba(10, 24, 18, 0.88);
   color: #f6f4ec;
@@ -390,7 +394,7 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 .prose h2 { font-size: 28px; letter-spacing: -0.03em; }
 .prose p, .prose li { color: var(--muted); }
 .prose li + li { margin-top: 9px; }
-.prose code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 0.9em; color: var(--ink); }
+.prose code { overflow-wrap: anywhere; font-family: "Cascadia Mono", Consolas, monospace; font-size: 0.9em; color: var(--ink); }
 .notice { padding: 18px 20px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--ink); }
 
 .site-footer { border-top: 1px solid rgba(246, 244, 236, 0.14); background: #07130f; }
@@ -403,7 +407,7 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 @media (max-width: 840px) {
   .hero { grid-template-columns: 1fr; padding-top: 64px; }
   .command-field { width: min(100%, 540px); }
-  .brand-field { min-height: 590px; }
+  .brand-field { width: min(100%, 620px); }
   .feature-grid, .trust-line { grid-template-columns: 1fr; }
   .capability, .capability.reverse { grid-template-columns: 1fr; }
   .capability.reverse .capability-copy, .capability.reverse .product-frame { order: initial; }
@@ -416,6 +420,9 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
   .shell { width: min(100% - 28px, 1160px); }
   .nav-links > a:not(.button) { display: none; }
   .nav .button { min-height: 38px; padding-inline: 12px; }
+  .brand { gap: 7px; }
+  .brand-mark { width: 30px; height: 30px; }
+  .brand-wordmark { width: 108px; }
   .hero { min-height: auto; padding: 54px 0 72px; }
   h1 { font-size: clamp(46px, 15vw, 68px); }
   .section { padding: 76px 0; }
@@ -439,8 +446,8 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
   .capture-list i { width: 100%; }
   .library-preview { display: none; }
   .command-field { padding: 10px; border-radius: 18px; }
-  .brand-field { min-height: 530px; padding: 60px 14px 44px; border-radius: 20px; }
-  .catch-field-art { object-position: 61% center; opacity: 0.72; }
+  .brand-field { padding: 10px; border-radius: 20px; }
+  .catch-field-stage { border-radius: 13px; }
   .command-brand span { display: none; }
   .brand-field-caption { right: 16px; }
   .command { min-height: 48px; }
