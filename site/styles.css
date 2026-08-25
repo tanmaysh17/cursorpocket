@@ -200,6 +200,9 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 .lede { max-width: 620px; margin: 26px 0 0; color: var(--muted); font-size: clamp(18px, 2vw, 22px); }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
 .requirements { margin-top: 16px; color: var(--muted); font-size: 13px; }
+.download-warning { max-width: 620px; margin: 18px 0 0; padding: 12px 14px; border-left: 3px solid var(--red); background: color-mix(in srgb, var(--raised) 72%, transparent); color: var(--muted); font-size: 13px; }
+.download-warning strong { color: var(--ink); }
+.download-warning a { color: var(--ink); font-weight: 650; text-underline-offset: 3px; }
 
 .command-field {
   position: relative;
@@ -390,12 +393,18 @@ h3 { font-size: 21px; font-weight: 650; letter-spacing: -0.025em; }
 .page-header h1 { font-size: clamp(44px, 6vw, 74px); }
 .page-header p { margin-top: 20px; color: var(--muted); font-size: 19px; }
 .prose { max-width: 780px; }
-.prose section { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+.prose section { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); scroll-margin-top: 92px; }
 .prose h2 { font-size: 28px; letter-spacing: -0.03em; }
 .prose p, .prose li { color: var(--muted); }
 .prose li + li { margin-top: 9px; }
 .prose code { overflow-wrap: anywhere; font-family: "Cascadia Mono", Consolas, monospace; font-size: 0.9em; color: var(--ink); }
 .notice { padding: 18px 20px; border-left: 3px solid var(--green); background: var(--green-soft); color: var(--ink); }
+.install-path { display: grid; gap: 1px; margin: 24px 0; border: 1px solid var(--line); background: var(--line); }
+.install-path > div { display: grid; grid-template-columns: 38px 1fr; gap: 14px; padding: 20px; background: var(--canvas); }
+.install-path p { margin: 0; }
+.install-path strong, .install-path span { display: block; }
+.install-path p > span { margin-top: 4px; color: var(--muted); }
+.install-step { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ink); }
 
 .site-footer { border-top: 1px solid rgba(246, 244, 236, 0.14); background: #07130f; }
 .footer-inner { min-height: 110px; display: flex; align-items: center; justify-content: space-between; gap: 24px; color: var(--muted); font-size: 13px; }

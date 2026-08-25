@@ -5,6 +5,7 @@
 ## 0.4.4 — 2026-08-25
 
 - Expanded the public site with detailed annotation, video recording, and Library capability previews, practical Support guidance, and the approved cyclone, orbit, pocket, and motion-wordmark brand assets.
+- Made the unsigned-installer warning explicit before download, with exact SmartScreen continuation steps and a separate explanation for policy-enforced blocks where Windows does not offer Run anyway.
 
 ## 0.4.2 — 2026-08-25
 
