@@ -8,7 +8,7 @@ namespace CursorPocket.Tests;
 public sealed class ApplicationUpdateTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "CursorPocket.Update.Tests", Guid.NewGuid().ToString("N"));
-    private static readonly Uri ManifestUri = new("https://tanmaysh17.github.io/cursorpocket/update.json");
+    private static readonly Uri ManifestUri = new("https://github.com/tanmaysh17/cursorpocket/releases/latest/download/update.json");
 
     [Theory]
     [InlineData("0.4.0.1")]
@@ -160,6 +160,7 @@ public sealed class ApplicationUpdateTests : IDisposable
     public void Main_build_queues_a_stable_free_release_for_the_declared_version()
     {
         var workflow = ReadRepositoryFile(".github", "workflows", "native-windows.yml");
+        var coordinator = ReadRepositoryFile("native", "CursorPocket.App", "Services", "ApplicationUpdateCoordinator.cs");
         var versionProps = ReadRepositoryFile("native", "Version.props");
         var changelog = ReadRepositoryFile("CHANGELOG.md");
 
@@ -171,6 +172,7 @@ public sealed class ApplicationUpdateTests : IDisposable
         Assert.Contains("needs: [validate-release-version, build-test-package]", workflow, StringComparison.Ordinal);
         Assert.Contains("actions: write", workflow, StringComparison.Ordinal);
         Assert.Contains("gh workflow run native-windows.yml --ref", workflow, StringComparison.Ordinal);
+        Assert.Contains("gh workflow run pages.yml --ref main", workflow, StringComparison.Ordinal);
         Assert.Contains("refs/tags/$tag^{commit}", workflow, StringComparison.Ordinal);
         Assert.Contains("git rev-parse origin/main", workflow, StringComparison.Ordinal);
         Assert.Contains("should-dispatch == 'true'", workflow, StringComparison.Ordinal);
@@ -179,6 +181,8 @@ public sealed class ApplicationUpdateTests : IDisposable
         Assert.DoesNotContain("AZURE_", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Get-AuthenticodeSignature", workflow, StringComparison.Ordinal);
         Assert.Equal(2, workflow.Split("overwrite: true", StringSplitOptions.None).Length - 1);
+        Assert.Contains("releases/latest/download/update.json", coordinator, StringComparison.Ordinal);
+        Assert.DoesNotContain("github.io", coordinator, StringComparison.OrdinalIgnoreCase);
 
         var version = System.Xml.Linq.XDocument.Parse(versionProps)
             .Descendants("CursorPocketVersion")

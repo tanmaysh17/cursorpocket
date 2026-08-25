@@ -1,6 +1,6 @@
 # Releasing CursorPocket
 
-CursorPocket public releases are unsigned Windows Setup executables hosted by GitHub Releases. GitHub Pages links to the latest installer and hosts the static update manifest used by the app. This release path uses only the free infrastructure available to public GitHub repositories; it does not require Azure, a paid signing certificate, repository secrets, or a `release` environment.
+CursorPocket public releases are unsigned Windows Setup executables hosted by GitHub Releases. The app reads its static update manifest from the latest Release asset; GitHub Pages links to the installer and temporarily mirrors the manifest for v0.4.1 compatibility. This release path uses only the free infrastructure available to public GitHub repositories; it does not require Azure, a paid signing certificate, repository secrets, or a `release` environment.
 
 ## One-time GitHub setup
 
@@ -31,7 +31,7 @@ git tag -a v0.4.1 -m "CursorPocket 0.4.1"
 git push origin v0.4.1
 ```
 
-The release workflow tests the app, builds the installer, performs a clean silent install, compares the installed payload, generates hashes and `update.json`, attests GitHub build provenance, publishes the GitHub Release, and deploys Pages. Any failed stage prevents publication.
+The release workflow tests the app, builds the installer, performs a clean silent install, compares the installed payload, generates hashes and `update.json`, attests GitHub build provenance, publishes the GitHub Release, and queues the main-branch Pages workflow for v0.4.1 compatibility. Any failed release stage prevents publication.
 
 ## What users will see
 

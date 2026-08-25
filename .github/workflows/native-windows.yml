@@ -174,6 +174,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
+      actions: write
       attestations: write
       id-token: write
     steps:
@@ -269,27 +270,8 @@ jobs:
           if-no-files-found: error
           overwrite: true
           retention-days: 30
-
-  deploy-release-pages:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    needs: publish-release
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: cursorpocket-update-manifest
-          path: site
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Queue the compatibility Pages deployment
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

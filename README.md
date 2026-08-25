@@ -114,7 +114,7 @@ A normal first launch opens a short field guide that explains the cursor compani
 
 ## Private updates
 
-CursorPocket reads one static release file from `https://tanmaysh17.github.io/cursorpocket/update.json` at most once every 24 hours. The check sends no installation ID, capture information, settings, or analytics, and it fails silently when offline. Disable it or run a manual check under **Settings → Updates**.
+CursorPocket reads one static file from the [latest GitHub Release](https://github.com/tanmaysh17/cursorpocket/releases/latest/download/update.json) at most once every 24 hours. The check sends no installation ID, capture information, settings, or analytics, and it fails silently when offline. Disable it or run a manual check under **Settings → Updates**.
 
 When a newer release is available, CursorPocket asks before downloading. It accepts only this project's HTTPS GitHub Release address and verifies the exact byte length, SHA-256, Windows requirement, and version before launching the installer. Installation waits until recording, capture, and annotation work is finished.
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.2 — 2026-08-25
+
+- Moved update checks from the order-sensitive GitHub Pages mirror to the latest GitHub Release manifest, while retaining a main-branch Pages deployment for v0.4.1 compatibility.
+- Made release publication explicitly queue that compatibility deployment after the Release asset exists, avoiding tag protection and same-run Pages artifact retry failures.
+
 ## 0.4.1 — 2026-08-24
 
 - Made successful `main` builds automatically queue the release pipeline, require a new documented version before merge, and safely resume partial publication, so each app merge becomes a GitHub Release and live update manifest without manual tagging.
