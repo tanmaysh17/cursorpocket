@@ -1,6 +1,6 @@
 # Releasing CursorPocket
 
-CursorPocket public releases are unsigned Windows Setup executables hosted by GitHub Releases. The app reads its static update manifest from the latest Release asset; GitHub Pages links to the installer and temporarily mirrors the manifest for v0.4.1 compatibility. This release path uses only the free infrastructure available to public GitHub repositories; it does not require Azure, a paid signing certificate, repository secrets, or a `release` environment.
+CursorPocket public releases contain the unsigned Windows Setup executable and a universal, ad-hoc-signed macOS app archive hosted by GitHub Releases. The macOS artifact currently supports interactive region/window screenshots only and must not be described as feature-equivalent to Windows. The Windows app reads its static update manifest from the latest Release asset; GitHub Pages links to the installer and temporarily mirrors the manifest for v0.4.1 compatibility. This release path uses only the free infrastructure available to public GitHub repositories; it does not require Azure, Apple Developer credentials, a paid signing certificate, repository secrets, or a `release` environment.
 
 ## One-time GitHub setup
 
@@ -31,7 +31,7 @@ git tag -a v0.4.1 -m "CursorPocket 0.4.1"
 git push origin v0.4.1
 ```
 
-The release workflow tests the app, builds the installer, performs a clean silent install, compares the installed payload, generates hashes and `update.json`, attests GitHub build provenance, publishes the GitHub Release, and queues the main-branch Pages workflow for v0.4.1 compatibility. Any failed release stage prevents publication.
+The release workflows test the app, build and verify the Windows installer, build and verify the universal macOS preview, perform a clean Windows silent install, generate hashes and `update.json`, attest GitHub build provenance, publish the GitHub Release assets, and queue the main-branch Pages workflow for v0.4.1 compatibility. The macOS workflow waits for the Windows workflow to create the tag's Release, then uploads `CursorPocket-macOS-universal.zip` with replacement enabled so interrupted publication can be rerun safely. Any failed release stage prevents that platform's artifact from publishing.
 
 ## What users will see
 
