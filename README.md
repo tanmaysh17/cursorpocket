@@ -2,6 +2,8 @@
 
 CursorPocket is a local-first Windows capture utility. A tiny green cursor mark follows the pointer, giving you quick access to screenshots, video, audio notes, selected text, and the current browser link. It turns red while audio or video is recording.
 
+A universal native macOS app is also attached to each GitHub Release (`CursorPocket-macOS-universal.zip`, Apple silicon and Intel, macOS 13+). It covers the full capture set — region/window/display screenshots, screen video with optional microphone narration and a camera self-view, audio notes, selected-text capture, browser-link capture, an annotation editor, a searchable Library, a menu-bar presence, a command palette, and ⌃⌥ global hotkeys — and shares the exact `Documents/CursorPocket Captures` layout and `captures.jsonl` index with the Windows app. Each permission (Screen Recording, Microphone, Camera, Accessibility, browser automation) is requested only when its feature is first used. Screenshots also support on-device text recognition ("Grab text"), saved as a text capture. The signature interactions carry over: the cursor companion dot, two quick mouse circles or a two-button chord hold to open the command palette, capture receipts, pinned screenshots, camera effects with on-device person segmentation, and window recording.
+
 Everything is saved to one organized folder on your computer. CursorPocket has no account, analytics, cloud upload, or AI service.
 
 ## The everyday workflow
@@ -133,6 +135,16 @@ This produces the self-contained app under `artifacts\CursorPocket-win-x64`. Wit
 For another person, the only supported public artifact is `CursorPocket-Setup-x64.exe`: it installs per user, requires no administrator access, and includes the self-contained runtime and FFmpeg. Download it from the [CursorPocket site](https://tanmaysh17.github.io/cursorpocket/) or the latest GitHub Release. Releases are intentionally unsigned so this open-source project can publish entirely through GitHub's free public-repository infrastructure. Windows may therefore show **Unknown publisher** or a Microsoft Defender SmartScreen warning; verify that the download came from this repository before choosing **More info → Run anyway**. The release workflow still installs and checks the finished artifact in CI, publishes SHA-256 hashes, and attests its GitHub build provenance.
 
 Release configuration and the exact version/tag procedure are documented in [RELEASING.md](RELEASING.md).
+
+## macOS build
+
+The macOS edition is a native SwiftUI application supporting Apple silicon and Intel Macs on macOS 13 or newer. Screenshots shell out to `screencapture`, screen video uses ScreenCaptureKit muxed to H.264/AAC MP4 by AVAssetWriter, audio notes record WAV with AVAudioRecorder, and all capture-flow decision logic lives in the unit-tested `CursorPocketMacKit` library (`swift test --package-path macos/CursorPocketMac`). Build its universal, ad-hoc-signed app archive on macOS with:
+
+```bash
+./macos/build-macos.sh
+```
+
+The script produces `artifacts/CursorPocket-macOS-universal.zip`. GitHub Actions builds and verifies it on pull requests and attaches it to each tagged GitHub Release. It is not notarized, so macOS may require **Control-click → Open** on first launch. The first screenshot also prompts for macOS Screen Recording permission.
 
 ## Develop locally
 

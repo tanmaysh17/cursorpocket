@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.4.7 — 2026-08-26
+
+- Added a full-featured native SwiftUI macOS app for Apple silicon and Intel Macs: region/window/display screenshots, screen video recording (display or drag-selected region) with optional microphone narration and a draggable camera self-view, audio notes, selected-text capture via Accessibility, browser-link capture via Apple events, an annotation editor (arrow, line, box, ellipse, freehand, text, solid redaction, crop-as-new-capture, undo/redo), a searchable Library with day grouping and Trash-only deletion, a menu-bar presence, a draggable command palette with S/V/A/T/L/O mnemonics, and ⌃⌥-modified global hotkeys.
+- The macOS app reads and writes the exact Windows library layout — the same `captures.jsonl` schema, dated `screenshots/videos/audio/text/links` folders, InternetShortcut `.url` bodies, and orphan recovery — so one synced capture folder serves both apps.
+- Carried the Windows behavioral invariants over: Escape stops a recording by saving, two-stage Escape in annotation, marks overwrite while crops write a new capture, solid-only redaction, camera self-view included in (never excluded from) capture and clamped inside the recorded rectangle, palette bare keys live only while the palette is visible, deletion to Trash only.
+- Ported the double-circle mouse gesture and the two-button chord hold (700 ms): both open the command palette using the same detector thresholds as Windows, with the Windows test drawings and chord tests ported alongside so the detectors cannot drift. The chord needs Accessibility access and quietly stays off without it.
+- Added the cursor companion: a small capture-excluded dot trails the pointer — hollow green ring when idle, red with a filled square while recording (shape changes, not just color) — and clicking it opens the command palette.
+- Added capture receipts (auto-dismissing panel with Open/Reveal/Annotate, ⌃⌥-modified keys), pinned screenshots (explicit action only, never restored after restart, deliberately visible to captures, no Escape handling), and Library thumbnails.
+- Added window-source recording (the file follows the window wherever it moves), pointer-resolved display targeting for multi-monitor setups, and a per-recording preflight with microphone/camera choices and a live camera preview that releases the device before the self-view acquires it.
+- Added camera effects — background blur, brand-dark background replacement, brightness/contrast/warmth — using on-device Vision person segmentation. Every effect defaults off, the no-effects self-view path is untouched, and effects degrade rather than fail: no person mask means the background is left alone, and color adjustments keep working.
+- Added optional audio-note cleanup at save time (80 Hz high-pass + peak normalize, off by default); the raw take is written first and only replaced when processing succeeds.
+- Added a daily GitHub-release update check (one anonymous request, no auto-download), start-at-login via the system login items, editing text captures in place, numbered step markers and a multiply-blend highlighter in the annotation editor, and a generated app icon from the committed brand assets.
+- Added shared golden manifest fixtures under `spec/capture-manifest/` that both the Swift and the Windows C# test suites parse, so a storage-contract change breaks a CI until both sides agree.
+- Added on-device text recognition for screenshots ("Grab text" in the Library) via Apple's Vision framework; the result saves as a text capture and never reaches the clipboard unasked.
+- All decision logic lives in a `CursorPocketMacKit` library covered by a 75+ case unit-test suite that runs in CI before packaging — including pixel-level rendering tests for text blocks and redaction; macOS CI also verifies the universal binary, ad-hoc signature, provenance attestation, and tagged GitHub Release publication as `CursorPocket-macOS-universal.zip`.
+- Documented the macOS edition's support boundary, local build, distribution, and first-launch Gatekeeper behavior.
+
 ## 0.4.6 — 2026-08-25
 
 - Tightened the public-site hero so the primary Download action stays in the first viewport on common desktop and mobile sizes.

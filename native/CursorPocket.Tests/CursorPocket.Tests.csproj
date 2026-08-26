@@ -95,6 +95,9 @@
     <None Include="..\CursorPocket.App\Assets\Square44x44Logo.scale-200.png" Link="Fixtures\Brand\Square44x44Logo.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\StoreLogo.png" Link="Fixtures\Brand\StoreLogo.png" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\Assets\Wide310x150Logo.scale-200.png" Link="Fixtures\Brand\Wide310x150Logo.scale-200.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Cross-platform storage-contract golden fixtures; the macOS suite reads the same files. -->
+    <None Include="..\..\spec\capture-manifest\golden.jsonl" Link="Fixtures\golden.jsonl" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\spec\capture-manifest\golden.url" Link="Fixtures\golden.url" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
