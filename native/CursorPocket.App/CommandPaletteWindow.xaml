@@ -35,7 +35,9 @@
                 <DoubleAnimation Storyboard.TargetName="PulseRing" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="0.78" To="1.08" Duration="0:0:1.35" />
             </Storyboard>
         </Grid.Resources>
-        <Border Background="{ThemeResource PocketGlassPanel}" CornerRadius="14" IsHitTestVisible="False" />
+        <!-- Keep the system backdrop directly visible. In WinUI 3 an element-level
+             Acrylic brush only samples XAML inside this window, so a full-shell
+             layer here turns desktop glass into a flat tint. -->
         <Border Margin="1" BorderBrush="{ThemeResource PocketGlassRim}" BorderThickness="1" CornerRadius="13" IsHitTestVisible="False" />
         <Border Margin="1" BorderBrush="{ThemeResource PocketGlassTopEdge}" BorderThickness="0,1,0,0" CornerRadius="13" IsHitTestVisible="False" />
         <Border BorderBrush="{ThemeResource PocketGreen}" BorderThickness="1" CornerRadius="14" IsHitTestVisible="False" Opacity="0.28" />
