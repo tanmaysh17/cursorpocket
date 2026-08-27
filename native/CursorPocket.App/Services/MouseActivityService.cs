@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 
 namespace CursorPocket_App.Services;
@@ -32,6 +33,7 @@ public sealed class MouseActivityService : IDisposable
     private int _hasPoint;
     private int _movePending;
     private int _gestureEnabled;
+    private int _gestureSensitivity = (int)MouseGestureSensitivity.Balanced;
     private bool _swallowingChord;
     private bool _started;
     private bool _disposed;
@@ -70,6 +72,16 @@ public sealed class MouseActivityService : IDisposable
     {
         get => Volatile.Read(ref _gestureEnabled) != 0;
         set => Volatile.Write(ref _gestureEnabled, value ? 1 : 0);
+    }
+
+    /// <summary>
+    /// The detector reads this atomically on the hook thread, so Settings can change
+    /// the tolerance live without replacing gesture state or blocking pointer input.
+    /// </summary>
+    public MouseGestureSensitivity GestureSensitivity
+    {
+        get => (MouseGestureSensitivity)Volatile.Read(ref _gestureSensitivity);
+        set => Volatile.Write(ref _gestureSensitivity, (int)value);
     }
 
     /// <summary>
@@ -183,7 +195,11 @@ public sealed class MouseActivityService : IDisposable
                 }
             }
             if (Volatile.Read(ref _gestureEnabled) != 0 &&
-                _gesture.Feed(x, y, _clock.Elapsed.TotalSeconds))
+                _gesture.Feed(
+                    x,
+                    y,
+                    _clock.Elapsed.TotalSeconds,
+                    (MouseGestureSensitivity)Volatile.Read(ref _gestureSensitivity)))
             {
                 DoubleCircle?.Invoke(this, EventArgs.Empty);
             }

@@ -12,6 +12,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     private static readonly HashSet<string> SettingsProperties =
     [
         nameof(CaptureDirectory), nameof(ThemeModeIndex), nameof(StartWithWindows), nameof(MouseGestureEnabled),
+        nameof(MouseGestureSensitivityIndex),
         nameof(MouseChordEnabled), nameof(CursorCompanionMode), nameof(ActivationShortcut),
         nameof(VideoMicrophoneEnabled), nameof(VideoCameraEnabled), nameof(VideoFramesPerSecond),
         nameof(VideoCountdownSeconds), nameof(AudioNoiseSuppression), nameof(AudioAutoLevel),
@@ -39,6 +40,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     };
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
+    [ObservableProperty] private int _mouseGestureSensitivityIndex = services.Settings.MouseGestureSensitivity switch
+    {
+        MouseGestureSensitivity.Low => 0,
+        MouseGestureSensitivity.High => 2,
+        _ => 1,
+    };
     [ObservableProperty] private bool _mouseChordEnabled = services.Settings.MouseChordEnabled;
     [ObservableProperty] private string _cursorCompanionMode = services.Settings.CursorCompanionMode;
     [ObservableProperty] private string _activationShortcut = services.Hotkey.RegisteredShortcut ?? "Shortcut unavailable";
@@ -285,6 +292,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             CaptureDirectory = CaptureDirectory,
             StartWithWindows = StartWithWindows,
             MouseGestureEnabled = MouseGestureEnabled,
+            MouseGestureSensitivity = MouseGestureSensitivityIndex switch
+            {
+                0 => MouseGestureSensitivity.Low,
+                2 => MouseGestureSensitivity.High,
+                _ => MouseGestureSensitivity.Balanced,
+            },
             MouseChordEnabled = MouseChordEnabled,
             CursorCompanionMode = CursorCompanionMode,
             ActivationShortcut = ActivationShortcut,

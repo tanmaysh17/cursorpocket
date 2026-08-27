@@ -1,3 +1,5 @@
+using CursorPocket.Core.Models;
+
 namespace CursorPocket.Core.Services;
 
 /// <summary>
@@ -23,21 +25,10 @@ public sealed class DoubleCircleGestureDetector
     // These sit midway between the original strict thresholds and a much looser pass
     // that turned out to trigger during ordinary mouse work. Small and large circles
     // and fast and slow ones all still register; a careless flick no longer does.
-    private const double WindowSeconds = 3.0;
     private const double CooldownSeconds = 1.4;
     private const double MinimumDuration = 0.18;
     private const double MinimumStep = 2;
     private const int MinimumPoints = 14;
-    // From a wrist circle to a wide sweep, without treating a sweep across a whole
-    // 4K display as a gesture.
-    private const double MinimumDiameter = 18;
-    private const double MaximumDiameter = 520;
-    private const double MaximumAspectRatio = 2.4;
-    private const double MaximumRadiusVariation = 0.46;
-    private const double MinimumDirectionality = 0.68;
-    // Two loops, near enough. This is the strongest guard against false positives,
-    // so it stays where it started.
-    private const double MinimumAngularTravel = Math.PI * 3.4;
     // Bounds the cost of the sliding-window scan below, which runs on the
     // low-level mouse hook for every pointer move.
     private const int MaximumPoints = 320;
@@ -57,14 +48,19 @@ public sealed class DoubleCircleGestureDetector
     private double _heading;
     private double _cumulativeHeading;
 
-    public bool Feed(int x, int y, double now)
+    public bool Feed(
+        int x,
+        int y,
+        double now,
+        MouseGestureSensitivity sensitivity = MouseGestureSensitivity.Balanced)
     {
+        var profile = ProfileFor(sensitivity);
         if (now < _cooldownUntil)
         {
             Reset();
             return false;
         }
-        while (_count > 0 && now - Point(0).Time > WindowSeconds)
+        while (_count > 0 && now - Point(0).Time > profile.WindowSeconds)
         {
             DropOldest();
         }
@@ -84,7 +80,7 @@ public sealed class DoubleCircleGestureDetector
 
         var end = _count - 1;
         var lastStart = _count - MinimumPoints;
-        if (!HeadingGateOpen(lastStart, end))
+        if (!HeadingGateOpen(lastStart, end, profile))
         {
             return false;
         }
@@ -98,7 +94,7 @@ public sealed class DoubleCircleGestureDetector
             {
                 break;
             }
-            if (LooksLikeDoubleCircle(start, end))
+            if (LooksLikeDoubleCircle(start, end, profile))
             {
                 Reset();
                 _cooldownUntil = now + CooldownSeconds;
@@ -116,7 +112,7 @@ public sealed class DoubleCircleGestureDetector
         _cumulativeHeading = 0;
     }
 
-    private bool HeadingGateOpen(int lastStart, int end)
+    private bool HeadingGateOpen(int lastStart, int end, GestureProfile profile)
     {
         // The signed heading total is kept per sample, so the travel of any candidate
         // suffix is a single subtraction. Straight motion accumulates nothing, and
@@ -131,10 +127,10 @@ public sealed class DoubleCircleGestureDetector
                 widest = travel;
             }
         }
-        return widest >= MinimumAngularTravel * HeadingGateFactor;
+        return widest >= profile.MinimumAngularTravel * HeadingGateFactor;
     }
 
-    private bool LooksLikeDoubleCircle(int start, int end)
+    private bool LooksLikeDoubleCircle(int start, int end, GestureProfile profile)
     {
         double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
         for (var index = start; index <= end; index++)
@@ -149,7 +145,9 @@ public sealed class DoubleCircleGestureDetector
         var height = maxY - minY;
         var diameter = Math.Max(width, height);
         var smaller = Math.Min(width, height);
-        if (smaller < MinimumDiameter || diameter > MaximumDiameter || diameter / smaller > MaximumAspectRatio)
+        if (smaller < profile.MinimumDiameter ||
+            diameter > profile.MaximumDiameter ||
+            diameter / smaller > profile.MaximumAspectRatio)
         {
             return false;
         }
@@ -185,8 +183,8 @@ public sealed class DoubleCircleGestureDetector
         var variation = Math.Sqrt(varianceSum / count) / meanRadius;
         var first = Point(start);
         var last = Point(end);
-        var closingGap = Math.Max(20, meanRadius * 0.9);
-        if (variation > MaximumRadiusVariation ||
+        var closingGap = Math.Max(profile.MinimumClosingGap, meanRadius * profile.ClosingGapFactor);
+        if (variation > profile.MaximumRadiusVariation ||
             SquaredDistance(first.X, first.Y, last.X, last.Y) > closingGap * closingGap)
         {
             return false;
@@ -204,10 +202,44 @@ public sealed class DoubleCircleGestureDetector
             signedTravel += delta;
             absoluteTravel += Math.Abs(delta);
         }
-        return Math.Abs(signedTravel) >= MinimumAngularTravel
+        return Math.Abs(signedTravel) >= profile.MinimumAngularTravel
             && absoluteTravel > 0
-            && Math.Abs(signedTravel) / absoluteTravel >= MinimumDirectionality;
+            && Math.Abs(signedTravel) / absoluteTravel >= profile.MinimumDirectionality;
     }
+
+    private static GestureProfile ProfileFor(MouseGestureSensitivity sensitivity) => sensitivity switch
+    {
+        MouseGestureSensitivity.Low => new GestureProfile(
+            WindowSeconds: 2.4,
+            MinimumDiameter: 24,
+            MaximumDiameter: 420,
+            MaximumAspectRatio: 1.9,
+            MaximumRadiusVariation: 0.34,
+            MinimumDirectionality: 0.78,
+            MinimumAngularTravel: Math.PI * 3.7,
+            ClosingGapFactor: 0.75,
+            MinimumClosingGap: 16),
+        MouseGestureSensitivity.High => new GestureProfile(
+            WindowSeconds: 4.0,
+            MinimumDiameter: 14,
+            MaximumDiameter: 700,
+            MaximumAspectRatio: 3.0,
+            MaximumRadiusVariation: 0.60,
+            MinimumDirectionality: 0.56,
+            MinimumAngularTravel: Math.PI * 3.15,
+            ClosingGapFactor: 1.10,
+            MinimumClosingGap: 28),
+        _ => new GestureProfile(
+            WindowSeconds: 3.0,
+            MinimumDiameter: 18,
+            MaximumDiameter: 520,
+            MaximumAspectRatio: 2.4,
+            MaximumRadiusVariation: 0.46,
+            MinimumDirectionality: 0.68,
+            MinimumAngularTravel: Math.PI * 3.4,
+            ClosingGapFactor: 0.90,
+            MinimumClosingGap: 20),
+    };
 
     private void Append(int x, int y, double now)
     {
@@ -276,4 +308,15 @@ public sealed class DoubleCircleGestureDetector
     }
 
     private readonly record struct GesturePoint(double Time, double X, double Y, double CumulativeHeading);
+
+    private readonly record struct GestureProfile(
+        double WindowSeconds,
+        double MinimumDiameter,
+        double MaximumDiameter,
+        double MaximumAspectRatio,
+        double MaximumRadiusVariation,
+        double MinimumDirectionality,
+        double MinimumAngularTravel,
+        double ClosingGapFactor,
+        double MinimumClosingGap);
 }

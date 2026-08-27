@@ -7,7 +7,9 @@
     <!-- The window is a fixed size and slides vertically, mostly off the top of the
          screen when closed. Nothing resizes and no window region is recomputed, which
          is what keeps the travel smooth: both of those force a full redraw per frame. -->
-    <Grid x:Name="Root" Background="{ThemeResource PocketGlassPanel}" PointerEntered="Root_PointerEntered" PointerExited="Root_PointerExited" GotFocus="Root_GotFocus" LostFocus="Root_LostFocus">
+    <Grid x:Name="Root" Background="{ThemeResource PocketGlassDense}" PointerEntered="Root_PointerEntered" PointerExited="Root_PointerExited" GotFocus="Root_GotFocus" LostFocus="Root_LostFocus">
+        <Border Margin="1" BorderBrush="{ThemeResource PocketGlassRim}" BorderThickness="1" CornerRadius="19" IsHitTestVisible="False" />
+        <Border Margin="1" BorderBrush="{ThemeResource PocketGlassTopEdge}" BorderThickness="0,1,0,0" CornerRadius="19" IsHitTestVisible="False" />
         <!-- Closed: only this strip, at the bottom of the window, is on screen. -->
         <Grid x:Name="CollapsedView" Height="40" VerticalAlignment="Bottom" Padding="12,0" ColumnSpacing="8">
             <Grid.ColumnDefinitions>

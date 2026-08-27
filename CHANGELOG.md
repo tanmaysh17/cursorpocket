@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.8 — 2026-08-27
+
+- Restored Liquid Glass across app-owned chrome while keeping screenshots, video, pinned media, and other captured content visually exact.
+- Added Low, Balanced, and High sensitivity choices for the two-circle mouse gesture, with live updates and saved settings.
+
 ## 0.4.6 — 2026-08-25
 
 - Tightened the public-site hero so the primary Download action stays in the first viewport on common desktop and mobile sizes.

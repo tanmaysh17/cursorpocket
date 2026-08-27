@@ -12,13 +12,15 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 ## Visual direction
 
-The visual direction is **instrument, not app**. CursorPocket uses layered liquid glass throughout: Mica or Mica Alt for long-lived windows, Desktop Acrylic for short-lived decision surfaces, and restrained translucent planes for navigation, inspectors, and controls. Each window owns one compositor backdrop; individual panels do not stack independent blur effects. Structure comes from a strict grid, hairline highlights, and a real type scale — never from tinted blobs. Avoid decorative glass-card mosaics, excessive gradients, decorative spheres, glossy or three-dimensional marks, and ornamental copy.
+The visual direction is **instrument, not app**. CursorPocket uses dramatic layered liquid glass throughout app-owned chrome: Desktop Acrylic is the common compositor backdrop for persistent workspaces and short-lived decision surfaces, while real in-app Acrylic is reserved for non-overlapping navigation, inspector, and command planes. Each window owns one compositor backdrop. In-app panes never nest or tile into a glass-card mosaic. Structure comes from a strict grid, neutral inner rims, one restrained top-edge catch-light, and a real type scale — never from tinted blobs. Avoid decorative glass-card mosaics, excessive gradients, decorative spheres, glossy or three-dimensional marks, and ornamental copy.
 
 ### Theme and material
 
 - `System`, `Light`, and `Dark` are first-class app modes. The choice applies live to every app-owned window, title bar, flyout, tooltip, dialog, overlay, and tray/context menu.
 - Light uses a pale mineral glass with dark graphite ink. Dark uses graphite glass with chalk ink. Both retain the same green-ready and red-recording meanings.
-- High contrast always wins over the app preference. Disabled transparency, battery saver, unsupported backdrop hardware, and inactive windows use the matching opaque semantic fallback.
+- High contrast always wins over the app preference. Windows owns disabled-transparency, battery-saver, unsupported-hardware, and inactive-window adaptation while every Acrylic brush supplies the matching opaque semantic fallback. An optional system-status probe must never remove the material from every window.
+- The main window, annotation workspace, command mode, recording preflight, HUD, and receipts all receive their backdrop through `ThemeCoordinator`; XAML windows never declare a second backdrop.
+- Region selection, camera self-view, pinned media, and the cursor companion are content or capture surfaces, not chrome. Their pixels remain exact and do not gain a compositor backdrop.
 - Windows-owned File/Folder pickers and Explorer surfaces follow Windows. CursorPocket never replaces system UI merely to force its app theme.
 
 ### Colour roles
@@ -28,10 +30,10 @@ The visual direction is **instrument, not app**. CursorPocket uses layered liqui
 | Ink | `#F6F4EC` | Primary text; brand name Paper |
 | Ink dim | `#CBD7D1` | Descriptions and supporting copy |
 | Muted | `#8EA099` | Tertiary only: timestamps, counts, paths; never critical recording state |
-| Base | `#07130F` | Opaque transient surfaces (HUD, receipt); brand name Pine |
+| Base | `#07130F` | Opaque material fallback and brand Pine |
 | Sunken | `#66070C0B` | Wells and inset groups inside a card |
-| Surface | `#CC101815` | Mica-supported panels and cards |
-| Raised | `#E0161F1C` | Inputs, key chips, and secondary controls |
+| Surface | `#8F101815` | Translucent panels and cards over Acrylic |
+| Raised | `#B8161F1C` | Inputs, key chips, and secondary controls |
 | Line | `#24FFFFFF` | Restrained structural separation |
 | Line strong | `#40FFFFFF` | Key chip edges and framing rectangles |
 | Ready | `#36E58C` | Ready, saved, audio activity, the one primary action, brand motion |
@@ -65,7 +67,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 - A first visible launch opens a three-stage field guide before the persistent Library: meet CursorPocket, learn command-mode activation, and rehearse with the real command surface. A `--background` launch never raises or flashes onboarding.
 - The flow has one job: move a new user from install to a confident first capture in under a minute. It explains local storage and recording colour semantics, shows all seven commands from the shared action catalogue, confirms the registered activation shortcut, and makes the real command mode directly launchable.
-- The signature is one changing cursor-field instrument over the persistent Mica backdrop. It is not a marketing carousel and does not introduce a decorative card mosaic, gradients, screenshots of obsolete UI, or permission requests before a relevant action.
+- The signature is one changing cursor-field instrument over the persistent Acrylic backdrop. It is not a marketing carousel and does not introduce a decorative card mosaic, gradients, screenshots of obsolete UI, or permission requests before a relevant action.
 - The rail is a real three-step sequence and may be selected directly. At narrow widths it collapses while Back and Continue preserve the same sequence. The surface may use one document-level vertical scroll under text scaling; it never scrolls horizontally or nests scroll regions.
 - The final step offers two relevant, reversible choices: start at sign-in and show the cursor companion. The installer does not maintain a competing startup preference. Finish and Skip both persist the current onboarding version atomically; Skip preserves the loaded choices. Settings exposes `Run tour` without clearing completion, so leaving a revisited tour cannot make it appear again at startup. A future materially changed tour may increment the version and run once.
 - Onboarding inherits live System, Light, Dark, high-contrast, transparency, text-scale, and reduced-motion policies. Every action is at least 36 px, named, keyboard-operable, and visibly focused.
@@ -83,7 +85,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - **The user places it; nothing else moves it.** Drag anywhere on the panel except a button to move it, double-click to reset to the top right. An earlier version stepped away from an approaching pointer on its own; predictability proved worth more than the clearance, so the pointer, a mode change, and a reopen never relocate it.
 - The position is remembered as a fraction of the display's free space (`CommandPanelPlacement`), not as screen coordinates, so it means the same thing on another display, resolution, or DPI and can never be restored off screen.
 - Dragging uses Windows' own move loop rather than per-frame pointer tracking, so it feels exactly like dragging a title bar on a surface that has none. The panel takes its rounded corners from DWM rather than a window region, because a region clip drops the window off DWM's fast path and makes dragging lag.
-- **Liquid glass.** Command mode is the one transient surface that uses a system backdrop: `DesktopAcrylicBackdrop` blurs the live desktop behind it, with only a thin tint over the top for text contrast. The system paints the whole window, so this is not the transparent-root gutter that the opacity rule guards against. The frozen desktop snapshot it replaced now belongs to region selection alone.
+- **Liquid glass.** `DesktopAcrylicBackdrop` blurs the live desktop behind command mode. A real Acrylic panel supplies the light graphite or mineral tint, a neutral inner rim and one top-edge catch-light give the pane thickness, and the green hairline remains state rather than decoration. The frozen desktop snapshot it replaced now belongs to region selection alone.
 - Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
 - A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
 - The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
@@ -95,6 +97,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - At normal height the root is one compact list. A short work area uses a two-column command matrix, and the screenshot page uses a 3 × 2 matrix. Neither page scrolls or clips.
 - Commands are mnemonic single keys. Screenshot is explicitly sequential (`S`, then `R/W/D/A/P`).
 - Mnemonic keys are temporarily registered only while command mode is visible so focus cannot make them intermittent. Because the panel no longer covers the screen it can lose activation while still shown; the global bare-key service is what keeps the keys working, and clicking elsewhere deliberately does **not** dismiss it.
+- Two-circle sensitivity is an enumerated Settings choice: Low requires cleaner, smaller-window gestures; Balanced preserves the original detector thresholds; High accepts slower, wider, or rougher loops. Every level still requires clearly more than one turn and rejects straight or reversing motion.
 
 ### Recording preflight
 
@@ -137,8 +140,8 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - It moves like a drawer: **one fixed-size window that slides vertically**, mostly above the top edge when closed, over an eased ~190 ms travel with the contents cross-fading. Nothing resizes and no window region is recomputed per frame — both drop the window off DWM's fast path, which is what made an earlier resize-based version stutter. Rounded corners come from DWM instead. Keyboard focus holds it open, tracked explicitly because `FocusManager` reports stale focus on an inactive window.
 - Text is sized to fit the drawer. Type large enough to overflow the panel is worse for legibility than smaller type that fits.
 - `Escape` stops and saves at any time, which is what makes a collapsed HUD safe. The collapsed pill carries its state as a live mark plus a tooltip, with the running timer as the non-colour cue.
-- Opaque near-black surface (`#09110F`) with white primary text, pale supporting text, red live mark, green level meter.
-- No outline or hard bounding stroke; separation comes from the opaque surface, radius, and restrained shadow.
+- Dense Pine Acrylic (`0.84` tint, `#09110F` fallback) with chalk primary text, pale supporting text, red live mark, and green level meter. The tint stays dark in both app themes because recording legibility wins over theme expression.
+- No hard bounding stroke or shadow stack; separation comes from the dense material, radius, neutral inner rim, and restrained top-edge catch-light.
 - Status and actions are separated, so stopping is never a near-miss for reading the timer.
 - Timer, device state, **Stop & save**, and **Discard** are all visible together once expanded, at 100–250% display scale. The timer is mono with tabular figures so it does not jitter.
 - The primary stop action is text-labelled; discard has both an accessible name and tooltip.
@@ -146,7 +149,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 
 ### Annotation editor
 
-- The editor is a normal Mica window the user works *in*, not a transient overlay, so the opaque-root and capture-exclusion rules for transient surfaces do not apply to it. It is brought up with `WindowPlacement.ForceForeground` on the capture path and plain `Activate()` everywhere else — a transient surface has just hidden itself on the capture path, so the source app still owns the foreground lock.
+- The editor is a normal Acrylic workspace the user works *in*, not a transient overlay. The chrome remains glass while the screenshot canvas and preview remain opaque and colour-accurate. It is brought up with `WindowPlacement.ForceForeground` on the capture path and plain `Activate()` everywhere else — a transient surface has just hidden itself on the capture path, so the source app still owns the foreground lock.
 - **The editor separates selection from adjustment without hiding capability.** All sixteen tools live in a stable left panel; contextual properties and Save, Copy, Pin, Undo, and Redo live in a stable right panel. No tool is placed in `More` at any width.
 - Every tool button shows its shortcut. At full width it shows icon, name, and key; constrained layouts use a two- or three-column icon-and-key matrix. The teaching compresses, never the capability. Neither side panel scrolls.
 - A tool's variants are reached by pressing its key again, and the status strip states the current variant and what the next press will do. That is the teaching surface a hover submenu would otherwise be.
@@ -176,7 +179,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Receipts never register global action shortcuts. Their labelled controls are pointer- and keyboard-operable when focused, and `Esc` dismisses a focused receipt without stealing keys from the user's work.
 - The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy path, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Every one stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
 - Receipts use the correct media preview and labelled click actions such as Open, Mark up, and Show in folder. Receipt-specific global action shortcuts are forbidden. A screenshot is copied to the clipboard when taken and after a saved annotation; Copy inside the editor never overwrites the source capture.
-- Library is a standard resizable Mica window with a top navigation bar, so the wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
+- Library is a standard resizable Acrylic window with a transparent root, top navigation, and two non-overlapping glass content panes. The wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
 - Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter.
 - Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
@@ -229,9 +232,11 @@ The design-consultation gate requires all of the following before release:
 - `Enter` saves a screenshot from the annotation surface whether or not anything was drawn, and the shot is on the clipboard without asking;
 - a dragged region is captured in full, with nothing missing from its right or bottom edge at any display scale;
 - two circles drawn with the pointer open command mode whether they are small or large, fast or slow, clockwise or not — and ordinary mouse work over a working session never opens it;
+- Low, Balanced, and High sensitivity save atomically and apply live; Balanced matches the original detector, while High still rejects a single circle, straight movement, arcs, and back-and-forth motion;
 - named microphone and camera are visible before video begins;
 - the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;
 - recording HUD is readable over both light and dark source content at the active Windows scale;
+- every app-owned chrome window shows Acrylic when Windows allows it, and falls back to the correct opaque semantic surface in high contrast, battery saver, inactive state, disabled transparency, and unsupported hardware without a black or transparent gutter;
 - save, failure, and discard states are unmistakable;
 - Library remains readable and scrollable at its minimum size;
 - green appears only on live state, the primary action, the current selection, and the command-mode field;
