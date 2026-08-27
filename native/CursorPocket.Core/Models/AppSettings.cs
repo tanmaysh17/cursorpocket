@@ -11,6 +11,13 @@ public enum AppThemeMode
     Dark,
 }
 
+public enum GlassTransparencyLevel
+{
+    Clear,
+    Balanced,
+    Solid,
+}
+
 public enum MouseGestureSensitivity
 {
     Low,
@@ -47,11 +54,44 @@ public sealed class MouseGestureSensitivityJsonConverter : JsonConverter<MouseGe
             Enum.IsDefined(value) ? value.ToString() : MouseGestureSensitivity.Balanced.ToString());
 }
 
+public sealed class GlassTransparencyLevelJsonConverter : JsonConverter<GlassTransparencyLevel>
+{
+    public override GlassTransparencyLevel Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String &&
+            Enum.TryParse<GlassTransparencyLevel>(reader.GetString(), ignoreCase: true, out var named) &&
+            Enum.IsDefined(named))
+        {
+            return named;
+        }
+        if (reader.TokenType == JsonTokenType.Number &&
+            reader.TryGetInt32(out var numeric) &&
+            Enum.IsDefined((GlassTransparencyLevel)numeric))
+        {
+            return (GlassTransparencyLevel)numeric;
+        }
+        return GlassTransparencyLevel.Balanced;
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        GlassTransparencyLevel value,
+        JsonSerializerOptions options) => writer.WriteStringValue(
+            Enum.IsDefined(value) ? value.ToString() : GlassTransparencyLevel.Balanced.ToString());
+}
+
 public sealed record AppSettings
 {
     [JsonPropertyName("theme_mode")]
     [JsonConverter(typeof(JsonStringEnumConverter<AppThemeMode>))]
     public AppThemeMode ThemeMode { get; init; } = AppThemeMode.System;
+
+    [JsonPropertyName("glass_transparency")]
+    [JsonConverter(typeof(GlassTransparencyLevelJsonConverter))]
+    public GlassTransparencyLevel GlassTransparency { get; init; } = GlassTransparencyLevel.Balanced;
 
     [JsonPropertyName("capture_dir")]
     public string CaptureDirectory { get; init; } = Path.Combine(

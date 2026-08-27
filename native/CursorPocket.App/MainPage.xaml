@@ -870,25 +870,54 @@
                                 Style="{StaticResource PocketBodyStrongText}"
                                 Text="Appearance" />
                             <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
-                                <Grid Style="{StaticResource SettingsRow}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Style="{StaticResource PocketChipLarge}">
-                                        <FontIcon Glyph="&#xE790;" Style="{StaticResource PocketChipIcon}" />
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="App theme" />
-                                        <TextBlock Margin="0,3,0,0" Style="{StaticResource PocketCaptionText}" Text="System follows Windows. Light and Dark override every CursorPocket surface." TextWrapping="Wrap" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" AutomationProperties.Name="App theme">
-                                        <Button x:Name="ThemeSystemButton" Click="ThemeMode_Click" Content="System" Tag="0" Style="{StaticResource PocketQuietButton}" />
-                                        <Button x:Name="ThemeLightButton" Click="ThemeMode_Click" Content="Light" Tag="1" Style="{StaticResource PocketQuietButton}" />
-                                        <Button x:Name="ThemeDarkButton" Click="ThemeMode_Click" Content="Dark" Tag="2" Style="{StaticResource PocketQuietButton}" />
-                                    </StackPanel>
-                                </Grid>
+                                <StackPanel>
+                                    <Grid Style="{StaticResource SettingsRow}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE790;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="App theme" />
+                                            <TextBlock Margin="0,3,0,0" Style="{StaticResource PocketCaptionText}" Text="System follows Windows. Light and Dark override every CursorPocket surface." TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" AutomationProperties.Name="App theme">
+                                            <Button x:Name="ThemeSystemButton" Click="ThemeMode_Click" Content="System" Tag="0" Style="{StaticResource PocketQuietButton}" />
+                                            <Button x:Name="ThemeLightButton" Click="ThemeMode_Click" Content="Light" Tag="1" Style="{StaticResource PocketQuietButton}" />
+                                            <Button x:Name="ThemeDarkButton" Click="ThemeMode_Click" Content="Dark" Tag="2" Style="{StaticResource PocketQuietButton}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Style="{StaticResource PocketChipLarge}">
+                                            <FontIcon Glyph="&#xE706;" Style="{StaticResource PocketChipIcon}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Glass transparency" />
+                                            <TextBlock
+                                                Margin="0,3,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="More transparent reveals more of the desktop. More solid increases contrast. Windows still controls blur availability."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ComboBox
+                                            Grid.Column="2"
+                                            Width="176"
+                                            AutomationProperties.Name="Glass transparency"
+                                            SelectedIndex="{x:Bind ViewModel.GlassTransparencyIndex, Mode=TwoWay}">
+                                            <ComboBoxItem Content="More transparent" />
+                                            <ComboBoxItem Content="Balanced" />
+                                            <ComboBoxItem Content="More solid" />
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
                             </Border>
 
                                 <TextBlock

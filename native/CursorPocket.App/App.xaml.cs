@@ -50,7 +50,7 @@ public partial class App : Microsoft.UI.Xaml.Application
 
             DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             Services = await AppServices.CreateAsync();
-            Theme = new ThemeCoordinator(Services.Settings.ThemeMode);
+            Theme = new ThemeCoordinator(Services.Settings.ThemeMode, Services.Settings.GlassTransparency);
             // Resolved before the window exists so the Library knows not to build
             // itself for a tray-only launch, rather than racing the deferred hide.
             StartedInBackground = args.Arguments.Contains("--background", StringComparison.OrdinalIgnoreCase)

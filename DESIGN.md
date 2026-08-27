@@ -20,7 +20,8 @@ The visual direction is **instrument, not app**. CursorPocket uses dramatic laye
 - Light uses a pale mineral glass with dark graphite ink. Dark uses graphite glass with chalk ink. Both retain the same green-ready and red-recording meanings.
 - High contrast always wins over the app preference. Windows owns disabled-transparency, battery-saver, unsupported-hardware, and inactive-window adaptation while every Acrylic brush supplies the matching opaque semantic fallback. An optional system-status probe must never remove the material from every window.
 - The main window, annotation workspace, command mode, recording preflight, HUD, and receipts all receive their backdrop through `ThemeCoordinator`; XAML windows never declare a second backdrop.
-- Panel Acrylic stays deliberately clear enough for the desktop material to read through it: dark panel/raised tints use `0.48`/`0.62`, and light uses `0.54`/`0.68`. The recording HUD remains denser at `0.84` for legibility.
+- Settings exposes three live, autosaved glass-transparency presets. Balanced preserves the established dark panel/raised tints (`0.48`/`0.62`) and light tints (`0.54`/`0.68`); More transparent lowers Acrylic tint and semantic-layer opacity, while More solid raises both for contrast. The choice tunes CursorPocket's tint layers, not Windows' blur availability or adaptive fallback policy. Invalid or missing values normalize to Balanced.
+- High contrast ignores the glass-transparency preference, and the recording HUD remains dense at `0.84` in every preset because recording legibility wins over customization.
 - Region selection, camera self-view, pinned media, and the cursor companion are content or capture surfaces, not chrome. Their pixels remain exact and do not gain a compositor backdrop.
 - Windows-owned File/Folder pickers and Explorer surfaces follow Windows. CursorPocket never replaces system UI merely to force its app theme.
 
@@ -239,6 +240,7 @@ The design-consultation gate requires all of the following before release:
 - the camera self-view is visible on screen while recording, lands inside the recorded area, passes clicks through, and appears in the saved display or region recording;
 - recording HUD is readable over both light and dark source content at the active Windows scale;
 - every app-owned chrome window shows Acrylic when Windows allows it, and falls back to the correct opaque semantic surface in high contrast, battery saver, inactive state, disabled transparency, and unsupported hardware without a black or transparent gutter;
+- More transparent, Balanced, and More solid apply live across open app chrome, persist atomically, and leave high contrast and the dense recording HUD unchanged;
 - save, failure, and discard states are unmistakable;
 - Library remains readable and scrollable at its minimum size;
 - green appears only on live state, the primary action, the current selection, and the command-mode field;

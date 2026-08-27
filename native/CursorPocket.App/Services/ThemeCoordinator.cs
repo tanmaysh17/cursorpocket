@@ -37,6 +37,13 @@ public sealed record ThemePalette(
 public sealed class ThemeCoordinator : IDisposable
 {
     private sealed record Registration(Window Window, FrameworkElement Root, SurfaceRole Role);
+    private sealed record GlassProfile(
+        double PanelTint,
+        double RaisedTint,
+        byte SunkenAlpha,
+        byte SurfaceAlpha,
+        byte RaisedAlpha,
+        byte TransientAlpha);
 
     private readonly List<Registration> _registrations = [];
     private readonly UISettings _uiSettings = new();
@@ -44,10 +51,15 @@ public sealed class ThemeCoordinator : IDisposable
     private bool _uiSettingsSubscribed;
     private bool _accessibilitySubscribed;
     private AppThemeMode _mode;
+    private GlassTransparencyLevel _glassTransparency;
 
-    public ThemeCoordinator(AppThemeMode mode)
+    public ThemeCoordinator(AppThemeMode mode, GlassTransparencyLevel glassTransparency)
     {
         _mode = mode;
+        _glassTransparency = Enum.IsDefined(glassTransparency)
+            ? glassTransparency
+            : GlassTransparencyLevel.Balanced;
+        ApplyGlassTransparency();
         // These projections are OS-version and session dependent. A missing optional
         // notification must not prevent the app from starting; the current value is
         // still read whenever another supported signal or an app override applies.
@@ -73,6 +85,7 @@ public sealed class ThemeCoordinator : IDisposable
 
     public event EventHandler? ThemeChanged;
     public AppThemeMode Mode => _mode;
+    public GlassTransparencyLevel GlassTransparency => _glassTransparency;
     public bool IsHighContrast
     {
         get
@@ -119,6 +132,17 @@ public sealed class ThemeCoordinator : IDisposable
         ApplyAll();
     }
 
+    public void SetGlassTransparency(GlassTransparencyLevel glassTransparency)
+    {
+        glassTransparency = Enum.IsDefined(glassTransparency)
+            ? glassTransparency
+            : GlassTransparencyLevel.Balanced;
+        if (_glassTransparency == glassTransparency) return;
+        _glassTransparency = glassTransparency;
+        ApplyGlassTransparency();
+        ApplyAll();
+    }
+
     public void Register(Window window, FrameworkElement root, SurfaceRole role)
     {
         if (_registrations.Any(item => ReferenceEquals(item.Window, window))) return;
@@ -131,6 +155,7 @@ public sealed class ThemeCoordinator : IDisposable
     public SolidColorBrush Brush(string key)
     {
         var palette = Palette;
+        var glass = ProfileFor(_glassTransparency, palette.IsDark);
         var colour = key switch
         {
             "PocketInk" => palette.Text,
@@ -139,16 +164,16 @@ public sealed class ThemeCoordinator : IDisposable
             "PocketBase" => palette.Background,
             "PocketSunken" => IsHighContrast
                 ? palette.Background
-                : WithAlpha(Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12), palette.IsDark ? (byte)0xA6 : (byte)0xB8),
+                : WithAlpha(Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12), glass.SunkenAlpha),
             "PocketSurface" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(0x8F, 0x10, 0x18, 0x15) : Color.FromArgb(0xA8, 0xF8, 0xFC, 0xFA),
+                : palette.IsDark ? Color.FromArgb(glass.SurfaceAlpha, 0x10, 0x18, 0x15) : Color.FromArgb(glass.SurfaceAlpha, 0xF8, 0xFC, 0xFA),
             "PocketRaised" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(0xB8, 0x16, 0x1F, 0x1C) : Color.FromArgb(0xD1, 0xFF, 0xFF, 0xFF),
+                : palette.IsDark ? Color.FromArgb(glass.RaisedAlpha, 0x16, 0x1F, 0x1C) : Color.FromArgb(glass.RaisedAlpha, 0xFF, 0xFF, 0xFF),
             "PocketTransientSurface" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(0xC2, 0x14, 0x1E, 0x1A) : Color.FromArgb(0xD9, 0xF7, 0xFB, 0xF9),
+                : palette.IsDark ? Color.FromArgb(glass.TransientAlpha, 0x14, 0x1E, 0x1A) : Color.FromArgb(glass.TransientAlpha, 0xF7, 0xFB, 0xF9),
             "PocketLine" or "PocketLineStrong" => palette.Line,
             "PocketGreen" => palette.Selection,
             "PocketGreenSoft" => WithAlpha(palette.Selection, 48),
@@ -159,6 +184,55 @@ public sealed class ThemeCoordinator : IDisposable
             _ => Color.Transparent,
         };
         return new SolidColorBrush(Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B));
+    }
+
+    private void ApplyGlassTransparency()
+    {
+        var resources = Application.Current?.Resources;
+        if (resources is null) return;
+
+        ApplyGlassProfile(resources, ProfileFor(_glassTransparency, dark: true));
+        if (resources.ThemeDictionaries.TryGetValue("Dark", out var darkValue) && darkValue is ResourceDictionary dark)
+        {
+            ApplyGlassProfile(dark, ProfileFor(_glassTransparency, dark: true));
+        }
+        if (resources.ThemeDictionaries.TryGetValue("Light", out var lightValue) && lightValue is ResourceDictionary light)
+        {
+            ApplyGlassProfile(light, ProfileFor(_glassTransparency, dark: false));
+        }
+    }
+
+    private static GlassProfile ProfileFor(GlassTransparencyLevel level, bool dark) => (level, dark) switch
+    {
+        (GlassTransparencyLevel.Clear, true) => new(0.34, 0.48, 0x82, 0x73, 0x9F, 0xAD),
+        (GlassTransparencyLevel.Clear, false) => new(0.40, 0.54, 0x9D, 0x8F, 0xB8, 0xC2),
+        (GlassTransparencyLevel.Solid, true) => new(0.62, 0.76, 0xC0, 0xAB, 0xD0, 0xDC),
+        (GlassTransparencyLevel.Solid, false) => new(0.68, 0.82, 0xD1, 0xC2, 0xE6, 0xED),
+        (_, true) => new(0.48, 0.62, 0xA6, 0x8F, 0xB8, 0xC2),
+        _ => new(0.54, 0.68, 0xB8, 0xA8, 0xD1, 0xD9),
+    };
+
+    private static void ApplyGlassProfile(ResourceDictionary resources, GlassProfile profile)
+    {
+        if (resources.ContainsKey("PocketGlassPanel") && resources["PocketGlassPanel"] is AcrylicBrush panel)
+        {
+            panel.TintOpacity = profile.PanelTint;
+        }
+        if (resources.ContainsKey("PocketGlassRaised") && resources["PocketGlassRaised"] is AcrylicBrush raised)
+        {
+            raised.TintOpacity = profile.RaisedTint;
+        }
+        SetBrushAlpha(resources, "PocketSunken", profile.SunkenAlpha);
+        SetBrushAlpha(resources, "PocketSurface", profile.SurfaceAlpha);
+        SetBrushAlpha(resources, "PocketRaised", profile.RaisedAlpha);
+        SetBrushAlpha(resources, "PocketTransientSurface", profile.TransientAlpha);
+    }
+
+    private static void SetBrushAlpha(ResourceDictionary resources, string key, byte alpha)
+    {
+        if (!resources.ContainsKey(key) || resources[key] is not SolidColorBrush brush) return;
+        var colour = brush.Color;
+        brush.Color = Windows.UI.Color.FromArgb(alpha, colour.R, colour.G, colour.B);
     }
 
     public System.Windows.Forms.ToolStripRenderer CreateMenuRenderer() => new ThemedToolStripRenderer(Palette);

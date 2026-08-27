@@ -1044,6 +1044,7 @@ public sealed partial class MainWindow : Window
         App.DispatcherQueue.TryEnqueue(() =>
         {
             App.Theme.SetMode(settings.ThemeMode);
+            App.Theme.SetGlassTransparency(settings.GlassTransparency);
             SubscribeToRecordingState();
             _companion?.SetMode(settings.CursorCompanionMode);
             if (_mouseActivity is not null)

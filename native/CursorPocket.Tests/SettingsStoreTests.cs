@@ -25,6 +25,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal("bottom-right", settings.VideoCameraPosition);
         Assert.Equal("off", settings.CursorCompanionMode);
         Assert.Equal(MouseGestureSensitivity.Balanced, settings.MouseGestureSensitivity);
+        Assert.Equal(GlassTransparencyLevel.Balanced, settings.GlassTransparency);
     }
 
     [Fact]
@@ -146,6 +147,29 @@ public sealed class SettingsStoreTests : IDisposable
         var invalidName = await store.LoadAsync();
         Assert.Equal(@"C:\Still Here", invalidName.CaptureDirectory);
         Assert.Equal(MouseGestureSensitivity.Balanced, invalidName.MouseGestureSensitivity);
+    }
+
+    [Fact]
+    public async Task GlassTransparencyRoundTripsAndInvalidValuesNormalizeToBalanced()
+    {
+        var path = Path.Combine(_root, "glass", "settings.json");
+        var store = new SettingsStore(path);
+
+        await store.SaveAsync(new AppSettings { GlassTransparency = GlassTransparencyLevel.Clear });
+        Assert.Equal(GlassTransparencyLevel.Clear, (await store.LoadAsync()).GlassTransparency);
+
+        var repaired = SettingsStore.Normalize(new AppSettings
+        {
+            GlassTransparency = (GlassTransparencyLevel)999,
+        });
+        Assert.Equal(GlassTransparencyLevel.Balanced, repaired.GlassTransparency);
+
+        await File.WriteAllTextAsync(path, """
+            {"capture_dir":"C:\\Still Here","glass_transparency":"Invisible"}
+            """);
+        var invalidName = await store.LoadAsync();
+        Assert.Equal(@"C:\Still Here", invalidName.CaptureDirectory);
+        Assert.Equal(GlassTransparencyLevel.Balanced, invalidName.GlassTransparency);
     }
 
     [Fact]
