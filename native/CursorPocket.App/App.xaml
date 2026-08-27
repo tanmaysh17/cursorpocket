@@ -32,8 +32,8 @@
                     <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
                     <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
-                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.52" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
-                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.66" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.48" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.62" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
                     <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
                     <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Offset="0" Color="#4AFFFFFF" />
@@ -64,8 +64,8 @@
                     <SolidColorBrush x:Key="PocketRed" Color="#FFD73546" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="#24D73546" />
                     <SolidColorBrush x:Key="PocketBlue" Color="#FF276EA8" />
-                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF5FAF7" TintOpacity="0.58" TintLuminosityOpacity="0.82" FallbackColor="#FFF5FAF7" />
-                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFFFFFF" TintOpacity="0.72" TintLuminosityOpacity="0.78" FallbackColor="#FFF8FCFA" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF5FAF7" TintOpacity="0.54" TintLuminosityOpacity="0.82" FallbackColor="#FFF5FAF7" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFFFFFF" TintOpacity="0.68" TintLuminosityOpacity="0.78" FallbackColor="#FFF8FCFA" />
                     <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
                     <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Offset="0" Color="#9AFFFFFF" />
@@ -123,8 +123,8 @@
             <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
             <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
             <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
-            <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.52" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
-            <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.66" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
+            <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.48" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
+            <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.62" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
             <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
             <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
                 <GradientStop Offset="0" Color="#4AFFFFFF" />

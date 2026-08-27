@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.10 — 2026-08-27
+
+- Made Library Copy place the real capture on the clipboard, including a pasteable bitmap representation for screenshots, instead of copying path text.
+- Increased panel-glass transparency slightly while preserving the denser recording HUD treatment.
+- Removed the command-center logo pulse so the brand mark remains quiet and static.
+
 ## 0.4.9 — 2026-08-27
 
 - Made the command center visibly translucent again by allowing its Desktop Acrylic backdrop to show through the shell.

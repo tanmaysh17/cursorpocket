@@ -31,7 +31,6 @@ public sealed partial class CommandPaletteWindow : Window
     private bool _dragging;
     private bool _screenshotMode;
     private bool _restoreSourceOnClose = true;
-    private bool _paletteLoaded;
     private bool _twoColumn;
     private long _lastTimeoutReset;
     private readonly List<Button> _primaryButtons = [];
@@ -64,10 +63,6 @@ public sealed partial class CommandPaletteWindow : Window
         // snapshot used to be for.
         if (initialMode == "screenshot") ShowScreenshotCommands(); else ShowPrimaryCommands();
         ApplySavedPlacement();
-        if (_paletteLoaded && App.AnimationsEnabled)
-        {
-            PulseStoryboard.Begin();
-        }
         _commandKeys.SetEnabled(true);
         AppWindow.Show(false);
         Activate();
@@ -334,9 +329,6 @@ public sealed partial class CommandPaletteWindow : Window
     private void HidePalette()
     {
         _timeout.Stop();
-        // The palette window stays alive between activations, so a Forever
-        // storyboard left running would keep animating an invisible surface.
-        if (_paletteLoaded) PulseStoryboard.Stop();
         _commandKeys.SetEnabled(false);
         AppWindow.Hide();
         if (_restoreSourceOnClose)
@@ -365,13 +357,11 @@ public sealed partial class CommandPaletteWindow : Window
 
     private void Root_Loaded(object sender, RoutedEventArgs eventArgs)
     {
-        _paletteLoaded = true;
-        if (App.AnimationsEnabled) PulseStoryboard.Begin();
         FocusCommandSurface();
     }
     private void FocusCommandSurface() => (_screenshotMode ? RegionCommand : ScreenshotCommand).Focus(FocusState.Programmatic);
     private void Close_Click(object sender, RoutedEventArgs eventArgs) => HidePalette();
-    private void LibraryPulse_Click(object sender, RoutedEventArgs eventArgs) => Request(CaptureActionId.Library);
+    private void Library_Click(object sender, RoutedEventArgs eventArgs) => Request(CaptureActionId.Library);
 
     private void BuildCommands()
     {

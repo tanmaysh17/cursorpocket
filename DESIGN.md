@@ -20,6 +20,7 @@ The visual direction is **instrument, not app**. CursorPocket uses dramatic laye
 - Light uses a pale mineral glass with dark graphite ink. Dark uses graphite glass with chalk ink. Both retain the same green-ready and red-recording meanings.
 - High contrast always wins over the app preference. Windows owns disabled-transparency, battery-saver, unsupported-hardware, and inactive-window adaptation while every Acrylic brush supplies the matching opaque semantic fallback. An optional system-status probe must never remove the material from every window.
 - The main window, annotation workspace, command mode, recording preflight, HUD, and receipts all receive their backdrop through `ThemeCoordinator`; XAML windows never declare a second backdrop.
+- Panel Acrylic stays deliberately clear enough for the desktop material to read through it: dark panel/raised tints use `0.48`/`0.62`, and light uses `0.54`/`0.68`. The recording HUD remains denser at `0.84` for legibility.
 - Region selection, camera self-view, pinned media, and the cursor companion are content or capture surfaces, not chrome. Their pixels remain exact and do not gain a compositor backdrop.
 - Windows-owned File/Folder pickers and Explorer surfaces follow Windows. CursorPocket never replaces system UI merely to force its app theme.
 
@@ -85,10 +86,10 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - **The user places it; nothing else moves it.** Drag anywhere on the panel except a button to move it, double-click to reset to the top right. An earlier version stepped away from an approaching pointer on its own; predictability proved worth more than the clearance, so the pointer, a mode change, and a reopen never relocate it.
 - The position is remembered as a fraction of the display's free space (`CommandPanelPlacement`), not as screen coordinates, so it means the same thing on another display, resolution, or DPI and can never be restored off screen.
 - Dragging uses Windows' own move loop rather than per-frame pointer tracking, so it feels exactly like dragging a title bar on a surface that has none. The panel takes its rounded corners from DWM rather than a window region, because a region clip drops the window off DWM's fast path and makes dragging lag.
-- **Liquid glass.** `DesktopAcrylicBackdrop` blurs the live desktop behind command mode. A real Acrylic panel supplies the light graphite or mineral tint, a neutral inner rim and one top-edge catch-light give the pane thickness, and the green hairline remains state rather than decoration. The frozen desktop snapshot it replaced now belongs to region selection alone.
+- **Liquid glass.** `DesktopAcrylicBackdrop` blurs the live desktop behind command mode. The transparent shell exposes that desktop-sampling material directly; a neutral inner rim and one top-edge catch-light give the pane thickness, and the green hairline remains state rather than decoration. The frozen desktop snapshot it replaced now belongs to region selection alone.
 - Rows are single-line: keycap, label, kind icon. No per-row captions—the panel is meant to be read at a glance, not studied.
 - A hairline green border communicates that command mode is active. No four-edge glow, no hard-edged glass slab.
-- The header carries the product logo as the brand mark and the Library affordance, with a soft green pulse behind it. This supersedes the earlier vector-cursor-only rule and the general ban on raster marks, for this surface only.
+- The header carries the product logo as a static brand mark and Library affordance. It never pulses or adds ambient motion because the mark does not communicate changing state.
 - The row icon column says one thing on every row: which kind of capture it is. It never mixes a submenu chevron with kind glyphs, and no row is left without one.
 - Every key chip is the same width and a combination rides in a single chip, so a two-key shortcut cannot shift its label out of line with the rest.
 - The root presents seven content-sized actions: Screenshot `S`, Video `V`, Repeat video `Shift+V`, Audio `A`, Highlighted text `T`, Current link `L`, and Library `O`.
@@ -177,7 +178,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Rows are compact strips carrying the capture's own thumbnail — the screenshot, a video frame, or its waveform — with the kind icon only as a fallback. Each row states kind and file size. Selection is extended, and delete moves every selected capture to the Recycle Bin, saying how many.
 - Receipt appears without stealing focus. Screenshot receipts remain for 3 seconds; video and audio receipts remain for 6 seconds. The countdown pauses on hover or keyboard focus, and a 36 px dismiss control plus `Esc` provide an immediate exit.
 - Receipts never register global action shortcuts. Their labelled controls are pointer- and keyboard-operable when focused, and `Esc` dismisses a focused receipt without stealing keys from the user's work.
-- The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy path, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Every one stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
+- The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy the selected capture itself, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Screenshot copies expose both bitmap and file formats; every other capture exposes the real file rather than path text. Every accelerator stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
 - Receipts use the correct media preview and labelled click actions such as Open, Mark up, and Show in folder. Receipt-specific global action shortcuts are forbidden. A screenshot is copied to the clipboard when taken and after a saved annotation; Copy inside the editor never overwrites the source capture.
 - Library is a standard resizable Acrylic window with a transparent root, top navigation, and two non-overlapping glass content panes. The wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
 - Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter.
@@ -226,6 +227,7 @@ The design-consultation gate requires all of the following before release:
 - onboarding exposes the registered activation shortcut and all seven command actions without horizontal or nested scrolling at required scales;
 - no opaque gray capture surface or black companion rectangle;
 - the command panel stays small, keeps the blurred desktop readable behind it, drags from anywhere except a button, reopens where it was left, and never moves on its own;
+- the command panel logo remains static and carries no ambient pulse;
 - command mode has no scroll region and switches to a drill-down layout before clipping at 100–250% scale;
 - every displayed shortcut works while command mode is visible;
 - a screenshot opens its annotation surface in the foreground, never behind the source app or minimized;
@@ -243,6 +245,7 @@ The design-consultation gate requires all of the following before release:
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
+- Library Copy places the selected capture on the clipboard as an actual file, plus a directly pasteable bitmap for screenshots, never path text.
 - automatic update checks can be disabled, never block offline startup, and cannot install an off-repository, corrupt, older, or incompatible artifact;
 - every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
 - no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;

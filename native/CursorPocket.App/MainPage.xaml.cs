@@ -289,14 +289,14 @@ public sealed partial class MainPage : Page
         ViewModel.RevealSelectedCommand.Execute(null);
     }
 
-    private void CopyPathAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    private void CopyCaptureAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
         if (!LibraryKeysActive() || ViewModel.SelectedItem is null)
         {
             return;
         }
         eventArgs.Handled = true;
-        CopyPath_Click(this, new RoutedEventArgs());
+        CopyCapture_Click(this, new RoutedEventArgs());
     }
 
     private void DeleteAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
@@ -908,15 +908,29 @@ public sealed partial class MainPage : Page
             isError ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
     }
 
-    private void CopyPath_Click(object sender, RoutedEventArgs eventArgs)
+    private async void CopyCapture_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (ViewModel.SelectedItem is null)
+        if (ViewModel.SelectedItem is not { } item)
         {
             return;
         }
-        var package = new DataPackage();
-        package.SetText(ViewModel.SelectedItem.AbsolutePath);
-        Clipboard.SetContent(package);
-        ViewModel.StatusMessage = "File path copied";
+
+        try
+        {
+            var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(item.AbsolutePath);
+            var package = new DataPackage();
+            package.SetStorageItems([file]);
+            if (item.Record.CaptureKind == CaptureKind.Screenshot)
+            {
+                package.SetBitmap(Windows.Storage.Streams.RandomAccessStreamReference.CreateFromFile(file));
+            }
+            Clipboard.SetContent(package);
+            Clipboard.Flush();
+            SetLibraryStatus("Capture copied");
+        }
+        catch (Exception)
+        {
+            SetLibraryStatus("Capture could not be copied", isError: true);
+        }
     }
 }

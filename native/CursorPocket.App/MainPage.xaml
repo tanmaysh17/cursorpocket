@@ -38,7 +38,7 @@
             <KeyboardAccelerator Key="E" Modifiers="Control" Invoked="EditAccelerator_Invoked" />
             <KeyboardAccelerator Key="S" Modifiers="Control" Invoked="SaveTextAccelerator_Invoked" />
             <KeyboardAccelerator Key="Escape" Invoked="CancelTextEditAccelerator_Invoked" />
-            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyPathAccelerator_Invoked" />
+            <KeyboardAccelerator Key="C" Modifiers="Control" Invoked="CopyCaptureAccelerator_Invoked" />
             <KeyboardAccelerator Key="M" Modifiers="Control" Invoked="MaximizeAccelerator_Invoked" />
             <KeyboardAccelerator Key="A" Modifiers="Control" Invoked="SelectAllAccelerator_Invoked" />
             <KeyboardAccelerator Key="Number1" Modifiers="Control" Invoked="FilterAccelerator_Invoked" />
@@ -481,7 +481,7 @@
                                             <Button x:Name="OpenButton" Click="Open_Click" Content="Open" Style="{StaticResource PocketPrimaryButton}" />
                                             <Button Command="{x:Bind ViewModel.RevealSelectedCommand}" Content="Reveal" Style="{StaticResource PocketQuietButton}" />
                                             <Button x:Name="EditButton" Click="Edit_Click" Content="Mark up" Style="{StaticResource PocketQuietButton}" ToolTipService.ToolTip="Ctrl+E — saves an edited copy and leaves this one alone" />
-                                            <Button Click="CopyPath_Click" Style="{StaticResource PocketIconButton}" ToolTipService.ToolTip="Copy file path">
+                                            <Button Click="CopyCapture_Click" Style="{StaticResource PocketIconButton}" ToolTipService.ToolTip="Copy capture · Ctrl+C">
                                                 <FontIcon FontSize="14" Glyph="&#xE8C8;" />
                                             </Button>
                                         </StackPanel>

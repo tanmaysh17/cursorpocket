@@ -28,6 +28,9 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("_palette.NotifyPointerMoved", main, StringComparison.Ordinal);
         Assert.DoesNotContain("PalettePlacementPolicy", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PulseStoryboard", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PulseRing", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PulseStoryboard", code, StringComparison.Ordinal);
         Assert.Contains("CaptureActionCatalog.Primary", code, StringComparison.Ordinal);
         Assert.Contains("TransientWindowLayoutPolicy.Resolve", code, StringComparison.Ordinal);
     }
@@ -43,9 +46,12 @@ public sealed class UtilitySurfaceContractTests
         var annotation = ReadFixture("AnnotationWindow.xaml");
 
         Assert.Contains("<AcrylicBrush x:Key=\"PocketGlassPanel\"", app, StringComparison.Ordinal);
-        Assert.Contains("TintOpacity=\"0.52\"", app, StringComparison.Ordinal);
-        Assert.Contains("TintOpacity=\"0.58\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.48\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.54\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.62\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.68\"", app, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"PocketGlassDense\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.84\"", app, StringComparison.Ordinal);
         Assert.Contains("#8F101815", app, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("#A8F8FCFA", app, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PocketGlassRim", app, StringComparison.Ordinal);
@@ -69,6 +75,23 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("SurfaceRole.Receipt", ReadFixture("ReceiptWindow.xaml.cs.txt"), StringComparison.Ordinal);
         Assert.Contains("SurfaceRole.Pin", ReadFixture("PinnedCaptureWindow.xaml.cs.txt"), StringComparison.Ordinal);
         Assert.Contains("SurfaceRole.CaptureOverlay", ReadFixture("RegionSelectorWindow.xaml.cs.txt"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Library_copy_places_the_capture_itself_on_the_clipboard()
+    {
+        var xaml = ReadFixture("MainPage.xaml");
+        var code = ReadFixture("MainPage.xaml.cs.txt");
+
+        Assert.Contains("Invoked=\"CopyCaptureAccelerator_Invoked\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CopyCapture_Click\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ToolTipService.ToolTip=\"Copy capture · Ctrl+C\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SetStorageItems([file])", code, StringComparison.Ordinal);
+        Assert.Contains("CaptureKind.Screenshot", code, StringComparison.Ordinal);
+        Assert.Contains("SetBitmap", code, StringComparison.Ordinal);
+        Assert.Contains("Clipboard.Flush()", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetText(ViewModel.SelectedItem.AbsolutePath)", code, StringComparison.Ordinal);
+        Assert.Contains("Capture copied", code, StringComparison.Ordinal);
     }
 
     [Fact]
