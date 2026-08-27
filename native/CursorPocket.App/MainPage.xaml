@@ -8,6 +8,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:CursorPocket_App.ViewModels"
     Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded"
     mc:Ignorable="d">
 
     <Page.Resources>
@@ -208,7 +209,7 @@
                                 </Border>
                             </ScrollViewer>
 
-                            <Border Grid.Row="1" Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
+                            <Border x:Name="LibraryListPane" Grid.Row="1" Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
                                 <Grid>
                                 <ListView
                                     x:Name="CaptureList"
@@ -904,17 +905,19 @@
                                             <TextBlock
                                                 Margin="0,3,0,0"
                                                 Style="{StaticResource PocketCaptionText}"
-                                                Text="More transparent reveals more of the desktop. More solid increases contrast. Windows still controls blur availability."
+                                                Text="Five levels from clear glass to dense frost. Changes apply instantly to Library panes and app chrome; Windows controls blur availability."
                                                 TextWrapping="Wrap" />
                                         </StackPanel>
                                         <ComboBox
                                             Grid.Column="2"
-                                            Width="176"
+                                            Width="184"
                                             AutomationProperties.Name="Glass transparency"
                                             SelectedIndex="{x:Bind ViewModel.GlassTransparencyIndex, Mode=TwoWay}">
+                                            <ComboBoxItem Content="Very transparent" />
                                             <ComboBoxItem Content="More transparent" />
                                             <ComboBoxItem Content="Balanced" />
                                             <ComboBoxItem Content="More solid" />
+                                            <ComboBoxItem Content="Very solid" />
                                         </ComboBox>
                                     </Grid>
                                 </StackPanel>

@@ -39,7 +39,9 @@ public sealed class ThemeCoordinator : IDisposable
     private sealed record Registration(Window Window, FrameworkElement Root, SurfaceRole Role);
     private sealed record GlassProfile(
         double PanelTint,
+        double PanelLuminosity,
         double RaisedTint,
+        double RaisedLuminosity,
         byte SunkenAlpha,
         byte SurfaceAlpha,
         byte RaisedAlpha,
@@ -186,6 +188,35 @@ public sealed class ThemeCoordinator : IDisposable
         return new SolidColorBrush(Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B));
     }
 
+    /// <summary>
+    /// Produces an independently owned pane material. Library panes use this path so
+    /// a live transparency change cannot be hidden by a ThemeResource brush that was
+    /// resolved before the setting changed.
+    /// </summary>
+    public Microsoft.UI.Xaml.Media.Brush GlassBrush(bool raised = false)
+    {
+        if (IsHighContrast)
+        {
+            return Brush("PocketSurface");
+        }
+
+        var dark = IsDark;
+        var profile = ProfileFor(_glassTransparency, dark);
+        var tint = dark
+            ? raised ? Windows.UI.Color.FromArgb(0xFF, 0x18, 0x23, 0x1F) : Windows.UI.Color.FromArgb(0xFF, 0x10, 0x18, 0x15)
+            : raised ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF) : Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xFA, 0xF7);
+        var fallback = dark
+            ? tint
+            : raised ? Windows.UI.Color.FromArgb(0xFF, 0xF8, 0xFC, 0xFA) : tint;
+        return new AcrylicBrush
+        {
+            TintColor = tint,
+            TintOpacity = raised ? profile.RaisedTint : profile.PanelTint,
+            TintLuminosityOpacity = raised ? profile.RaisedLuminosity : profile.PanelLuminosity,
+            FallbackColor = fallback,
+        };
+    }
+
     private void ApplyGlassTransparency()
     {
         var resources = Application.Current?.Resources;
@@ -204,12 +235,16 @@ public sealed class ThemeCoordinator : IDisposable
 
     private static GlassProfile ProfileFor(GlassTransparencyLevel level, bool dark) => (level, dark) switch
     {
-        (GlassTransparencyLevel.Clear, true) => new(0.34, 0.48, 0x82, 0x73, 0x9F, 0xAD),
-        (GlassTransparencyLevel.Clear, false) => new(0.40, 0.54, 0x9D, 0x8F, 0xB8, 0xC2),
-        (GlassTransparencyLevel.Solid, true) => new(0.62, 0.76, 0xC0, 0xAB, 0xD0, 0xDC),
-        (GlassTransparencyLevel.Solid, false) => new(0.68, 0.82, 0xD1, 0xC2, 0xE6, 0xED),
-        (_, true) => new(0.48, 0.62, 0xA6, 0x8F, 0xB8, 0xC2),
-        _ => new(0.54, 0.68, 0xB8, 0xA8, 0xD1, 0xD9),
+        (GlassTransparencyLevel.VeryClear, true) => new(0.06, 0.18, 0.18, 0.24, 0x52, 0x38, 0x60, 0x74),
+        (GlassTransparencyLevel.VeryClear, false) => new(0.10, 0.24, 0.22, 0.30, 0x64, 0x48, 0x78, 0x88),
+        (GlassTransparencyLevel.Clear, true) => new(0.24, 0.42, 0.36, 0.46, 0x78, 0x64, 0x88, 0x98),
+        (GlassTransparencyLevel.Clear, false) => new(0.30, 0.50, 0.44, 0.52, 0x8F, 0x78, 0xA0, 0xAE),
+        (GlassTransparencyLevel.Solid, true) => new(0.72, 0.88, 0.82, 0.86, 0xD2, 0xC4, 0xE0, 0xE8),
+        (GlassTransparencyLevel.Solid, false) => new(0.76, 0.92, 0.86, 0.90, 0xDF, 0xD2, 0xEC, 0xF1),
+        (GlassTransparencyLevel.VerySolid, true) => new(0.90, 0.96, 0.94, 0.94, 0xF0, 0xE8, 0xF6, 0xFA),
+        (GlassTransparencyLevel.VerySolid, false) => new(0.92, 0.98, 0.96, 0.96, 0xF4, 0xEC, 0xFA, 0xFC),
+        (_, true) => new(0.48, 0.72, 0.62, 0.68, 0xA6, 0x8F, 0xB8, 0xC2),
+        _ => new(0.54, 0.82, 0.68, 0.78, 0xB8, 0xA8, 0xD1, 0xD9),
     };
 
     private static void ApplyGlassProfile(ResourceDictionary resources, GlassProfile profile)
@@ -217,10 +252,12 @@ public sealed class ThemeCoordinator : IDisposable
         if (resources.ContainsKey("PocketGlassPanel") && resources["PocketGlassPanel"] is AcrylicBrush panel)
         {
             panel.TintOpacity = profile.PanelTint;
+            panel.TintLuminosityOpacity = profile.PanelLuminosity;
         }
         if (resources.ContainsKey("PocketGlassRaised") && resources["PocketGlassRaised"] is AcrylicBrush raised)
         {
             raised.TintOpacity = profile.RaisedTint;
+            raised.TintLuminosityOpacity = profile.RaisedLuminosity;
         }
         SetBrushAlpha(resources, "PocketSunken", profile.SunkenAlpha);
         SetBrushAlpha(resources, "PocketSurface", profile.SurfaceAlpha);

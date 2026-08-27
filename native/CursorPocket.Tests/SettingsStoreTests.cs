@@ -155,8 +155,11 @@ public sealed class SettingsStoreTests : IDisposable
         var path = Path.Combine(_root, "glass", "settings.json");
         var store = new SettingsStore(path);
 
-        await store.SaveAsync(new AppSettings { GlassTransparency = GlassTransparencyLevel.Clear });
-        Assert.Equal(GlassTransparencyLevel.Clear, (await store.LoadAsync()).GlassTransparency);
+        await store.SaveAsync(new AppSettings { GlassTransparency = GlassTransparencyLevel.VeryClear });
+        Assert.Equal(GlassTransparencyLevel.VeryClear, (await store.LoadAsync()).GlassTransparency);
+
+        await store.SaveAsync(new AppSettings { GlassTransparency = GlassTransparencyLevel.VerySolid });
+        Assert.Equal(GlassTransparencyLevel.VerySolid, (await store.LoadAsync()).GlassTransparency);
 
         var repaired = SettingsStore.Normalize(new AppSettings
         {

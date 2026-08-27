@@ -4,7 +4,7 @@
 
 ## 0.4.11 — 2026-08-27
 
-- Added live, autosaved More transparent, Balanced, and More solid glass presets in Settings, while preserving Windows fallbacks, high contrast, and the dense recording HUD.
+- Added five live, autosaved glass-transparency levels with dramatically wider tint and luminosity ranges, including direct live updates for both Library panes, while preserving Windows fallbacks, high contrast, and the dense recording HUD.
 
 ## 0.4.10 — 2026-08-27
 

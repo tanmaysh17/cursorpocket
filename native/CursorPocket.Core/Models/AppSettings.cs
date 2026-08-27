@@ -13,9 +13,12 @@ public enum AppThemeMode
 
 public enum GlassTransparencyLevel
 {
-    Clear,
-    Balanced,
-    Solid,
+    // Keep the first three numeric values stable for settings written by 0.4.11.
+    Clear = 0,
+    Balanced = 1,
+    Solid = 2,
+    VeryClear = 3,
+    VerySolid = 4,
 }
 
 public enum MouseGestureSensitivity
