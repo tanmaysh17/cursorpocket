@@ -1,11 +1,9 @@
 using System.Drawing;
 using CursorPocket.Core.Models;
-using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI.ViewManagement;
-using Windows.System.Power;
 using Color = System.Drawing.Color;
 
 namespace CursorPocket_App.Services;
@@ -45,7 +43,6 @@ public sealed class ThemeCoordinator : IDisposable
     private readonly AccessibilitySettings _accessibility = new();
     private bool _uiSettingsSubscribed;
     private bool _accessibilitySubscribed;
-    private bool _powerSubscribed;
     private AppThemeMode _mode;
 
     public ThemeCoordinator(AppThemeMode mode)
@@ -72,15 +69,6 @@ public sealed class ThemeCoordinator : IDisposable
         {
             _accessibilitySubscribed = false;
         }
-        try
-        {
-            PowerManager.EnergySaverStatusChanged += PowerManager_EnergySaverStatusChanged;
-            _powerSubscribed = true;
-        }
-        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
-        {
-            _powerSubscribed = false;
-        }
     }
 
     public event EventHandler? ThemeChanged;
@@ -91,22 +79,6 @@ public sealed class ThemeCoordinator : IDisposable
         {
             try { return _accessibility.HighContrast; }
             catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException) { return false; }
-        }
-    }
-    public bool TransparencyAllowed
-    {
-        get
-        {
-            if (IsHighContrast) return false;
-            try
-            {
-                return _uiSettings.AdvancedEffectsEnabled
-                    && PowerManager.EnergySaverStatus != EnergySaverStatus.On;
-            }
-            catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or NotSupportedException)
-            {
-                return false;
-            }
         }
     }
     public bool IsDark => _mode switch
@@ -165,10 +137,18 @@ public sealed class ThemeCoordinator : IDisposable
             "PocketInkDim" => palette.InkDim,
             "PocketMuted" => palette.Muted,
             "PocketBase" => palette.Background,
-            "PocketSunken" => Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12),
-            "PocketSurface" => palette.Background,
-            "PocketRaised" => palette.Raised,
-            "PocketTransientSurface" => palette.Background,
+            "PocketSunken" => IsHighContrast
+                ? palette.Background
+                : WithAlpha(Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12), palette.IsDark ? (byte)0xA6 : (byte)0xB8),
+            "PocketSurface" => IsHighContrast
+                ? palette.Background
+                : palette.IsDark ? Color.FromArgb(0x8F, 0x10, 0x18, 0x15) : Color.FromArgb(0xA8, 0xF8, 0xFC, 0xFA),
+            "PocketRaised" => IsHighContrast
+                ? palette.Background
+                : palette.IsDark ? Color.FromArgb(0xB8, 0x16, 0x1F, 0x1C) : Color.FromArgb(0xD1, 0xFF, 0xFF, 0xFF),
+            "PocketTransientSurface" => IsHighContrast
+                ? palette.Background
+                : palette.IsDark ? Color.FromArgb(0xC2, 0x14, 0x1E, 0x1A) : Color.FromArgb(0xD9, 0xF7, 0xFB, 0xF9),
             "PocketLine" or "PocketLineStrong" => palette.Line,
             "PocketGreen" => palette.Selection,
             "PocketGreenSoft" => WithAlpha(palette.Selection, 48),
@@ -198,15 +178,17 @@ public sealed class ThemeCoordinator : IDisposable
             _ => ElementTheme.Default,
         };
 
-        registration.Window.SystemBackdrop = !TransparencyAllowed ? null : registration.Role switch
+        if (registration.Role is SurfaceRole.Pin or SurfaceRole.CaptureOverlay)
         {
-            SurfaceRole.Persistent or SurfaceRole.Workspace => new MicaBackdrop
-            {
-                Kind = registration.Role == SurfaceRole.Workspace ? MicaKind.BaseAlt : MicaKind.Base,
-            },
-            SurfaceRole.Transient or SurfaceRole.Hud or SurfaceRole.Receipt => new DesktopAcrylicBackdrop(),
-            _ => null,
-        };
+            registration.Window.SystemBackdrop = null;
+        }
+        else if (registration.Window.SystemBackdrop is not DesktopAcrylicBackdrop)
+        {
+            // The compositor owns disabled-transparency, battery-saver, inactive,
+            // high-contrast, and unsupported-hardware fallbacks. Keeping the material
+            // attached avoids turning one failed optional system probe into a flat app.
+            registration.Window.SystemBackdrop = new DesktopAcrylicBackdrop();
+        }
         ApplyTitleBar(registration.Window.AppWindow.TitleBar);
     }
 
@@ -228,7 +210,6 @@ public sealed class ThemeCoordinator : IDisposable
 
     private void UiSettings_ColorValuesChanged(UISettings sender, object args) => QueueApply();
     private void Accessibility_HighContrastChanged(AccessibilitySettings sender, object args) => QueueApply();
-    private void PowerManager_EnergySaverStatusChanged(object? sender, object args) => QueueApply();
 
     private void QueueApply()
     {
@@ -274,7 +255,6 @@ public sealed class ThemeCoordinator : IDisposable
     {
         try { if (_uiSettingsSubscribed) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged; } catch { }
         try { if (_accessibilitySubscribed) _accessibility.HighContrastChanged -= Accessibility_HighContrastChanged; } catch { }
-        try { if (_powerSubscribed) PowerManager.EnergySaverStatusChanged -= PowerManager_EnergySaverStatusChanged; } catch { }
         _registrations.Clear();
     }
 }

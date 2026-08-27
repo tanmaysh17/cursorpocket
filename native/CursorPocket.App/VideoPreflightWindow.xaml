@@ -4,11 +4,9 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Set up screen recording">
-    <Window.SystemBackdrop>
-        <MicaBackdrop Kind="BaseAlt" />
-    </Window.SystemBackdrop>
     <Grid
         x:Name="Root"
+        Background="Transparent"
         Padding="24"
         KeyDown="Root_KeyDown">
         <Grid.RowDefinitions>

@@ -24,6 +24,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal("display", settings.VideoSourceKind);
         Assert.Equal("bottom-right", settings.VideoCameraPosition);
         Assert.Equal("off", settings.CursorCompanionMode);
+        Assert.Equal(MouseGestureSensitivity.Balanced, settings.MouseGestureSensitivity);
     }
 
     [Fact]
@@ -122,6 +123,29 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.True(actual.VideoCameraEnabled);
         Assert.Equal("Win+Alt+Space", actual.ActivationShortcut);
         Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task CircleGestureSensitivityRoundTripsAndInvalidValuesNormalizeToBalanced()
+    {
+        var path = Path.Combine(_root, "gesture", "settings.json");
+        var store = new SettingsStore(path);
+
+        await store.SaveAsync(new AppSettings { MouseGestureSensitivity = MouseGestureSensitivity.High });
+        Assert.Equal(MouseGestureSensitivity.High, (await store.LoadAsync()).MouseGestureSensitivity);
+
+        var repaired = SettingsStore.Normalize(new AppSettings
+        {
+            MouseGestureSensitivity = (MouseGestureSensitivity)999,
+        });
+        Assert.Equal(MouseGestureSensitivity.Balanced, repaired.MouseGestureSensitivity);
+
+        await File.WriteAllTextAsync(path, """
+            {"capture_dir":"C:\\Still Here","mouse_gesture_sensitivity":"Extreme"}
+            """);
+        var invalidName = await store.LoadAsync();
+        Assert.Equal(@"C:\Still Here", invalidName.CaptureDirectory);
+        Assert.Equal(MouseGestureSensitivity.Balanced, invalidName.MouseGestureSensitivity);
     }
 
     [Fact]

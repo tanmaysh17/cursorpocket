@@ -50,6 +50,7 @@
         </Grid.KeyboardAccelerators>
         <NavigationView
             x:Name="Navigation"
+            Background="Transparent"
             IsBackButtonVisible="Collapsed"
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
@@ -207,7 +208,7 @@
                                 </Border>
                             </ScrollViewer>
 
-                            <Border Grid.Row="1" Style="{StaticResource PocketCard}">
+                            <Border Grid.Row="1" Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
                                 <Grid>
                                 <ListView
                                     x:Name="CaptureList"
@@ -317,7 +318,8 @@
                         <Border
                             x:Name="DetailPane"
                             Grid.Column="1"
-                            Style="{StaticResource PocketCard}">
+                            Style="{StaticResource PocketCard}"
+                            Background="{ThemeResource PocketGlassPanel}">
                             <Grid Padding="12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -960,20 +962,34 @@
                                             <FontIcon Glyph="&#xE8B0;" Style="{StaticResource PocketChipIcon}" />
                                         </Border>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Two quick mouse circles" />
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="Two mouse circles" />
                                             <TextBlock
                                                 Margin="0,3,0,0"
                                                 Style="{StaticResource PocketCaptionText}"
-                                                Text="Draw two fast circles anywhere to open command mode."
+                                                Text="Draw two circles anywhere to open command mode. Low requires cleaner circles. High accepts slower or rougher circles."
                                                 TextWrapping="Wrap" />
                                         </StackPanel>
-                                        <ToggleSwitch
+                                        <StackPanel
                                             Grid.Column="2"
-                                            MinWidth="0"
-                                            IsOn="{x:Bind ViewModel.MouseGestureEnabled, Mode=TwoWay}"
-                                            OffContent=""
-                                            OnContent=""
-                                            AutomationProperties.Name="Two quick mouse circles" />
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal"
+                                            Spacing="10">
+                                            <ComboBox
+                                                Width="124"
+                                                AutomationProperties.Name="Circle gesture sensitivity"
+                                                IsEnabled="{x:Bind ViewModel.MouseGestureEnabled, Mode=OneWay}"
+                                                SelectedIndex="{x:Bind ViewModel.MouseGestureSensitivityIndex, Mode=TwoWay}">
+                                                <ComboBoxItem Content="Low" />
+                                                <ComboBoxItem Content="Balanced" />
+                                                <ComboBoxItem Content="High" />
+                                            </ComboBox>
+                                            <ToggleSwitch
+                                                MinWidth="0"
+                                                IsOn="{x:Bind ViewModel.MouseGestureEnabled, Mode=TwoWay}"
+                                                OffContent=""
+                                                OnContent=""
+                                                AutomationProperties.Name="Two mouse circles" />
+                                        </StackPanel>
                                     </Grid>
                                     <Grid Style="{StaticResource SettingsRow}" BorderBrush="{ThemeResource PocketLine}" BorderThickness="0,1,0,0">
                                         <Grid.ColumnDefinitions>

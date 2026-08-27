@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using CursorPocket.Core.Services;
 
@@ -8,6 +9,42 @@ public enum AppThemeMode
     System,
     Light,
     Dark,
+}
+
+public enum MouseGestureSensitivity
+{
+    Low,
+    Balanced,
+    High,
+}
+
+public sealed class MouseGestureSensitivityJsonConverter : JsonConverter<MouseGestureSensitivity>
+{
+    public override MouseGestureSensitivity Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options)
+    {
+        if (reader.TokenType == JsonTokenType.String &&
+            Enum.TryParse<MouseGestureSensitivity>(reader.GetString(), ignoreCase: true, out var named) &&
+            Enum.IsDefined(named))
+        {
+            return named;
+        }
+        if (reader.TokenType == JsonTokenType.Number &&
+            reader.TryGetInt32(out var numeric) &&
+            Enum.IsDefined((MouseGestureSensitivity)numeric))
+        {
+            return (MouseGestureSensitivity)numeric;
+        }
+        return MouseGestureSensitivity.Balanced;
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        MouseGestureSensitivity value,
+        JsonSerializerOptions options) => writer.WriteStringValue(
+            Enum.IsDefined(value) ? value.ToString() : MouseGestureSensitivity.Balanced.ToString());
 }
 
 public sealed record AppSettings
@@ -29,6 +66,10 @@ public sealed record AppSettings
 
     [JsonPropertyName("mouse_gesture_enabled")]
     public bool MouseGestureEnabled { get; init; } = true;
+
+    [JsonPropertyName("mouse_gesture_sensitivity")]
+    [JsonConverter(typeof(MouseGestureSensitivityJsonConverter))]
+    public MouseGestureSensitivity MouseGestureSensitivity { get; init; } = MouseGestureSensitivity.Balanced;
 
     /// <summary>Hold both mouse buttons together to open command mode.</summary>
     [JsonPropertyName("mouse_chord_enabled")]

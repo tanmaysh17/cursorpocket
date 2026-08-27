@@ -1,4 +1,5 @@
 using CursorPocket.Core.Services;
+using CursorPocket.Core.Models;
 
 namespace CursorPocket.Tests;
 
@@ -18,7 +19,8 @@ public sealed class DoubleCircleGestureDetectorTests
         int centerY = 300,
         bool clockwise = true,
         double startSeconds = 0,
-        DoubleCircleGestureDetector? detector = null)
+        DoubleCircleGestureDetector? detector = null,
+        MouseGestureSensitivity sensitivity = MouseGestureSensitivity.Balanced)
     {
         detector ??= new DoubleCircleGestureDetector();
         var samples = (int)Math.Round(samplesPerTurn * turns);
@@ -28,7 +30,7 @@ public sealed class DoubleCircleGestureDetectorTests
             var angle = index / (double)samplesPerTurn * Math.PI * 2 * (clockwise ? 1 : -1);
             var x = centerX + (int)Math.Round(Math.Cos(angle) * radius);
             var y = centerY + (int)Math.Round(Math.Sin(angle) * radius);
-            if (detector.Feed(x, y, startSeconds + (index * secondsPerSample)))
+            if (detector.Feed(x, y, startSeconds + (index * secondsPerSample), sensitivity))
             {
                 triggered++;
             }
@@ -74,6 +76,35 @@ public sealed class DoubleCircleGestureDetectorTests
     [Fact]
     public void CounterClockwiseCirclesTrigger() => Assert.Equal(1, DrawCircles(40, clockwise: false));
 
+    [Theory]
+    [InlineData(MouseGestureSensitivity.Low)]
+    [InlineData(MouseGestureSensitivity.Balanced)]
+    [InlineData(MouseGestureSensitivity.High)]
+    public void IdealGesturesWorkAtEverySensitivity(MouseGestureSensitivity sensitivity)
+    {
+        Assert.Equal(1, DrawCircles(20, sensitivity: sensitivity));
+        Assert.Equal(1, DrawCircles(180, sensitivity: sensitivity));
+        Assert.Equal(1, DrawCircles(60, samplesPerTurn: 20, secondsPerSample: 0.008, sensitivity: sensitivity));
+        Assert.Equal(1, DrawCircles(60, samplesPerTurn: 20, secondsPerSample: 0.05, sensitivity: sensitivity));
+        Assert.Equal(1, DrawCircles(60, clockwise: false, sensitivity: sensitivity));
+    }
+
+    [Fact]
+    public void HighSensitivityAcceptsAFullGestureDrawnOverMoreThanThreeSeconds()
+    {
+        Assert.Equal(0, DrawCircles(60, secondsPerSample: 0.075, sensitivity: MouseGestureSensitivity.Balanced));
+        Assert.Equal(1, DrawCircles(60, secondsPerSample: 0.075, sensitivity: MouseGestureSensitivity.High));
+    }
+
+    [Fact]
+    public void SensitivityLevelsExpandTheSupportedCircleSize()
+    {
+        Assert.Equal(0, DrawCircles(230, sensitivity: MouseGestureSensitivity.Low));
+        Assert.Equal(1, DrawCircles(230, sensitivity: MouseGestureSensitivity.Balanced));
+        Assert.Equal(0, DrawCircles(300, sensitivity: MouseGestureSensitivity.Balanced));
+        Assert.Equal(1, DrawCircles(300, sensitivity: MouseGestureSensitivity.High));
+    }
+
     [Fact]
     public void CoarselySampledCirclesStillTrigger() =>
         // A fast sweep gives the hook few points per loop; the shape is still a circle.
@@ -109,6 +140,10 @@ public sealed class DoubleCircleGestureDetectorTests
     public void ASingleCircleDoesNotTrigger() => Assert.Equal(0, DrawCircles(40, turns: 1));
 
     [Fact]
+    public void HighSensitivityStillRejectsASingleCircle() =>
+        Assert.Equal(0, DrawCircles(40, turns: 1, sensitivity: MouseGestureSensitivity.High));
+
+    [Fact]
     public void AGentleArcDoesNotTrigger() => Assert.Equal(0, DrawCircles(300, turns: 0.75, samplesPerTurn: 40));
 
     [Fact]
@@ -124,6 +159,19 @@ public sealed class DoubleCircleGestureDetectorTests
             {
                 triggered++;
             }
+        }
+        Assert.Equal(0, triggered);
+    }
+
+    [Fact]
+    public void HighSensitivityStillRejectsOrdinaryBackAndForthMotion()
+    {
+        var detector = new DoubleCircleGestureDetector();
+        var triggered = 0;
+        for (var index = 0; index <= 80; index++)
+        {
+            var x = 400 + (int)Math.Round(Math.Sin(index / 6d) * 60);
+            if (detector.Feed(x, 300 + (index % 3), index * 0.02, MouseGestureSensitivity.High)) triggered++;
         }
         Assert.Equal(0, triggered);
     }

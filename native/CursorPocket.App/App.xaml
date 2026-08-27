@@ -20,9 +20,9 @@
                     <SolidColorBrush x:Key="PocketMuted" Color="#FF8EA099" />
                     <SolidColorBrush x:Key="PocketBase" Color="#FF07130F" />
                     <SolidColorBrush x:Key="PocketSunken" Color="#A6070C0B" />
-                    <SolidColorBrush x:Key="PocketSurface" Color="#B5101815" />
-                    <SolidColorBrush x:Key="PocketRaised" Color="#D9161F1C" />
-                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#E6141E1A" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="#8F101815" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="#B8161F1C" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#C2141E1A" />
                     <SolidColorBrush x:Key="PocketLine" Color="#24FFFFFF" />
                     <SolidColorBrush x:Key="PocketLineStrong" Color="#40FFFFFF" />
                     <SolidColorBrush x:Key="PocketOverlay" Color="#14FFFFFF" />
@@ -32,8 +32,19 @@
                     <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
                     <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
-                    <SolidColorBrush x:Key="PocketGlassPanel" Color="#B5101815" />
-                    <SolidColorBrush x:Key="PocketGlassRaised" Color="#D9161F1C" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.52" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.66" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
+                    <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
+                    <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Offset="0" Color="#4AFFFFFF" />
+                        <GradientStop Offset="0.5" Color="#10FFFFFF" />
+                        <GradientStop Offset="1" Color="#26FFFFFF" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="PocketGlassTopEdge" StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Offset="0" Color="#00FFFFFF" />
+                        <GradientStop Offset="0.5" Color="#66FFFFFF" />
+                        <GradientStop Offset="1" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="PocketInk" Color="#FF15201C" />
@@ -41,9 +52,9 @@
                     <SolidColorBrush x:Key="PocketMuted" Color="#FF5F6E68" />
                     <SolidColorBrush x:Key="PocketBase" Color="#FFF5F9F7" />
                     <SolidColorBrush x:Key="PocketSunken" Color="#B8E4ECE8" />
-                    <SolidColorBrush x:Key="PocketSurface" Color="#BDF8FCFA" />
-                    <SolidColorBrush x:Key="PocketRaised" Color="#E8FFFFFF" />
-                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#EDF7FBF9" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="#A8F8FCFA" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="#D1FFFFFF" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#D9F7FBF9" />
                     <SolidColorBrush x:Key="PocketLine" Color="#29111D18" />
                     <SolidColorBrush x:Key="PocketLineStrong" Color="#47111D18" />
                     <SolidColorBrush x:Key="PocketOverlay" Color="#10111D18" />
@@ -53,8 +64,19 @@
                     <SolidColorBrush x:Key="PocketRed" Color="#FFD73546" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="#24D73546" />
                     <SolidColorBrush x:Key="PocketBlue" Color="#FF276EA8" />
-                    <SolidColorBrush x:Key="PocketGlassPanel" Color="#BDF8FCFA" />
-                    <SolidColorBrush x:Key="PocketGlassRaised" Color="#E8FFFFFF" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF5FAF7" TintOpacity="0.58" TintLuminosityOpacity="0.82" FallbackColor="#FFF5FAF7" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFFFFFF" TintOpacity="0.72" TintLuminosityOpacity="0.78" FallbackColor="#FFF8FCFA" />
+                    <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
+                    <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Offset="0" Color="#9AFFFFFF" />
+                        <GradientStop Offset="0.5" Color="#22111D18" />
+                        <GradientStop Offset="1" Color="#45111D18" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="PocketGlassTopEdge" StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Offset="0" Color="#00FFFFFF" />
+                        <GradientStop Offset="0.5" Color="#C2FFFFFF" />
+                        <GradientStop Offset="1" Color="#00FFFFFF" />
+                    </LinearGradientBrush>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="HighContrast">
                     <SolidColorBrush x:Key="PocketInk" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -76,6 +98,9 @@
                     <SolidColorBrush x:Key="PocketBlue" Color="{ThemeResource SystemColorHighlightColor}" />
                     <SolidColorBrush x:Key="PocketGlassPanel" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="PocketGlassRaised" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketGlassDense" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketGlassRim" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketGlassTopEdge" Color="{ThemeResource SystemColorWindowTextColor}" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
             <!-- Common fallback for the brief interval before a Page is attached to a
@@ -86,9 +111,9 @@
             <SolidColorBrush x:Key="PocketMuted" Color="#FF8EA099" />
             <SolidColorBrush x:Key="PocketBase" Color="#FF07130F" />
             <SolidColorBrush x:Key="PocketSunken" Color="#A6070C0B" />
-            <SolidColorBrush x:Key="PocketSurface" Color="#B5101815" />
-            <SolidColorBrush x:Key="PocketRaised" Color="#D9161F1C" />
-            <SolidColorBrush x:Key="PocketTransientSurface" Color="#E6141E1A" />
+            <SolidColorBrush x:Key="PocketSurface" Color="#8F101815" />
+            <SolidColorBrush x:Key="PocketRaised" Color="#B8161F1C" />
+            <SolidColorBrush x:Key="PocketTransientSurface" Color="#C2141E1A" />
             <SolidColorBrush x:Key="PocketLine" Color="#24FFFFFF" />
             <SolidColorBrush x:Key="PocketLineStrong" Color="#40FFFFFF" />
             <SolidColorBrush x:Key="PocketOverlay" Color="#14FFFFFF" />
@@ -98,8 +123,19 @@
             <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
             <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
             <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
-            <SolidColorBrush x:Key="PocketGlassPanel" Color="#B5101815" />
-            <SolidColorBrush x:Key="PocketGlassRaised" Color="#D9161F1C" />
+            <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.52" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
+            <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.66" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
+            <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
+            <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Offset="0" Color="#4AFFFFFF" />
+                <GradientStop Offset="0.5" Color="#10FFFFFF" />
+                <GradientStop Offset="1" Color="#26FFFFFF" />
+            </LinearGradientBrush>
+            <LinearGradientBrush x:Key="PocketGlassTopEdge" StartPoint="0,0" EndPoint="1,0">
+                <GradientStop Offset="0" Color="#00FFFFFF" />
+                <GradientStop Offset="0.5" Color="#66FFFFFF" />
+                <GradientStop Offset="1" Color="#00FFFFFF" />
+            </LinearGradientBrush>
             <SolidColorBrush x:Key="PocketTransparent" Color="Transparent" />
 
             <!--  Annotation ink. These are the user's marks, not app state, and that is

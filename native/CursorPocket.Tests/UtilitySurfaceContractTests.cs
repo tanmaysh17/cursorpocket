@@ -8,12 +8,15 @@ public sealed class UtilitySurfaceContractTests
         var code = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
         var xaml = ReadFixture("CommandPaletteWindow.xaml");
         var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var theme = ReadFixture("ThemeCoordinator.cs.txt");
 
         Assert.Contains("RegularWidth = 304", code, StringComparison.Ordinal);
         Assert.Contains("ShortWidth = 520", code, StringComparison.Ordinal);
         // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
         // per-move realignment are gone along with the keep-away behaviour.
-        Assert.Contains("DesktopAcrylicBackdrop", xaml, StringComparison.Ordinal);
+        Assert.Contains("new DesktopAcrylicBackdrop()", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("Window.SystemBackdrop", xaml, StringComparison.Ordinal);
+        Assert.Contains("PocketGlassPanel", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BackdropImage", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
         // The panel only ever moves because the user dragged it — never on its own.
@@ -23,6 +26,64 @@ public sealed class UtilitySurfaceContractTests
         Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("CaptureActionCatalog.Primary", code, StringComparison.Ordinal);
         Assert.Contains("TransientWindowLayoutPolicy.Resolve", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Acrylic_is_owned_once_and_every_surface_has_an_explicit_material_role()
+    {
+        var app = ReadFixture("App.xaml");
+        var theme = ReadFixture("ThemeCoordinator.cs.txt");
+        var main = ReadFixture("MainWindow.xaml");
+        var command = ReadFixture("CommandPaletteWindow.xaml");
+        var preflight = ReadFixture("VideoPreflightWindow.xaml");
+        var annotation = ReadFixture("AnnotationWindow.xaml");
+
+        Assert.Contains("<AcrylicBrush x:Key=\"PocketGlassPanel\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.52\"", app, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.58\"", app, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"PocketGlassDense\"", app, StringComparison.Ordinal);
+        Assert.Contains("#8F101815", app, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#A8F8FCFA", app, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PocketGlassRim", app, StringComparison.Ordinal);
+        Assert.Contains("PocketGlassTopEdge", app, StringComparison.Ordinal);
+        Assert.Contains("<SolidColorBrush x:Key=\"PocketGlassPanel\" Color=\"{ThemeResource SystemColorWindowColor}\"", app, StringComparison.Ordinal);
+
+        Assert.Contains("new DesktopAcrylicBackdrop()", theme, StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Pin or SurfaceRole.CaptureOverlay", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyAllowed", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("MicaBackdrop", theme, StringComparison.Ordinal);
+        foreach (var xaml in new[] { main, command, preflight, annotation })
+        {
+            Assert.DoesNotContain("Window.SystemBackdrop", xaml, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("SurfaceRole.Persistent", ReadFixture("MainWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Workspace", ReadFixture("AnnotationWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Transient", ReadFixture("CommandPaletteWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Transient", ReadFixture("VideoPreflightWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Hud", ReadFixture("RecordingHudWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Receipt", ReadFixture("ReceiptWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.Pin", ReadFixture("PinnedCaptureWindow.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("SurfaceRole.CaptureOverlay", ReadFixture("RegionSelectorWindow.xaml.cs.txt"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Circle_gesture_sensitivity_is_visible_persisted_and_applied_live()
+    {
+        var page = ReadFixture("MainPage.xaml");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var mouse = ReadFixture("MouseActivityService.cs.txt");
+
+        Assert.Contains("AutomationProperties.Name=\"Circle gesture sensitivity\"", page, StringComparison.Ordinal);
+        Assert.Contains("ViewModel.MouseGestureSensitivityIndex", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Low\"", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Balanced\"", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"High\"", page, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{x:Bind ViewModel.MouseGestureEnabled, Mode=OneWay}\"", page, StringComparison.Ordinal);
+        Assert.Contains("GestureSensitivity = settings.MouseGestureSensitivity", main, StringComparison.Ordinal);
+        Assert.Contains("GestureSensitivity = App.Services.Settings.MouseGestureSensitivity", main, StringComparison.Ordinal);
+        Assert.Contains("Volatile.Read(ref _gestureSensitivity)", mouse, StringComparison.Ordinal);
+        Assert.Contains("_gesture.Feed", mouse, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -548,7 +609,7 @@ public sealed class UtilitySurfaceContractTests
     {
         var xaml = ReadFixture("RecordingHudWindow.xaml");
 
-        Assert.Contains("Background=\"{ThemeResource PocketGlassPanel}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketGlassDense}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"20\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"17\"", xaml, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"13\"", xaml, StringComparison.Ordinal);
@@ -592,9 +653,10 @@ public sealed class UtilitySurfaceContractTests
         var receipt = ReadFixture("ReceiptWindow.xaml");
         var placement = ReadFixture("WindowPlacement.cs.txt");
 
-        Assert.Contains("Background=\"{ThemeResource PocketTransientSurface}\"", receipt, StringComparison.Ordinal);
-        Assert.DoesNotContain("Background=\"Transparent\"", receipt, StringComparison.Ordinal);
-        Assert.DoesNotContain("BorderBrush=", receipt, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource PocketGlassPanel}\"", receipt, StringComparison.Ordinal);
+        Assert.Contains("Background=\"Transparent\"", receipt, StringComparison.Ordinal);
+        Assert.Contains("BorderBrush=\"{ThemeResource PocketGlassRim}\"", receipt, StringComparison.Ordinal);
+        Assert.Contains("PocketGlassTopEdge", receipt, StringComparison.Ordinal);
         Assert.Contains("DwmSetWindowAttribute", placement, StringComparison.Ordinal);
         Assert.Contains("DwmWindowCornerPreferenceRound", placement, StringComparison.Ordinal);
         Assert.Contains("DwmwaBorderColor", placement, StringComparison.Ordinal);

@@ -1049,6 +1049,7 @@ public sealed partial class MainWindow : Window
             if (_mouseActivity is not null)
             {
                 _mouseActivity.GestureEnabled = settings.MouseGestureEnabled;
+                _mouseActivity.GestureSensitivity = settings.MouseGestureSensitivity;
             }
             if (_companionTrayItem is not null)
             {
@@ -1063,6 +1064,7 @@ public sealed partial class MainWindow : Window
         _mouseActivity = new MouseActivityService
         {
             GestureEnabled = App.Services.Settings.MouseGestureEnabled,
+            GestureSensitivity = App.Services.Settings.MouseGestureSensitivity,
         };
         // Raised from a timer thread, so it has to marshal like the others.
         _mouseActivity.ChordHold += (_, _) =>

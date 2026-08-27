@@ -139,6 +139,9 @@ public sealed class SettingsStore(string? settingsPath = null)
         var anchorX = ClampAnchor(value.CommandPanelAnchorX, CommandPanelPlacement.DefaultAnchorX);
         var anchorY = ClampAnchor(value.CommandPanelAnchorY, CommandPanelPlacement.DefaultAnchorY);
         var themeMode = Enum.IsDefined(value.ThemeMode) ? value.ThemeMode : AppThemeMode.System;
+        var gestureSensitivity = Enum.IsDefined(value.MouseGestureSensitivity)
+            ? value.MouseGestureSensitivity
+            : MouseGestureSensitivity.Balanced;
 
         var onboardingVersion = value.OnboardingVersion > 0
             ? value.OnboardingVersion
@@ -151,6 +154,7 @@ public sealed class SettingsStore(string? settingsPath = null)
         return value with
         {
             ThemeMode = themeMode,
+            MouseGestureSensitivity = gestureSensitivity,
             CaptureDirectory = captureDirectory,
             VideoFramesPerSecond = fps,
             VideoCountdownSeconds = countdown,

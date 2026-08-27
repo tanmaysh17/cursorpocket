@@ -6,11 +6,11 @@
     Title="Capture saved">
     <Grid
         x:Name="Root"
-        Background="{ThemeResource PocketTransientSurface}"
+        Background="Transparent"
         KeyDown="Root_KeyDown"
         PointerEntered="Root_PointerEntered"
         PointerExited="Root_PointerExited">
-        <Border Padding="16" Background="{ThemeResource PocketTransientSurface}" CornerRadius="16">
+        <Border Padding="16" Background="{ThemeResource PocketGlassPanel}" CornerRadius="16">
             <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="72" />
@@ -50,6 +50,8 @@
                 </Button>
             </Grid>
         </Border>
+        <Border Margin="1" BorderBrush="{ThemeResource PocketGlassRim}" BorderThickness="1" CornerRadius="15" IsHitTestVisible="False" />
+        <Border Margin="1" BorderBrush="{ThemeResource PocketGlassTopEdge}" BorderThickness="0,1,0,0" CornerRadius="15" IsHitTestVisible="False" />
     </Grid>
 </Window>
 
