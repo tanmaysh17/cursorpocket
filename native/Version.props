@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <CursorPocketVersion>0.4.8</CursorPocketVersion>
-    <CursorPocketFileVersion>0.4.8.0</CursorPocketFileVersion>
+    <CursorPocketVersion>0.4.9</CursorPocketVersion>
+    <CursorPocketFileVersion>0.4.9.0</CursorPocketFileVersion>
   </PropertyGroup>
 </Project>

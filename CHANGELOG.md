@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.9 — 2026-08-27
+
+- Made the command center visibly translucent again by allowing its Desktop Acrylic backdrop to show through the shell.
+
 ## 0.4.8 — 2026-08-27
 
 - Restored Liquid Glass across app-owned chrome while keeping screenshots, video, pinned media, and other captured content visually exact.
