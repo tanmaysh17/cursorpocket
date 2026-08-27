@@ -44,6 +44,7 @@
   <ItemGroup>
     <None Include="..\CursorPocket.App\MainPage.xaml" Link="Fixtures\MainPage.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\MainPage.xaml.cs" Link="Fixtures\MainPage.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\CursorPocket.App\ViewModels\MainPageViewModel.cs" Link="Fixtures\MainPageViewModel.cs.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\CommandPaletteWindow.xaml" Link="Fixtures\CommandPaletteWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml" Link="Fixtures\RegionSelectorWindow.xaml" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\CursorPocket.App\RegionSelectorWindow.xaml.cs" Link="Fixtures\RegionSelectorWindow.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />

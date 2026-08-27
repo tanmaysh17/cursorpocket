@@ -139,6 +139,9 @@ public sealed class SettingsStore(string? settingsPath = null)
         var anchorX = ClampAnchor(value.CommandPanelAnchorX, CommandPanelPlacement.DefaultAnchorX);
         var anchorY = ClampAnchor(value.CommandPanelAnchorY, CommandPanelPlacement.DefaultAnchorY);
         var themeMode = Enum.IsDefined(value.ThemeMode) ? value.ThemeMode : AppThemeMode.System;
+        var glassTransparency = Enum.IsDefined(value.GlassTransparency)
+            ? value.GlassTransparency
+            : GlassTransparencyLevel.Balanced;
         var gestureSensitivity = Enum.IsDefined(value.MouseGestureSensitivity)
             ? value.MouseGestureSensitivity
             : MouseGestureSensitivity.Balanced;
@@ -154,6 +157,7 @@ public sealed class SettingsStore(string? settingsPath = null)
         return value with
         {
             ThemeMode = themeMode,
+            GlassTransparency = glassTransparency,
             MouseGestureSensitivity = gestureSensitivity,
             CaptureDirectory = captureDirectory,
             VideoFramesPerSecond = fps,

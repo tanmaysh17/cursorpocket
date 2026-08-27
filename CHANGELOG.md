@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.11 — 2026-08-27
+
+- Added live, autosaved More transparent, Balanced, and More solid glass presets in Settings, while preserving Windows fallbacks, high contrast, and the dense recording HUD.
+
 ## 0.4.10 — 2026-08-27
 
 - Made Library Copy place the real capture on the clipboard, including a pasteable bitmap representation for screenshots, instead of copying path text.

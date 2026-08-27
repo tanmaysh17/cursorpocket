@@ -11,7 +11,7 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
 {
     private static readonly HashSet<string> SettingsProperties =
     [
-        nameof(CaptureDirectory), nameof(ThemeModeIndex), nameof(StartWithWindows), nameof(MouseGestureEnabled),
+        nameof(CaptureDirectory), nameof(ThemeModeIndex), nameof(GlassTransparencyIndex), nameof(StartWithWindows), nameof(MouseGestureEnabled),
         nameof(MouseGestureSensitivityIndex),
         nameof(MouseChordEnabled), nameof(CursorCompanionMode), nameof(ActivationShortcut),
         nameof(VideoMicrophoneEnabled), nameof(VideoCameraEnabled), nameof(VideoFramesPerSecond),
@@ -37,6 +37,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
         AppThemeMode.Light => 1,
         AppThemeMode.Dark => 2,
         _ => 0,
+    };
+    [ObservableProperty] private int _glassTransparencyIndex = services.Settings.GlassTransparency switch
+    {
+        GlassTransparencyLevel.Clear => 0,
+        GlassTransparencyLevel.Solid => 2,
+        _ => 1,
     };
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
@@ -250,6 +256,15 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
                     _ => AppThemeMode.System,
                 });
             }
+            else if (name == nameof(GlassTransparencyIndex))
+            {
+                App.Theme.SetGlassTransparency(GlassTransparencyIndex switch
+                {
+                    0 => GlassTransparencyLevel.Clear,
+                    2 => GlassTransparencyLevel.Solid,
+                    _ => GlassTransparencyLevel.Balanced,
+                });
+            }
             QueueSettingsSave();
         }
     }
@@ -288,6 +303,12 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
                 1 => AppThemeMode.Light,
                 2 => AppThemeMode.Dark,
                 _ => AppThemeMode.System,
+            },
+            GlassTransparency = GlassTransparencyIndex switch
+            {
+                0 => GlassTransparencyLevel.Clear,
+                2 => GlassTransparencyLevel.Solid,
+                _ => GlassTransparencyLevel.Balanced,
             },
             CaptureDirectory = CaptureDirectory,
             StartWithWindows = StartWithWindows,

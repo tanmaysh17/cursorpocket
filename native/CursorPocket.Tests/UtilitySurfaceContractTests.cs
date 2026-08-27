@@ -78,6 +78,37 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Glass_transparency_is_visible_persisted_and_applied_live()
+    {
+        var page = ReadFixture("MainPage.xaml");
+        var viewModel = ReadFixture("MainPageViewModel.cs.txt");
+        var app = ReadFixture("App.xaml.cs.txt");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var theme = ReadFixture("ThemeCoordinator.cs.txt");
+
+        Assert.Contains("AutomationProperties.Name=\"Glass transparency\"", page, StringComparison.Ordinal);
+        Assert.Contains("ViewModel.GlassTransparencyIndex", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"More transparent\"", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Balanced\"", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"More solid\"", page, StringComparison.Ordinal);
+
+        Assert.Contains("nameof(GlassTransparencyIndex)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("App.Theme.SetGlassTransparency", viewModel, StringComparison.Ordinal);
+        Assert.Contains("GlassTransparency = GlassTransparencyIndex switch", viewModel, StringComparison.Ordinal);
+        Assert.Contains("new ThemeCoordinator(Services.Settings.ThemeMode, Services.Settings.GlassTransparency)", app, StringComparison.Ordinal);
+        Assert.Contains("SetGlassTransparency(settings.GlassTransparency)", main, StringComparison.Ordinal);
+
+        Assert.Contains("panel.TintOpacity = profile.PanelTint", theme, StringComparison.Ordinal);
+        Assert.Contains("raised.TintOpacity = profile.RaisedTint", theme, StringComparison.Ordinal);
+        Assert.Contains("SetBrushAlpha(resources, \"PocketSurface\"", theme, StringComparison.Ordinal);
+        Assert.Contains("GlassTransparencyLevel.Clear", theme, StringComparison.Ordinal);
+        Assert.Contains("GlassTransparencyLevel.Solid", theme, StringComparison.Ordinal);
+        var apply = Section(theme, "private void ApplyGlassTransparency", "private static GlassProfile ProfileFor");
+        Assert.DoesNotContain("PocketGlassDense", apply, StringComparison.Ordinal);
+        Assert.DoesNotContain("HighContrast", apply, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Library_copy_places_the_capture_itself_on_the_clipboard()
     {
         var xaml = ReadFixture("MainPage.xaml");
