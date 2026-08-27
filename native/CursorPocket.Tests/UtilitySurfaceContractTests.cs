@@ -16,7 +16,11 @@ public sealed class UtilitySurfaceContractTests
         // per-move realignment are gone along with the keep-away behaviour.
         Assert.Contains("new DesktopAcrylicBackdrop()", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("Window.SystemBackdrop", xaml, StringComparison.Ordinal);
-        Assert.Contains("PocketGlassPanel", xaml, StringComparison.Ordinal);
+        // Desktop Acrylic is the command window's desktop-sampling material. A
+        // full-window AcrylicBrush only blurs XAML content in WinUI 3 and masks the
+        // system backdrop with a nearly flat tint when there is no scene behind it.
+        Assert.Contains("Background=\"Transparent\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("PocketGlassPanel", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("BackdropImage", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("DesktopSnapshot.Capture", code, StringComparison.Ordinal);
         // The panel only ever moves because the user dragged it — never on its own.
