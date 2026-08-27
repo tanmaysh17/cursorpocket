@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.12 — 2026-08-27
+
+- Expanded glass transparency to five dramatically separated levels, changed both Acrylic tint and luminosity, and forced the two Library panes to refresh their material live.
+
 ## 0.4.11 — 2026-08-27
 
 - Added live, autosaved More transparent, Balanced, and More solid glass presets in Settings, while preserving Windows fallbacks, high contrast, and the dense recording HUD.

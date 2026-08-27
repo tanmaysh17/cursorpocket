@@ -88,9 +88,13 @@ public sealed class UtilitySurfaceContractTests
 
         Assert.Contains("AutomationProperties.Name=\"Glass transparency\"", page, StringComparison.Ordinal);
         Assert.Contains("ViewModel.GlassTransparencyIndex", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Very transparent\"", page, StringComparison.Ordinal);
         Assert.Contains("Content=\"More transparent\"", page, StringComparison.Ordinal);
         Assert.Contains("Content=\"Balanced\"", page, StringComparison.Ordinal);
         Assert.Contains("Content=\"More solid\"", page, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Very solid\"", page, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LibraryListPane\"", page, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DetailPane\"", page, StringComparison.Ordinal);
 
         Assert.Contains("nameof(GlassTransparencyIndex)", viewModel, StringComparison.Ordinal);
         Assert.Contains("App.Theme.SetGlassTransparency", viewModel, StringComparison.Ordinal);
@@ -99,10 +103,18 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("SetGlassTransparency(settings.GlassTransparency)", main, StringComparison.Ordinal);
 
         Assert.Contains("panel.TintOpacity = profile.PanelTint", theme, StringComparison.Ordinal);
+        Assert.Contains("panel.TintLuminosityOpacity = profile.PanelLuminosity", theme, StringComparison.Ordinal);
         Assert.Contains("raised.TintOpacity = profile.RaisedTint", theme, StringComparison.Ordinal);
+        Assert.Contains("raised.TintLuminosityOpacity = profile.RaisedLuminosity", theme, StringComparison.Ordinal);
         Assert.Contains("SetBrushAlpha(resources, \"PocketSurface\"", theme, StringComparison.Ordinal);
+        Assert.Contains("GlassTransparencyLevel.VeryClear", theme, StringComparison.Ordinal);
         Assert.Contains("GlassTransparencyLevel.Clear", theme, StringComparison.Ordinal);
         Assert.Contains("GlassTransparencyLevel.Solid", theme, StringComparison.Ordinal);
+        Assert.Contains("GlassTransparencyLevel.VerySolid", theme, StringComparison.Ordinal);
+        Assert.Contains("new(0.06, 0.18", theme, StringComparison.Ordinal);
+        Assert.Contains("new(0.92, 0.98", theme, StringComparison.Ordinal);
+        Assert.Contains("LibraryListPane.Background = App.Theme.GlassBrush()", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
+        Assert.Contains("DetailPane.Background = App.Theme.GlassBrush()", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
         var apply = Section(theme, "private void ApplyGlassTransparency", "private static GlassProfile ProfileFor");
         Assert.DoesNotContain("PocketGlassDense", apply, StringComparison.Ordinal);
         Assert.DoesNotContain("HighContrast", apply, StringComparison.Ordinal);

@@ -25,6 +25,7 @@ public sealed partial class MainPage : Page
     private bool _previewMaximized;
     private bool _startingTextEdit;
     private bool _textDetailLoadedFromFile;
+    private bool _themeSubscribed;
 
     public MainPage()
     {
@@ -69,6 +70,12 @@ public sealed partial class MainPage : Page
 
     private async void Page_Loaded(object sender, RoutedEventArgs eventArgs)
     {
+        if (!_themeSubscribed)
+        {
+            App.Theme.ThemeChanged += Theme_ThemeChanged;
+            _themeSubscribed = true;
+        }
+        ApplyLibraryPaneGlass();
         if (_loaded)
         {
             return;
@@ -932,5 +939,22 @@ public sealed partial class MainPage : Page
         {
             SetLibraryStatus("Capture could not be copied", isError: true);
         }
+    }
+
+    private void Page_Unloaded(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!_themeSubscribed) return;
+        App.Theme.ThemeChanged -= Theme_ThemeChanged;
+        _themeSubscribed = false;
+    }
+
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => ApplyLibraryPaneGlass();
+
+    private void ApplyLibraryPaneGlass()
+    {
+        // These are the two dominant Library planes. Give each a fresh material so
+        // a live setting change cannot keep a brush resolved under the previous theme.
+        LibraryListPane.Background = App.Theme.GlassBrush();
+        DetailPane.Background = App.Theme.GlassBrush();
     }
 }

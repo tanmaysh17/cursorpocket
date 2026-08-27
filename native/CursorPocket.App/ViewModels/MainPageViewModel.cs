@@ -40,9 +40,11 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
     };
     [ObservableProperty] private int _glassTransparencyIndex = services.Settings.GlassTransparency switch
     {
-        GlassTransparencyLevel.Clear => 0,
-        GlassTransparencyLevel.Solid => 2,
-        _ => 1,
+        GlassTransparencyLevel.VeryClear => 0,
+        GlassTransparencyLevel.Clear => 1,
+        GlassTransparencyLevel.Solid => 3,
+        GlassTransparencyLevel.VerySolid => 4,
+        _ => 2,
     };
     [ObservableProperty] private bool _startWithWindows = services.Settings.StartWithWindows;
     [ObservableProperty] private bool _mouseGestureEnabled = services.Settings.MouseGestureEnabled;
@@ -260,8 +262,10 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             {
                 App.Theme.SetGlassTransparency(GlassTransparencyIndex switch
                 {
-                    0 => GlassTransparencyLevel.Clear,
-                    2 => GlassTransparencyLevel.Solid,
+                    0 => GlassTransparencyLevel.VeryClear,
+                    1 => GlassTransparencyLevel.Clear,
+                    3 => GlassTransparencyLevel.Solid,
+                    4 => GlassTransparencyLevel.VerySolid,
                     _ => GlassTransparencyLevel.Balanced,
                 });
             }
@@ -306,8 +310,10 @@ public partial class MainPageViewModel(AppServices services) : ObservableObject
             },
             GlassTransparency = GlassTransparencyIndex switch
             {
-                0 => GlassTransparencyLevel.Clear,
-                2 => GlassTransparencyLevel.Solid,
+                0 => GlassTransparencyLevel.VeryClear,
+                1 => GlassTransparencyLevel.Clear,
+                3 => GlassTransparencyLevel.Solid,
+                4 => GlassTransparencyLevel.VerySolid,
                 _ => GlassTransparencyLevel.Balanced,
             },
             CaptureDirectory = CaptureDirectory,
