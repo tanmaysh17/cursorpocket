@@ -1,5 +1,7 @@
 using System.Drawing;
 using CursorPocket.Core.Models;
+using Microsoft.UI.Composition;
+using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
@@ -202,12 +204,8 @@ public sealed class ThemeCoordinator : IDisposable
 
         var dark = IsDark;
         var profile = ProfileFor(_glassTransparency, dark);
-        var tint = dark
-            ? raised ? Windows.UI.Color.FromArgb(0xFF, 0x18, 0x23, 0x1F) : Windows.UI.Color.FromArgb(0xFF, 0x10, 0x18, 0x15)
-            : raised ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF) : Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xFA, 0xF7);
-        var fallback = dark
-            ? tint
-            : raised ? Windows.UI.Color.FromArgb(0xFF, 0xF8, 0xFC, 0xFA) : tint;
+        var tint = GlassTintColor(dark, raised);
+        var fallback = GlassFallbackColor(dark, raised);
         return new AcrylicBrush
         {
             TintColor = tint,
@@ -293,11 +291,40 @@ public sealed class ThemeCoordinator : IDisposable
         {
             registration.Window.SystemBackdrop = null;
         }
+        else if (DesktopAcrylicController.IsSupported())
+        {
+            var dark = IsDark;
+            var profile = ProfileFor(_glassTransparency, dark);
+            var isHud = registration.Role == SurfaceRole.Hud;
+            var tint = isHud
+                ? Windows.UI.Color.FromArgb(0xFF, 0x07, 0x13, 0x0F)
+                : GlassTintColor(dark, raised: false);
+            var fallback = IsHighContrast
+                ? ToWindowsColor(Palette.Background)
+                : isHud
+                    ? Windows.UI.Color.FromArgb(0xFF, 0x09, 0x11, 0x0F)
+                    : GlassFallbackColor(dark, raised: false);
+            var tintOpacity = isHud ? 0.84 : profile.PanelTint;
+            var luminosityOpacity = isHud ? 0.48 : profile.PanelLuminosity;
+
+            if (registration.Window.SystemBackdrop is PocketAcrylicBackdrop backdrop)
+            {
+                backdrop.Update(tint, fallback, tintOpacity, luminosityOpacity);
+            }
+            else
+            {
+                registration.Window.SystemBackdrop = new PocketAcrylicBackdrop(
+                    tint,
+                    fallback,
+                    tintOpacity,
+                    luminosityOpacity);
+            }
+        }
         else if (registration.Window.SystemBackdrop is not DesktopAcrylicBackdrop)
         {
-            // The compositor owns disabled-transparency, battery-saver, inactive,
-            // high-contrast, and unsupported-hardware fallbacks. Keeping the material
-            // attached avoids turning one failed optional system probe into a flat app.
+            // Keep the built-in material as the compatibility path on systems where
+            // a configurable controller is unavailable. It still owns the correct
+            // opaque policy fallback instead of leaving a transparent window hole.
             registration.Window.SystemBackdrop = new DesktopAcrylicBackdrop();
         }
         ApplyTitleBar(registration.Window.AppWindow.TitleBar);
@@ -355,6 +382,20 @@ public sealed class ThemeCoordinator : IDisposable
     private static Windows.UI.Color ToWindowsColor(Color colour) =>
         Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B);
 
+    private static Windows.UI.Color GlassTintColor(bool dark, bool raised) => dark
+        ? raised
+            ? Windows.UI.Color.FromArgb(0xFF, 0x18, 0x23, 0x1F)
+            : Windows.UI.Color.FromArgb(0xFF, 0x10, 0x18, 0x15)
+        : raised
+            ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)
+            : Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xFA, 0xF7);
+
+    private static Windows.UI.Color GlassFallbackColor(bool dark, bool raised) => dark
+        ? GlassTintColor(dark, raised)
+        : raised
+            ? Windows.UI.Color.FromArgb(0xFF, 0xF8, 0xFC, 0xFA)
+            : GlassTintColor(dark, raised);
+
     private static Color WithAlpha(Color colour, byte alpha) => Color.FromArgb(alpha, colour.R, colour.G, colour.B);
     private static Color Blend(Color a, Color b, double amount) => Color.FromArgb(
         255,
@@ -367,6 +408,85 @@ public sealed class ThemeCoordinator : IDisposable
         try { if (_uiSettingsSubscribed) _uiSettings.ColorValuesChanged -= UiSettings_ColorValuesChanged; } catch { }
         try { if (_accessibilitySubscribed) _accessibility.HighContrastChanged -= Accessibility_HighContrastChanged; } catch { }
         _registrations.Clear();
+    }
+}
+
+/// <summary>
+/// Window-level Acrylic whose tint and luminosity can change without replacing the
+/// HWND or losing Windows' inactive, disabled-transparency, and high-contrast policy.
+/// One instance belongs to one window; ThemeCoordinator never shares it across HWNDs.
+/// </summary>
+internal sealed class PocketAcrylicBackdrop : SystemBackdrop
+{
+    private DesktopAcrylicController? _controller;
+    private Windows.UI.Color _tintColor;
+    private Windows.UI.Color _fallbackColor;
+    private float _tintOpacity;
+    private float _luminosityOpacity;
+
+    public PocketAcrylicBackdrop(
+        Windows.UI.Color tintColor,
+        Windows.UI.Color fallbackColor,
+        double tintOpacity,
+        double luminosityOpacity) =>
+        Update(tintColor, fallbackColor, tintOpacity, luminosityOpacity);
+
+    public void Update(
+        Windows.UI.Color tintColor,
+        Windows.UI.Color fallbackColor,
+        double tintOpacity,
+        double luminosityOpacity)
+    {
+        _tintColor = tintColor;
+        _fallbackColor = fallbackColor;
+        _tintOpacity = (float)Math.Clamp(tintOpacity, 0, 1);
+        _luminosityOpacity = (float)Math.Clamp(luminosityOpacity, 0, 1);
+        ApplyProperties();
+    }
+
+    protected override void OnTargetConnected(
+        ICompositionSupportsSystemBackdrop connectedTarget,
+        XamlRoot xamlRoot)
+    {
+        base.OnTargetConnected(connectedTarget, xamlRoot);
+        if (_controller is not null)
+        {
+            throw new InvalidOperationException("A PocketAcrylicBackdrop cannot be shared between windows.");
+        }
+
+        var controller = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Base };
+        try
+        {
+            _controller = controller;
+            ApplyProperties();
+            controller.SetSystemBackdropConfiguration(
+                GetDefaultSystemBackdropConfiguration(connectedTarget, xamlRoot));
+            controller.AddSystemBackdropTarget(connectedTarget);
+        }
+        catch
+        {
+            _controller = null;
+            controller.Dispose();
+            throw;
+        }
+    }
+
+    protected override void OnTargetDisconnected(ICompositionSupportsSystemBackdrop disconnectedTarget)
+    {
+        base.OnTargetDisconnected(disconnectedTarget);
+        if (_controller is null) return;
+        _controller.RemoveSystemBackdropTarget(disconnectedTarget);
+        _controller.Dispose();
+        _controller = null;
+    }
+
+    private void ApplyProperties()
+    {
+        if (_controller is null) return;
+        _controller.TintColor = _tintColor;
+        _controller.FallbackColor = _fallbackColor;
+        _controller.TintOpacity = _tintOpacity;
+        _controller.LuminosityOpacity = _luminosityOpacity;
     }
 }
 

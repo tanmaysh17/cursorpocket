@@ -14,7 +14,8 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("ShortWidth = 520", code, StringComparison.Ordinal);
         // Acrylic blurs the live desktop, so the frozen full-screen snapshot and its
         // per-move realignment are gone along with the keep-away behaviour.
-        Assert.Contains("new DesktopAcrylicBackdrop()", theme, StringComparison.Ordinal);
+        Assert.Contains("new PocketAcrylicBackdrop(", theme, StringComparison.Ordinal);
+        Assert.Contains("DesktopAcrylicController", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("Window.SystemBackdrop", xaml, StringComparison.Ordinal);
         // Desktop Acrylic is the command window's desktop-sampling material. A
         // full-window AcrylicBrush only blurs XAML content in WinUI 3 and masks the
@@ -58,6 +59,9 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("PocketGlassTopEdge", app, StringComparison.Ordinal);
         Assert.Contains("<SolidColorBrush x:Key=\"PocketGlassPanel\" Color=\"{ThemeResource SystemColorWindowColor}\"", app, StringComparison.Ordinal);
 
+        Assert.Contains("registration.Window.SystemBackdrop = new PocketAcrylicBackdrop(", theme, StringComparison.Ordinal);
+        Assert.Contains("registration.Window.SystemBackdrop is PocketAcrylicBackdrop backdrop", theme, StringComparison.Ordinal);
+        Assert.Contains("backdrop.Update(tint, fallback, tintOpacity, luminosityOpacity)", theme, StringComparison.Ordinal);
         Assert.Contains("new DesktopAcrylicBackdrop()", theme, StringComparison.Ordinal);
         Assert.Contains("SurfaceRole.Pin or SurfaceRole.CaptureOverlay", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyAllowed", theme, StringComparison.Ordinal);
@@ -113,6 +117,12 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("GlassTransparencyLevel.VerySolid", theme, StringComparison.Ordinal);
         Assert.Contains("new(0.06, 0.18", theme, StringComparison.Ordinal);
         Assert.Contains("new(0.92, 0.98", theme, StringComparison.Ordinal);
+        Assert.Contains("_controller.TintOpacity = _tintOpacity", theme, StringComparison.Ordinal);
+        Assert.Contains("_controller.LuminosityOpacity = _luminosityOpacity", theme, StringComparison.Ordinal);
+        Assert.Contains("GetDefaultSystemBackdropConfiguration", theme, StringComparison.Ordinal);
+        Assert.Contains("controller.AddSystemBackdropTarget(connectedTarget)", theme, StringComparison.Ordinal);
+        Assert.Contains("var isHud = registration.Role == SurfaceRole.Hud", theme, StringComparison.Ordinal);
+        Assert.Contains("var tintOpacity = isHud ? 0.84 : profile.PanelTint", theme, StringComparison.Ordinal);
         Assert.Contains("LibraryListPane.Background = App.Theme.GlassBrush()", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
         Assert.Contains("DetailPane.Background = App.Theme.GlassBrush()", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
         var apply = Section(theme, "private void ApplyGlassTransparency", "private static GlassProfile ProfileFor");
