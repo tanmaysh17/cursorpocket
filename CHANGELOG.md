@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+## 0.4.13 — 2026-08-27
+
+- Applied all five glass levels to each eligible window's compositor backdrop, including Library and Command Center, instead of limiting the visible change to inner panes and controls.
+
 ## 0.4.12 — 2026-08-27
 
-- Expanded glass transparency to five dramatically separated levels, changed both Acrylic tint and luminosity, and applied the choice live to every eligible window backdrop, including Library and Command Center, as well as their inner panes.
+- Expanded glass transparency to five dramatically separated levels, changed both Acrylic tint and luminosity, and forced the two Library panes to refresh their material live.
 
 ## 0.4.11 — 2026-08-27
 
