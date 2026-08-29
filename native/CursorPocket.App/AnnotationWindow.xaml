@@ -569,14 +569,14 @@
                           which left every accelerator dead until the user happened to
                           click a toolbar button. A Grid cannot stand in either: IsTabStop
                           belongs to Control and a Grid is a Panel. This ContentControl
-                          holds focus without drawing a ring and without eating the
-                          pointer input the Canvas below needs.  -->
+                          does not eat the Canvas pointer input, and its system focus
+                          visual preserves a keyboard-focus cue.  -->
                     <ContentControl
                         x:Name="CanvasHost"
                         HorizontalContentAlignment="Stretch"
                         VerticalContentAlignment="Stretch"
                         IsTabStop="True"
-                        UseSystemFocusVisuals="False">
+                        UseSystemFocusVisuals="True">
                         <Viewbox Stretch="Uniform">
                             <!--  The backdrop is previewed by actually framing the stage,
                                   so what is on screen is the shape that will be exported
@@ -790,6 +790,7 @@
                     VerticalAlignment="Center"
                     Style="{StaticResource PocketNumericText}" />
                 <Button
+                    x:Name="StatusKeysButton"
                     Grid.Column="4"
                     Click="KeySheet_Click"
                     Style="{StaticResource PocketGhostButton}"
