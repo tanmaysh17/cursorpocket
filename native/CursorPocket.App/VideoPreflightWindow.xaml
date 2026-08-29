@@ -423,6 +423,7 @@
                         Visibility="Collapsed">
                         <TextBlock
                             x:Name="FramingLabel"
+                            Foreground="{ThemeResource PocketMediaMuted}"
                             Style="{StaticResource PocketTagText}"
                             Text="Full display" />
                     </Border>
@@ -430,6 +431,7 @@
                         x:Name="CameraSlotLabel"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
+                        Foreground="{ThemeResource PocketMediaMuted}"
                         Style="{StaticResource PocketMetaText}"
                         Text="camera off" />
                     <Border
@@ -440,24 +442,27 @@
                             Margin="12,9"
                             Orientation="Horizontal"
                             Spacing="8">
-                            <Border Style="{StaticResource PocketTagBorder}">
-                                <TextBlock Style="{StaticResource PocketTagText}" Text="MP4 · H.264" />
+                            <Border BorderBrush="{ThemeResource PocketMediaLine}" Style="{StaticResource PocketTagBorder}">
+                                <TextBlock Foreground="{ThemeResource PocketMediaMuted}" Style="{StaticResource PocketTagText}" Text="MP4 · H.264" />
                             </Border>
-                            <Border Style="{StaticResource PocketTagBorder}">
+                            <Border BorderBrush="{ThemeResource PocketMediaLine}" Style="{StaticResource PocketTagBorder}">
                                 <TextBlock
                                     x:Name="FrameRateTag"
+                                    Foreground="{ThemeResource PocketMediaMuted}"
                                     Style="{StaticResource PocketTagText}"
                                     Text="30 FPS" />
                             </Border>
-                            <Border Style="{StaticResource PocketTagBorder}">
+                            <Border BorderBrush="{ThemeResource PocketMediaLine}" Style="{StaticResource PocketTagBorder}">
                                 <TextBlock
                                     x:Name="MicrophoneTag"
+                                    Foreground="{ThemeResource PocketMediaMuted}"
                                     Style="{StaticResource PocketTagText}"
                                     Text="Mic on" />
                             </Border>
-                            <Border Style="{StaticResource PocketTagBorder}">
+                            <Border BorderBrush="{ThemeResource PocketMediaLine}" Style="{StaticResource PocketTagBorder}">
                                 <TextBlock
                                     x:Name="CountdownTag"
+                                    Foreground="{ThemeResource PocketMediaMuted}"
                                     Style="{StaticResource PocketTagText}"
                                     Text="3 S" />
                             </Border>

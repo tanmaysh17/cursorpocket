@@ -28,7 +28,7 @@
             Visibility="Collapsed"
             Text="Camera unavailable"
             Style="{StaticResource PocketCaptionText}" />
-        <Border BorderBrush="{ThemeResource PocketGreen}" BorderThickness="1" Opacity="0.42" IsHitTestVisible="False" />
+        <Border BorderBrush="{ThemeResource PocketMediaGreen}" BorderThickness="1" Opacity="0.42" IsHitTestVisible="False" />
     </Grid>
 </Window>
 

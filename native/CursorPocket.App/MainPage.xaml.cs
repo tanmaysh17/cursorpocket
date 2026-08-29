@@ -150,7 +150,6 @@ public sealed partial class MainPage : Page
     {
         var shortcut = App.Services.Hotkey.RegisteredShortcut;
         NewCaptureShortcut.Text = shortcut ?? string.Empty;
-        NewCaptureShortcut.Visibility = shortcut is null ? Visibility.Collapsed : Visibility.Visible;
         ActivationShortcutHint.Text = shortcut is null
             ? "Choose a working shortcut in Settings"
             : $"{shortcut} over whatever is on screen";
@@ -481,13 +480,12 @@ public sealed partial class MainPage : Page
     }
     private void ApplyFilterSelection(string filter)
     {
-        var resources = Application.Current.Resources;
         foreach (var button in FilterBar.Children.OfType<Button>())
         {
             var selected = string.Equals(button.Tag as string, filter, StringComparison.Ordinal);
-            button.Background = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketRaised" : "PocketTransparent"];
-            button.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketLine" : "PocketTransparent"];
-            button.Foreground = (Microsoft.UI.Xaml.Media.Brush)resources[selected ? "PocketInk" : "PocketMuted"];
+            button.Background = App.Theme.Brush(selected ? "PocketRaised" : "PocketTransparent");
+            button.BorderBrush = App.Theme.Brush(selected ? "PocketLine" : "PocketTransparent");
+            button.Foreground = App.Theme.Brush(selected ? "PocketInk" : "PocketMuted");
         }
     }
 
@@ -948,7 +946,12 @@ public sealed partial class MainPage : Page
         _themeSubscribed = false;
     }
 
-    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => ApplyLibraryPaneGlass();
+    private void Theme_ThemeChanged(object? sender, EventArgs eventArgs)
+    {
+        ApplyLibraryPaneGlass();
+        ApplyFilterSelection(ViewModel.SelectedFilter);
+        ApplyThemeModeSelection();
+    }
 
     private void ApplyLibraryPaneGlass()
     {

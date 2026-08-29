@@ -54,7 +54,7 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("x:Key=\"PocketGlassDense\"", app, StringComparison.Ordinal);
         Assert.Contains("TintOpacity=\"0.84\"", app, StringComparison.Ordinal);
         Assert.Contains("#8F101815", app, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("#A8F8FCFA", app, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("#CFF9F9F6", app, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("PocketGlassRim", app, StringComparison.Ordinal);
         Assert.Contains("PocketGlassTopEdge", app, StringComparison.Ordinal);
         Assert.Contains("<SolidColorBrush x:Key=\"PocketGlassPanel\" Color=\"{ThemeResource SystemColorWindowColor}\"", app, StringComparison.Ordinal);

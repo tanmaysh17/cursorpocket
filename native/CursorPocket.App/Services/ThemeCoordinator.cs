@@ -64,6 +64,7 @@ public sealed class ThemeCoordinator : IDisposable
             ? glassTransparency
             : GlassTransparencyLevel.Balanced;
         ApplyGlassTransparency();
+        ApplyControlAccents();
         // These projections are OS-version and session dependent. A missing optional
         // notification must not prevent the app from starting; the current value is
         // still read whenever another supported signal or an app override applies.
@@ -119,14 +120,14 @@ public sealed class ThemeCoordinator : IDisposable
                 ColorTranslator.FromHtml("#07130F"),
                 true)
             : new ThemePalette(
-                ColorTranslator.FromHtml("#F5F9F7"),
-                ColorTranslator.FromHtml("#FFFFFF"),
-                ColorTranslator.FromHtml("#15201C"),
-                ColorTranslator.FromHtml("#35443E"),
-                ColorTranslator.FromHtml("#5F6E68"),
-                ColorTranslator.FromHtml("#C4CEC9"),
-                ColorTranslator.FromHtml("#168B52"),
-                Color.White,
+                ColorTranslator.FromHtml("#F7F7F4"),
+                ColorTranslator.FromHtml("#FCFCFA"),
+                ColorTranslator.FromHtml("#1F2925"),
+                ColorTranslator.FromHtml("#4E5C56"),
+                ColorTranslator.FromHtml("#5E6B65"),
+                ColorTranslator.FromHtml("#C9CEC9"),
+                ColorTranslator.FromHtml("#117A46"),
+                ColorTranslator.FromHtml("#F9FBFA"),
                 false);
 
     public void SetMode(AppThemeMode mode)
@@ -171,20 +172,28 @@ public sealed class ThemeCoordinator : IDisposable
                 : WithAlpha(Blend(palette.Background, palette.IsDark ? Color.Black : Color.Gray, 0.12), glass.SunkenAlpha),
             "PocketSurface" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(glass.SurfaceAlpha, 0x10, 0x18, 0x15) : Color.FromArgb(glass.SurfaceAlpha, 0xF8, 0xFC, 0xFA),
+                : palette.IsDark ? Color.FromArgb(glass.SurfaceAlpha, 0x10, 0x18, 0x15) : Color.FromArgb(glass.SurfaceAlpha, 0xF9, 0xF9, 0xF6),
             "PocketRaised" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(glass.RaisedAlpha, 0x16, 0x1F, 0x1C) : Color.FromArgb(glass.RaisedAlpha, 0xFF, 0xFF, 0xFF),
+                : palette.IsDark ? Color.FromArgb(glass.RaisedAlpha, 0x16, 0x1F, 0x1C) : Color.FromArgb(glass.RaisedAlpha, 0xFC, 0xFC, 0xFA),
             "PocketTransientSurface" => IsHighContrast
                 ? palette.Background
-                : palette.IsDark ? Color.FromArgb(glass.TransientAlpha, 0x14, 0x1E, 0x1A) : Color.FromArgb(glass.TransientAlpha, 0xF7, 0xFB, 0xF9),
-            "PocketLine" or "PocketLineStrong" => palette.Line,
+                : palette.IsDark ? Color.FromArgb(glass.TransientAlpha, 0x14, 0x1E, 0x1A) : Color.FromArgb(glass.TransientAlpha, 0xF9, 0xF9, 0xF6),
+            "PocketLine" => palette.Line,
+            "PocketLineStrong" => Blend(palette.Line, palette.Text, 0.20),
             "PocketGreen" => palette.Selection,
             "PocketGreenSoft" => WithAlpha(palette.Selection, 48),
             "PocketOnGreen" => palette.SelectionText,
-            "PocketRed" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#D73546"),
-            "PocketRedSoft" => WithAlpha(ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#D73546"), 44),
-            "PocketBlue" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#7AA7FF" : "#276EA8"),
+            "PocketRed" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#C52B3B"),
+            "PocketRedSoft" => WithAlpha(ColorTranslator.FromHtml(IsDark ? "#FF5964" : "#C52B3B"), 44),
+            "PocketBlue" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml(IsDark ? "#7AA7FF" : "#24669A"),
+            "PocketMediaInk" => IsHighContrast ? palette.Text : ColorTranslator.FromHtml("#F6F4EC"),
+            "PocketMediaInkDim" => IsHighContrast ? palette.InkDim : ColorTranslator.FromHtml("#CBD7D1"),
+            "PocketMediaMuted" => IsHighContrast ? palette.Muted : ColorTranslator.FromHtml("#AEBDB6"),
+            "PocketMediaRaised" => IsHighContrast ? palette.Background : Color.FromArgb(0xED, 0x15, 0x1E, 0x1A),
+            "PocketMediaLine" => IsHighContrast ? palette.Line : Color.FromArgb(0x52, 0xFF, 0xFF, 0xFF),
+            "PocketMediaGreen" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml("#36E58C"),
+            "PocketMediaRed" => IsHighContrast ? palette.Selection : ColorTranslator.FromHtml("#FF5964"),
             _ => Color.Transparent,
         };
         return new SolidColorBrush(Windows.UI.Color.FromArgb(colour.A, colour.R, colour.G, colour.B));
@@ -274,8 +283,30 @@ public sealed class ThemeCoordinator : IDisposable
 
     private void ApplyAll()
     {
+        ApplyControlAccents();
         foreach (var registration in _registrations.ToArray()) Apply(registration);
         ThemeChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void ApplyControlAccents()
+    {
+        var resources = Application.Current?.Resources;
+        if (resources is null) return;
+
+        var palette = Palette;
+        var accent = palette.Selection;
+        var hover = IsHighContrast ? accent : Blend(accent, palette.Text, 0.08);
+        var pressed = IsHighContrast ? accent : Blend(accent, palette.Text, 0.16);
+        SetBrushColour(resources, "PocketControlAccent", accent);
+        SetBrushColour(resources, "PocketControlAccentHover", hover);
+        SetBrushColour(resources, "PocketControlAccentPressed", pressed);
+        SetBrushColour(resources, "PocketControlAccentDisabled", WithAlpha(accent, 0x66));
+    }
+
+    private static void SetBrushColour(ResourceDictionary resources, string key, Color colour)
+    {
+        if (!resources.ContainsKey(key) || resources[key] is not SolidColorBrush brush) return;
+        brush.Color = ToWindowsColor(colour);
     }
 
     private void Apply(Registration registration)
@@ -387,13 +418,13 @@ public sealed class ThemeCoordinator : IDisposable
             ? Windows.UI.Color.FromArgb(0xFF, 0x18, 0x23, 0x1F)
             : Windows.UI.Color.FromArgb(0xFF, 0x10, 0x18, 0x15)
         : raised
-            ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF)
-            : Windows.UI.Color.FromArgb(0xFF, 0xF5, 0xFA, 0xF7);
+            ? Windows.UI.Color.FromArgb(0xFF, 0xFC, 0xFC, 0xFA)
+            : Windows.UI.Color.FromArgb(0xFF, 0xF7, 0xF7, 0xF4);
 
     private static Windows.UI.Color GlassFallbackColor(bool dark, bool raised) => dark
         ? GlassTintColor(dark, raised)
         : raised
-            ? Windows.UI.Color.FromArgb(0xFF, 0xF8, 0xFC, 0xFA)
+            ? Windows.UI.Color.FromArgb(0xFF, 0xFC, 0xFC, 0xFA)
             : GlassTintColor(dark, raised);
 
     private static Color WithAlpha(Color colour, byte alpha) => Color.FromArgb(alpha, colour.R, colour.G, colour.B);
