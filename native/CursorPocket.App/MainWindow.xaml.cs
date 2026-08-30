@@ -114,7 +114,10 @@ public sealed partial class MainWindow : Window
         ActivateMainWindow();
     }
 
-    public async Task CompleteOnboardingAsync(bool startWithWindows, bool showCompanion)
+    public async Task CompleteOnboardingAsync(
+        bool startWithWindows,
+        bool showCompanion,
+        bool openCommandMode = false)
     {
         await App.Services.UpdateAsync(settings => settings with
         {
@@ -131,6 +134,13 @@ public sealed partial class MainWindow : Window
             page.NavigateTo("capture");
         }
         ActivateMainWindow();
+        if (openCommandMode)
+        {
+            // Let the persistent page settle before placing the real transient
+            // command surface above it. The user leaves onboarding in the product,
+            // not in a disconnected tutorial simulation.
+            DispatcherQueue.TryEnqueue(() => ShowCommandPalette());
+        }
     }
 
     private MainPage? EnsureMainPage()

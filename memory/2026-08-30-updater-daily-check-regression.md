@@ -26,7 +26,7 @@ Evidence:
 - Before the fix, `Failed_automatic_attempt_is_persisted_and_throttles_the_next_check` failed at `Assert.NotNull(settings.Current.LastUpdateCheckAt)` after the first offline attempt.
 - Before the follow-up fix, `Enabling_automatic_checks_reschedules_the_background_loop` failed because `MainWindow` contained no transition-aware reschedule call.
 - Focused updater tests after all fixes: 26 passed, 0 failed.
-- Full native test suite against the final merged build: 560 passed, 0 failed, 0 skipped.
+- Full native test suite against the final onboarding/updater merge: 566 passed, 0 failed, 0 skipped.
 - `dotnet build native/CursorPocket.Native.sln -c Release --no-restore -p:UseSharedCompilation=false -nodeReuse:false`: succeeded with 0 warnings and 0 errors.
 - The self-contained publish/package pass was intentionally not run in this follow-up, per the completion-audit request. The native solution itself built successfully.
 
