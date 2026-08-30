@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.17 — 2026-08-30
+
+- Made automatic updates reliably check at most once per day, retry while CursorPocket stays open, resume shortly after being enabled, and stay silent during active capture work until the user can approve the install.
+- Kept failed update checks and installer launches non-disruptive, without repeated offline requests or stale pending-update errors.
+
 ## 0.4.16 — 2026-08-30
 
 - Moved the complete Library filter control into the shared action toolbar at wide widths, keeping every capture type visible and aligning the list with the preview.
