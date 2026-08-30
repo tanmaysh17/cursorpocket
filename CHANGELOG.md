@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.17 — 2026-08-30
+
+- Rebuilt first-run onboarding around the complete local capture loop, every command-mode activation path and action, and a guided handoff into a useful first screenshot, video, or audio capture.
+- Added contract coverage for the tour's capability map, accessibility, single-scroll layout, saved setup choices, and real command-mode launch.
+
 ## 0.4.16 — 2026-08-30
 
 - Moved the complete Library filter control into the shared action toolbar at wide widths, keeping every capture type visible and aligning the list with the preview.
