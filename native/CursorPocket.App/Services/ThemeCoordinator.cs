@@ -511,6 +511,17 @@ internal sealed class PocketAcrylicBackdrop : SystemBackdrop
         _controller = null;
     }
 
+    protected override void OnDefaultSystemBackdropConfigurationChanged(
+        ICompositionSupportsSystemBackdrop target,
+        XamlRoot xamlRoot)
+    {
+        // The configuration obtained during OnTargetConnected is maintained by WinUI.
+        // Re-querying it from this projected callback can pass an invalid target and
+        // crash with E_INVALIDARG while RequestedTheme is changing. Our custom Acrylic
+        // values are refreshed here; ThemeCoordinator applies the new palette next.
+        ApplyProperties();
+    }
+
     private void ApplyProperties()
     {
         if (_controller is null) return;

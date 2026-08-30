@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.15 — 2026-08-30
+
+- Prevented the app from crashing when switching between Light and Dark themes by keeping WinUI's connection-time Acrylic configuration and avoiding an invalid backdrop-target lookup during the theme callback.
+
 ## 0.4.14 — 2026-08-29
 
 - Restored readable light-mode contrast across persistent and transient capture surfaces while preserving green ready and red recording semantics.

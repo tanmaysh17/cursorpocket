@@ -82,6 +82,30 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Custom_acrylic_does_not_requery_the_default_configuration_during_theme_changes()
+    {
+        var theme = ReadFixture("ThemeCoordinator.cs.txt");
+        var callback = Section(
+            theme,
+            "protected override void OnDefaultSystemBackdropConfigurationChanged",
+            "private void ApplyProperties");
+
+        Assert.Contains("ApplyProperties();", callback, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "GetDefaultSystemBackdropConfiguration",
+            callback,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "SetSystemBackdropConfiguration",
+            callback,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "base.OnDefaultSystemBackdropConfigurationChanged",
+            callback,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Glass_transparency_is_visible_persisted_and_applied_live()
     {
         var page = ReadFixture("MainPage.xaml");
