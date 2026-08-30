@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
@@ -33,6 +34,9 @@ public sealed partial class MainWindow : Window
     private int _activeCaptureOperations;
     private bool _regionSelectorOpen;
     private readonly ReceiptCoordinator _receipts;
+    private readonly DispatcherTimer _pendingUpdateTimer;
+    private ApplicationUpdateInfo? _pendingUpdate;
+    private bool _automaticUpdatesEnabled;
 
     // Pins are held only for their lifetime and never restored after a restart: a window
     // that reappears after a reboot with no explanation is exactly the unexplained
@@ -69,6 +73,9 @@ public sealed partial class MainWindow : Window
         App.Theme.ThemeChanged += Theme_ThemeChanged;
         SubscribeToRecordingState();
         _receipts = new ReceiptCoordinator(ShowLibrary);
+        _pendingUpdateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _pendingUpdateTimer.Tick += (_, _) => TryShowPendingUpdate();
+        _automaticUpdatesEnabled = App.Services.Settings.AutomaticallyCheckForUpdates;
         App.Services.SettingsChanged += Services_SettingsChanged;
         App.Services.Updates.UpdateAvailable += Updates_UpdateAvailable;
         App.Services.Updates.StateChanged += Updates_StateChanged;
@@ -898,13 +905,15 @@ public sealed partial class MainWindow : Window
     }
 
     private void Updates_UpdateAvailable(object? sender, ApplicationUpdateInfo update) =>
-        App.DispatcherQueue.TryEnqueue(() => ShowUpdateAvailable(update));
+        App.DispatcherQueue.TryEnqueue(() => QueueUpdatePrompt(update));
 
     private void Updates_StateChanged(object? sender, EventArgs eventArgs) =>
         App.DispatcherQueue.TryEnqueue(() => (RootFrame.Content as MainPage)?.RefreshUpdateStatus());
 
     private void ShowUpdateAvailable(ApplicationUpdateInfo update)
     {
+        _pendingUpdate = null;
+        _pendingUpdateTimer.Stop();
         _receipts.Show(new ReceiptRequest(
             null,
             $"CursorPocket {update.Version} is ready",
@@ -922,12 +931,7 @@ public sealed partial class MainWindow : Window
     {
         if (IsBusyForUpdate())
         {
-            AppWindow.Show();
-            ActivateMainWindow();
-            var message = App.Services.RecordingSession.IsActive
-                ? "Finish the current recording before installing the update."
-                : "Finish the current capture or annotation before installing the update.";
-            ShowError("CursorPocket is busy", message);
+            QueueUpdatePrompt(update);
             return;
         }
 
@@ -943,10 +947,34 @@ public sealed partial class MainWindow : Window
             App.Services.Updates.LaunchInstaller(downloaded);
             await QuitForUpdateAsync();
         }
-        catch (Exception error) when (error is IOException or HttpRequestException or InvalidDataException or InvalidOperationException)
+        catch (Exception error) when (error is IOException or HttpRequestException or InvalidDataException or InvalidOperationException or Win32Exception)
         {
             ShowError("The update was not installed", error.Message);
         }
+    }
+
+    private void QueueUpdatePrompt(ApplicationUpdateInfo update)
+    {
+        if (_pendingUpdate is null || update.Version > _pendingUpdate.Version)
+        {
+            _pendingUpdate = update;
+        }
+        TryShowPendingUpdate();
+    }
+
+    private void TryShowPendingUpdate()
+    {
+        if (_pendingUpdate is not { } update)
+        {
+            _pendingUpdateTimer.Stop();
+            return;
+        }
+        if (IsBusyForUpdate())
+        {
+            _pendingUpdateTimer.Start();
+            return;
+        }
+        ShowUpdateAvailable(update);
     }
 
     private bool IsBusyForUpdate() =>
@@ -954,12 +982,14 @@ public sealed partial class MainWindow : Window
         Volatile.Read(ref _activeEditors) > 0 ||
         Volatile.Read(ref _activeCaptureOperations) > 0 ||
         _regionSelectorOpen ||
-        _preflight is not null;
+        _preflight is not null ||
+        RootFrame.Content is OnboardingPage;
 
     private async Task QuitForUpdateAsync()
     {
         _quitting = true;
         await PersistGeometryAsync();
+        _pendingUpdateTimer.Stop();
         _mouseActivity?.Dispose();
         App.Services.Updates.UpdateAvailable -= Updates_UpdateAvailable;
         App.Services.Updates.StateChanged -= Updates_StateChanged;
@@ -1043,6 +1073,13 @@ public sealed partial class MainWindow : Window
     private void Services_SettingsChanged(object? sender, AppSettings settings) =>
         App.DispatcherQueue.TryEnqueue(() =>
         {
+            var shouldRescheduleAutomaticCheck =
+                ApplicationUpdateCoordinator.ShouldRescheduleAutomaticCheck(_automaticUpdatesEnabled, settings.AutomaticallyCheckForUpdates);
+            _automaticUpdatesEnabled = settings.AutomaticallyCheckForUpdates;
+            if (shouldRescheduleAutomaticCheck)
+            {
+                App.Services.Updates.ScheduleAutomaticCheck();
+            }
             App.Theme.SetMode(settings.ThemeMode);
             App.Theme.SetGlassTransparency(settings.GlassTransparency);
             SubscribeToRecordingState();
@@ -1190,6 +1227,7 @@ public sealed partial class MainWindow : Window
         }
         _quitting = true;
         await PersistGeometryAsync();
+        _pendingUpdateTimer.Stop();
         if (_subscribedRecording is not null)
         {
             _subscribedRecording.StateChanged -= Recording_StateChanged;

@@ -15,17 +15,26 @@ public sealed class ApplicationUpdateCoordinator : IDisposable
     private readonly IApplicationUpdateService _service;
     private readonly ISettingsUpdateQueue _settings;
     private readonly Func<AppSettings> _currentSettings;
+    private readonly Func<DateTimeOffset> _clock;
+    private readonly Func<ProcessStartInfo, Process?> _startInstaller;
+    private readonly string _pendingUpdatePath;
     private readonly SemaphoreSlim _downloadGate = new(1, 1);
     private CancellationTokenSource? _scheduledCheck;
 
     public ApplicationUpdateCoordinator(
         IApplicationUpdateService service,
         ISettingsUpdateQueue settings,
-        Func<AppSettings> currentSettings)
+        Func<AppSettings> currentSettings,
+        Func<DateTimeOffset>? clock = null,
+        Func<ProcessStartInfo, Process?>? startInstaller = null,
+        string? pendingUpdatePath = null)
     {
         _service = service;
         _settings = settings;
         _currentSettings = currentSettings;
+        _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _startInstaller = startInstaller ?? Process.Start;
+        _pendingUpdatePath = pendingUpdatePath ?? DefaultPendingUpdatePath();
     }
 
     public string CurrentVersion => GetCurrentVersion();
@@ -35,20 +44,59 @@ public sealed class ApplicationUpdateCoordinator : IDisposable
     public event EventHandler? StateChanged;
     public event EventHandler<ApplicationUpdateInfo>? UpdateAvailable;
 
-    public void ScheduleAutomaticCheck(TimeSpan? delay = null)
+    internal static bool ShouldRescheduleAutomaticCheck(bool wasEnabled, bool isEnabled) =>
+        !wasEnabled && isEnabled;
+
+    public void ScheduleAutomaticCheck(TimeSpan? delay = null, TimeSpan? interval = null)
     {
+        var initialDelay = delay ?? TimeSpan.FromSeconds(30);
+        var repeatInterval = interval ?? ApplicationUpdateService.CheckInterval;
+        if (initialDelay < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(delay));
+        if (repeatInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
         _scheduledCheck?.Cancel();
         _scheduledCheck?.Dispose();
         var cancellation = _scheduledCheck = new CancellationTokenSource();
-        _ = CheckAfterDelayAsync(delay ?? TimeSpan.FromSeconds(30), cancellation.Token);
+        _ = RunAutomaticChecksAsync(
+            initialDelay,
+            repeatInterval,
+            cancellation.Token);
     }
 
-    private async Task CheckAfterDelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+    private async Task RunAutomaticChecksAsync(
+        TimeSpan initialDelay,
+        TimeSpan interval,
+        CancellationToken cancellationToken)
     {
         try
         {
-            await Task.Delay(delay, cancellationToken);
-            await CheckAsync(force: false, cancellationToken);
+            await Task.Delay(initialDelay, cancellationToken);
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                ApplicationUpdateCheckResult? result = null;
+                try
+                {
+                    result = await CheckAsync(force: false, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception error)
+                {
+                    // An automatic check is background maintenance. A settings or
+                    // service failure must not terminate the app or the daily loop.
+                    Debug.WriteLine($"Automatic update check failed: {error}");
+                }
+
+                var nextDelay = interval;
+                if (result?.Status == UpdateCheckStatus.Throttled &&
+                    _currentSettings().LastUpdateCheckAt is { } lastCheck)
+                {
+                    nextDelay = lastCheck + ApplicationUpdateService.CheckInterval - _clock();
+                    if (nextDelay < TimeSpan.Zero) nextDelay = TimeSpan.Zero;
+                }
+                await Task.Delay(nextDelay, cancellationToken);
+            }
         }
         catch (OperationCanceledException) { }
     }
@@ -70,8 +118,11 @@ public sealed class ApplicationUpdateCoordinator : IDisposable
                 force,
                 cancellationToken);
 
-            if (result.Status is UpdateCheckStatus.Available or UpdateCheckStatus.UpToDate && result.CheckedAt is { } checkedAt)
+            if (result.Status is not UpdateCheckStatus.Disabled and not UpdateCheckStatus.Throttled)
             {
+                // "At most daily" applies to attempts, not only successful responses.
+                // Otherwise an offline machine contacts GitHub on every relaunch.
+                var checkedAt = result.CheckedAt ?? _clock();
                 await _settings.UpdateAsync(value => value with { LastUpdateCheckAt = checkedAt }, cancellationToken);
             }
 
@@ -135,18 +186,30 @@ public sealed class ApplicationUpdateCoordinator : IDisposable
 
     public void LaunchInstaller(DownloadedApplicationUpdate downloaded)
     {
-        WritePendingUpdate(downloaded.Update);
-        Process.Start(new ProcessStartInfo
+        try
         {
-            FileName = downloaded.InstallerPath,
-            Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH",
-            UseShellExecute = true,
-        });
+            WritePendingUpdate(downloaded.Update);
+            using var process = _startInstaller(new ProcessStartInfo
+            {
+                FileName = downloaded.InstallerPath,
+                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /RELAUNCH",
+                UseShellExecute = true,
+            });
+            if (process is null)
+            {
+                throw new InvalidOperationException("Windows did not start the CursorPocket installer.");
+            }
+        }
+        catch
+        {
+            DeletePendingUpdate();
+            throw;
+        }
     }
 
     public string? ConsumePendingUpdateResult()
     {
-        var path = PendingUpdatePath();
+        var path = _pendingUpdatePath;
         if (!File.Exists(path)) return null;
         try
         {
@@ -163,12 +226,17 @@ public sealed class ApplicationUpdateCoordinator : IDisposable
 
     private void WritePendingUpdate(ApplicationUpdateInfo update)
     {
-        var path = PendingUpdatePath();
+        var path = _pendingUpdatePath;
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, update.Version.ToString());
     }
 
-    private static string PendingUpdatePath() => Path.Combine(
+    private void DeletePendingUpdate()
+    {
+        try { File.Delete(_pendingUpdatePath); } catch (Exception error) when (error is IOException or UnauthorizedAccessException) { }
+    }
+
+    private static string DefaultPendingUpdatePath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CursorPocket",
         "pending-update.txt");

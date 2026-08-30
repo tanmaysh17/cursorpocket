@@ -38,6 +38,7 @@
     <Compile Include="..\CursorPocket.App\Services\WindowContextService.cs" Link="Interop\WindowContextService.cs" />
     <Compile Include="..\CursorPocket.App\Services\MediaDeviceCatalog.cs" Link="Services\MediaDeviceCatalog.cs" />
     <Compile Include="..\CursorPocket.App\Services\RecordingSessionCoordinator.cs" Link="Services\RecordingSessionCoordinator.cs" />
+    <Compile Include="..\CursorPocket.App\Services\ApplicationUpdateCoordinator.cs" Link="Services\ApplicationUpdateCoordinator.cs" />
     <Compile Include="..\CursorPocket.App\Services\TrayPresentation.cs" Link="Services\TrayPresentation.cs" />
   </ItemGroup>
 
