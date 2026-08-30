@@ -82,6 +82,38 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void Library_filters_share_the_action_toolbar_and_leave_the_list_full_height()
+    {
+        var page = ReadFixture("MainPage.xaml");
+        var code = ReadFixture("MainPage.xaml.cs.txt");
+        var toolbar = Section(
+            page,
+            "x:Name=\"LibraryToolbar\"",
+            "<Grid Grid.Row=\"1\" Margin=\"0,20,0,0\"");
+        var list = Section(
+            page,
+            "<Grid x:Name=\"ListPane\">",
+            "x:Name=\"DetailPane\"");
+
+        Assert.Contains("x:Name=\"FilterHost\"", toolbar, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FilterBar\"", toolbar, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LibraryToolbarCompact\"", toolbar, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LibraryToolbarWide\"", toolbar, StringComparison.Ordinal);
+        Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"920\" />", toolbar, StringComparison.Ordinal);
+        foreach (var filter in new[] { "All", "Screenshots", "Video", "Audio", "Text", "Links" })
+        {
+            Assert.Contains($"Tag=\"{filter}\"", toolbar, StringComparison.Ordinal);
+        }
+        Assert.DoesNotContain("HorizontalScrollMode", toolbar, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"LibraryListPane\"", list, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"FilterBar\"", list, StringComparison.Ordinal);
+        Assert.Contains(
+            "FilterHost.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible",
+            code,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Custom_acrylic_does_not_requery_the_default_configuration_during_theme_changes()
     {
         var theme = ReadFixture("ThemeCoordinator.cs.txt");

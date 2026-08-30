@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.16 — 2026-08-30
+
+- Moved the complete Library filter control into the shared action toolbar at wide widths, keeping every capture type visible and aligning the list with the preview.
+
 ## 0.4.15 — 2026-08-30
 
 - Prevented the app from crashing when switching between Light and Dark themes by keeping WinUI's connection-time Acrylic configuration and avoiding an invalid backdrop-target lookup during the theme callback.

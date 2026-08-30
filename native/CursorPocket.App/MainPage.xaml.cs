@@ -429,6 +429,7 @@ public sealed partial class MainPage : Page
     private void SetPreviewMaximized(bool maximized)
     {
         _previewMaximized = maximized;
+        FilterHost.Visibility = maximized ? Visibility.Collapsed : Visibility.Visible;
         if (maximized)
         {
             ListPane.Visibility = Visibility.Collapsed;
