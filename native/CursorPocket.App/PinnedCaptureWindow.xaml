@@ -45,8 +45,8 @@
             VerticalAlignment="Bottom"
             Opacity="0">
             <Border
-                Background="{ThemeResource PocketRaised}"
-                BorderBrush="{ThemeResource PocketLine}"
+                Background="{ThemeResource PocketMediaRaised}"
+                BorderBrush="{ThemeResource PocketMediaLine}"
                 BorderThickness="1"
                 CornerRadius="10" />
             <Grid Padding="6,0">
@@ -67,7 +67,7 @@
                         Height="24"
                         Data="M6,9 H18 M6,12 H18 M6,15 H18"
                         Stretch="None"
-                        Stroke="{ThemeResource PocketMuted}"
+                        Stroke="{ThemeResource PocketMediaMuted}"
                         StrokeEndLineCap="Round"
                         StrokeStartLineCap="Round"
                         StrokeThickness="2" />
@@ -78,6 +78,7 @@
                     Spacing="6">
                     <Button
                         Click="Edit_Click"
+                        Foreground="{ThemeResource PocketMediaInk}"
                         Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Mark up this screenshot"
                         ToolTipService.ToolTip="Mark up">
@@ -85,6 +86,7 @@
                     </Button>
                     <Button
                         Click="CopyPath_Click"
+                        Foreground="{ThemeResource PocketMediaInk}"
                         Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Copy the file path"
                         ToolTipService.ToolTip="Copy file path">
@@ -92,6 +94,7 @@
                     </Button>
                     <Button
                         Click="Copy_Click"
+                        Foreground="{ThemeResource PocketMediaInk}"
                         Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Copy this screenshot"
                         ToolTipService.ToolTip="Copy image · Ctrl+C">
@@ -99,6 +102,7 @@
                     </Button>
                     <Button
                         Click="Close_Click"
+                        Foreground="{ThemeResource PocketMediaInk}"
                         Style="{StaticResource PocketGhostButton}"
                         AutomationProperties.Name="Close this pin"
                         ToolTipService.ToolTip="Close · Esc or middle-click">

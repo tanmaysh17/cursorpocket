@@ -32,6 +32,14 @@
                     <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
                     <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
+                    <!-- Media chrome stays on a dense Pine surface in either app theme. -->
+                    <SolidColorBrush x:Key="PocketMediaInk" Color="#FFF6F4EC" />
+                    <SolidColorBrush x:Key="PocketMediaInkDim" Color="#FFCBD7D1" />
+                    <SolidColorBrush x:Key="PocketMediaMuted" Color="#FFAEBDB6" />
+                    <SolidColorBrush x:Key="PocketMediaRaised" Color="#ED151E1A" />
+                    <SolidColorBrush x:Key="PocketMediaLine" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="PocketMediaGreen" Color="#FF36E58C" />
+                    <SolidColorBrush x:Key="PocketMediaRed" Color="#FFFF5964" />
                     <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.48" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
                     <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.62" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
                     <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
@@ -47,25 +55,32 @@
                     </LinearGradientBrush>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
-                    <SolidColorBrush x:Key="PocketInk" Color="#FF15201C" />
-                    <SolidColorBrush x:Key="PocketInkDim" Color="#FF35443E" />
-                    <SolidColorBrush x:Key="PocketMuted" Color="#FF5F6E68" />
-                    <SolidColorBrush x:Key="PocketBase" Color="#FFF5F9F7" />
-                    <SolidColorBrush x:Key="PocketSunken" Color="#B8E4ECE8" />
-                    <SolidColorBrush x:Key="PocketSurface" Color="#A8F8FCFA" />
-                    <SolidColorBrush x:Key="PocketRaised" Color="#D1FFFFFF" />
-                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#D9F7FBF9" />
-                    <SolidColorBrush x:Key="PocketLine" Color="#29111D18" />
-                    <SolidColorBrush x:Key="PocketLineStrong" Color="#47111D18" />
-                    <SolidColorBrush x:Key="PocketOverlay" Color="#10111D18" />
-                    <SolidColorBrush x:Key="PocketGreen" Color="#FF168B52" />
-                    <SolidColorBrush x:Key="PocketGreenSoft" Color="#26168B52" />
-                    <SolidColorBrush x:Key="PocketOnGreen" Color="#FFFFFFFF" />
-                    <SolidColorBrush x:Key="PocketRed" Color="#FFD73546" />
-                    <SolidColorBrush x:Key="PocketRedSoft" Color="#24D73546" />
-                    <SolidColorBrush x:Key="PocketBlue" Color="#FF276EA8" />
-                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF5FAF7" TintOpacity="0.54" TintLuminosityOpacity="0.82" FallbackColor="#FFF5FAF7" />
-                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFFFFFF" TintOpacity="0.68" TintLuminosityOpacity="0.78" FallbackColor="#FFF8FCFA" />
+                    <SolidColorBrush x:Key="PocketInk" Color="#FF1F2925" />
+                    <SolidColorBrush x:Key="PocketInkDim" Color="#FF4E5C56" />
+                    <SolidColorBrush x:Key="PocketMuted" Color="#FF5E6B65" />
+                    <SolidColorBrush x:Key="PocketBase" Color="#FFF7F7F4" />
+                    <SolidColorBrush x:Key="PocketSunken" Color="#C9EAEAE5" />
+                    <SolidColorBrush x:Key="PocketSurface" Color="#CFF9F9F6" />
+                    <SolidColorBrush x:Key="PocketRaised" Color="#E8FCFCFA" />
+                    <SolidColorBrush x:Key="PocketTransientSurface" Color="#EDF9F9F6" />
+                    <SolidColorBrush x:Key="PocketLine" Color="#2B1F2925" />
+                    <SolidColorBrush x:Key="PocketLineStrong" Color="#501F2925" />
+                    <SolidColorBrush x:Key="PocketOverlay" Color="#101F2925" />
+                    <SolidColorBrush x:Key="PocketGreen" Color="#FF117A46" />
+                    <SolidColorBrush x:Key="PocketGreenSoft" Color="#24117A46" />
+                    <SolidColorBrush x:Key="PocketOnGreen" Color="#FFF9FBFA" />
+                    <SolidColorBrush x:Key="PocketRed" Color="#FFC52B3B" />
+                    <SolidColorBrush x:Key="PocketRedSoft" Color="#24C52B3B" />
+                    <SolidColorBrush x:Key="PocketBlue" Color="#FF24669A" />
+                    <SolidColorBrush x:Key="PocketMediaInk" Color="#FFF6F4EC" />
+                    <SolidColorBrush x:Key="PocketMediaInkDim" Color="#FFCBD7D1" />
+                    <SolidColorBrush x:Key="PocketMediaMuted" Color="#FFAEBDB6" />
+                    <SolidColorBrush x:Key="PocketMediaRaised" Color="#ED151E1A" />
+                    <SolidColorBrush x:Key="PocketMediaLine" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="PocketMediaGreen" Color="#FF36E58C" />
+                    <SolidColorBrush x:Key="PocketMediaRed" Color="#FFFF5964" />
+                    <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FFF7F7F4" TintOpacity="0.54" TintLuminosityOpacity="0.82" FallbackColor="#FFF7F7F4" />
+                    <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FFFCFCFA" TintOpacity="0.68" TintLuminosityOpacity="0.78" FallbackColor="#FFFCFCFA" />
                     <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
                     <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Offset="0" Color="#9AFFFFFF" />
@@ -96,6 +111,13 @@
                     <SolidColorBrush x:Key="PocketRed" Color="{ThemeResource SystemColorHotlightColor}" />
                     <SolidColorBrush x:Key="PocketRedSoft" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="PocketBlue" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="PocketMediaInk" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketMediaInkDim" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketMediaMuted" Color="{ThemeResource SystemColorGrayTextColor}" />
+                    <SolidColorBrush x:Key="PocketMediaRaised" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="PocketMediaLine" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="PocketMediaGreen" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="PocketMediaRed" Color="{ThemeResource SystemColorHotlightColor}" />
                     <SolidColorBrush x:Key="PocketGlassPanel" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="PocketGlassRaised" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="PocketGlassDense" Color="{ThemeResource SystemColorWindowColor}" />
@@ -103,40 +125,30 @@
                     <SolidColorBrush x:Key="PocketGlassTopEdge" Color="{ThemeResource SystemColorWindowTextColor}" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
-            <!-- Common fallback for the brief interval before a Page is attached to a
-                 themed window, and for Windows builds that do not expose a named app
-                 theme during XBF construction. Named theme dictionaries override it. -->
-            <SolidColorBrush x:Key="PocketInk" Color="#FFF6F4EC" />
-            <SolidColorBrush x:Key="PocketInkDim" Color="#FFCBD7D1" />
-            <SolidColorBrush x:Key="PocketMuted" Color="#FF8EA099" />
-            <SolidColorBrush x:Key="PocketBase" Color="#FF07130F" />
-            <SolidColorBrush x:Key="PocketSunken" Color="#A6070C0B" />
-            <SolidColorBrush x:Key="PocketSurface" Color="#8F101815" />
-            <SolidColorBrush x:Key="PocketRaised" Color="#B8161F1C" />
-            <SolidColorBrush x:Key="PocketTransientSurface" Color="#C2141E1A" />
-            <SolidColorBrush x:Key="PocketLine" Color="#24FFFFFF" />
-            <SolidColorBrush x:Key="PocketLineStrong" Color="#40FFFFFF" />
-            <SolidColorBrush x:Key="PocketOverlay" Color="#14FFFFFF" />
-            <SolidColorBrush x:Key="PocketGreen" Color="#FF36E58C" />
-            <SolidColorBrush x:Key="PocketGreenSoft" Color="#2636E58C" />
-            <SolidColorBrush x:Key="PocketOnGreen" Color="#FF07130F" />
-            <SolidColorBrush x:Key="PocketRed" Color="#FFFF5964" />
-            <SolidColorBrush x:Key="PocketRedSoft" Color="#29FF5964" />
-            <SolidColorBrush x:Key="PocketBlue" Color="#FF7AA7FF" />
-            <AcrylicBrush x:Key="PocketGlassPanel" TintColor="#FF101815" TintOpacity="0.48" TintLuminosityOpacity="0.72" FallbackColor="#FF101815" />
-            <AcrylicBrush x:Key="PocketGlassRaised" TintColor="#FF18231F" TintOpacity="0.62" TintLuminosityOpacity="0.68" FallbackColor="#FF18231F" />
-            <AcrylicBrush x:Key="PocketGlassDense" TintColor="#FF07130F" TintOpacity="0.84" TintLuminosityOpacity="0.48" FallbackColor="#FF09110F" />
-            <LinearGradientBrush x:Key="PocketGlassRim" StartPoint="0,0" EndPoint="1,1">
-                <GradientStop Offset="0" Color="#4AFFFFFF" />
-                <GradientStop Offset="0.5" Color="#10FFFFFF" />
-                <GradientStop Offset="1" Color="#26FFFFFF" />
-            </LinearGradientBrush>
-            <LinearGradientBrush x:Key="PocketGlassTopEdge" StartPoint="0,0" EndPoint="1,0">
-                <GradientStop Offset="0" Color="#00FFFFFF" />
-                <GradientStop Offset="0.5" Color="#66FFFFFF" />
-                <GradientStop Offset="1" Color="#00FFFFFF" />
-            </LinearGradientBrush>
+            <!-- Theme-specific resources must not be duplicated here. WinUI searches
+                 the current dictionary before its ThemeDictionaries, so a common dark
+                 fallback silently shadows Light and causes chalk text on paper glass. -->
             <SolidColorBrush x:Key="PocketTransparent" Color="Transparent" />
+
+            <!-- WinUI's stock controls otherwise inherit the user's unrelated Windows
+                 accent. These shared brushes are recoloured by ThemeCoordinator and
+                 aliased into the lightweight styling hooks used by our controls. -->
+            <SolidColorBrush x:Key="PocketControlAccent" Color="#FF36E58C" />
+            <SolidColorBrush x:Key="PocketControlAccentHover" Color="#FF46E795" />
+            <SolidColorBrush x:Key="PocketControlAccentPressed" Color="#FF58EAA0" />
+            <SolidColorBrush x:Key="PocketControlAccentDisabled" Color="#6636E58C" />
+            <StaticResource x:Key="NavigationViewSelectionIndicatorForeground" ResourceKey="PocketControlAccent" />
+            <StaticResource x:Key="ToggleSwitchFillOn" ResourceKey="PocketControlAccent" />
+            <StaticResource x:Key="ToggleSwitchFillOnPointerOver" ResourceKey="PocketControlAccentHover" />
+            <StaticResource x:Key="ToggleSwitchFillOnPressed" ResourceKey="PocketControlAccentPressed" />
+            <StaticResource x:Key="ToggleSwitchFillOnDisabled" ResourceKey="PocketControlAccentDisabled" />
+            <StaticResource x:Key="ToggleSwitchStrokeOn" ResourceKey="PocketControlAccent" />
+            <StaticResource x:Key="ToggleSwitchStrokeOnPointerOver" ResourceKey="PocketControlAccentHover" />
+            <StaticResource x:Key="ToggleSwitchStrokeOnPressed" ResourceKey="PocketControlAccentPressed" />
+            <StaticResource x:Key="SliderTrackValueFill" ResourceKey="PocketControlAccent" />
+            <StaticResource x:Key="SliderTrackValueFillPointerOver" ResourceKey="PocketControlAccentHover" />
+            <StaticResource x:Key="SliderTrackValueFillPressed" ResourceKey="PocketControlAccentPressed" />
+            <StaticResource x:Key="SliderTrackValueFillDisabled" ResourceKey="PocketControlAccentDisabled" />
 
             <!--  Annotation ink. These are the user's marks, not app state, and that is
                   exactly why none of them is a state token: a green arrow on a surface

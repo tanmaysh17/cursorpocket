@@ -40,8 +40,9 @@ public sealed class AnnotationContractTests
         // one key worked until a toolbar button had been clicked.
         Assert.Contains("x:Name=\"CanvasHost\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsTabStop=\"True\"", xaml, StringComparison.Ordinal);
-        // No focus ring: this host exists to receive keys, not to look selected.
-        Assert.Contains("UseSystemFocusVisuals=\"False\"", xaml, StringComparison.Ordinal);
+        // Keyboard users still need a visible focus cue when they explicitly tab back
+        // to the drawing surface; programmatic focus does not flash the ring on launch.
+        Assert.Contains("UseSystemFocusVisuals=\"True\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("DrawingSurface.Focus(", code, StringComparison.Ordinal);
 
         // Focus must land on Loaded. Activated fires before the content tree exists, so

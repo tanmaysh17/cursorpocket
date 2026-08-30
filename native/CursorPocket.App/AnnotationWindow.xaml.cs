@@ -2333,7 +2333,13 @@ public sealed partial class AnnotationWindow : Window
         OutputLabel.Visibility = Visibility.Collapsed;
         ToolContextHost.Spacing = 2;
         OutputHost.Spacing = 2;
-        StatusRow.Visibility = Visibility.Collapsed;
+        // Keep the safety/state teaching visible when display scale forces this
+        // layout. Pointer and in-progress geometry are secondary; active variant,
+        // redaction recoverability, output size, and discard remain essential.
+        StatusRow.ColumnSpacing = 8;
+        StatusPointerText.Visibility = Visibility.Collapsed;
+        StatusSizeText.Visibility = Visibility.Collapsed;
+        StatusKeysButton.Visibility = Visibility.Collapsed;
         foreach (var button in OutputHost.Children.OfType<Button>()) button.MinHeight = 36;
     }
 

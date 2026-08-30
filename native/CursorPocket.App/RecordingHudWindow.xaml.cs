@@ -90,7 +90,7 @@ public sealed partial class RecordingHudWindow : Window
 
     private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
     {
-        var brush = App.Theme.Brush("PocketGreen");
+        var brush = App.Theme.Brush("PocketMediaGreen");
         foreach (var bar in _collapsedBars.Concat(_expandedBars)) bar.Fill = brush;
     });
 
@@ -153,7 +153,7 @@ public sealed partial class RecordingHudWindow : Window
         RadiusX = width / 2,
         RadiusY = width / 2,
         VerticalAlignment = VerticalAlignment.Center,
-        Fill = App.Theme.Brush("PocketGreen"),
+        Fill = App.Theme.Brush("PocketMediaGreen"),
     };
 
     private void RenderMeters()
