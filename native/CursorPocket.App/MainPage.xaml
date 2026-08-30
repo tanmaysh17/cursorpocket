@@ -73,12 +73,45 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid VerticalAlignment="Bottom">
+                    <Grid x:Name="LibraryToolbar" VerticalAlignment="Bottom">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup>
+                                <VisualState x:Name="LibraryToolbarCompact">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowWidth="0" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="FilterHost.(Grid.Row)" Value="2" />
+                                        <Setter Target="FilterHost.(Grid.Column)" Value="0" />
+                                        <Setter Target="FilterHost.(Grid.ColumnSpan)" Value="2" />
+                                        <Setter Target="FilterHost.HorizontalAlignment" Value="Left" />
+                                        <Setter Target="FilterHost.Margin" Value="0,12,0,0" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                                <VisualState x:Name="LibraryToolbarWide">
+                                    <VisualState.StateTriggers>
+                                        <AdaptiveTrigger MinWindowWidth="920" />
+                                    </VisualState.StateTriggers>
+                                    <VisualState.Setters>
+                                        <Setter Target="FilterHost.(Grid.Row)" Value="1" />
+                                        <Setter Target="FilterHost.(Grid.Column)" Value="1" />
+                                        <Setter Target="FilterHost.(Grid.ColumnSpan)" Value="1" />
+                                        <Setter Target="FilterHost.HorizontalAlignment" Value="Right" />
+                                        <Setter Target="FilterHost.Margin" Value="16,16,0,0" />
+                                    </VisualState.Setters>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <StackPanel Spacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.ColumnSpan="2" Spacing="6">
                             <TextBlock Style="{StaticResource PocketDisplayText}" Text="Everything you caught" />
                             <TextBlock
                                 FontSize="13"
@@ -87,6 +120,7 @@
                         </StackPanel>
                         <StackPanel
                             Grid.Row="1"
+                            Grid.Column="0"
                             Margin="0,16,0,0"
                             HorizontalAlignment="Left"
                             Orientation="Horizontal"
@@ -116,6 +150,57 @@
                                 </StackPanel>
                             </Button>
                         </StackPanel>
+                        <Border
+                            x:Name="FilterHost"
+                            Grid.Row="2"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="2"
+                            Margin="0,12,0,0"
+                            Padding="3"
+                            HorizontalAlignment="Left"
+                            Background="{ThemeResource PocketSunken}"
+                            BorderBrush="{ThemeResource PocketLine}"
+                            BorderThickness="1"
+                            CornerRadius="10">
+                            <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="All">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="All" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AllCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Screenshots">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="Screenshots" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.ScreenshotCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Video">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="Video" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.VideoCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Audio">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="Audio" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AudioCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Text">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="Text" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.TextCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Links">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <TextBlock Text="Links" />
+                                        <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.LinkCount, Mode=OneWay}" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <Grid Grid.Row="1" Margin="0,20,0,0" ColumnSpacing="16">
@@ -150,73 +235,15 @@
                         </VisualStateManager.VisualStateGroups>
                         <Grid.ColumnDefinitions>
                             <!--  The preview gets almost two thirds of a wide Library. Filters
-                                  stay with the list instead of reserving a blank row over the
-                                  preview. DetailColumn collapses in the narrow state; preview-only
-                                  mode spans DetailPane across both columns.  -->
+                                  live in the shared toolbar above both panes so all six remain
+                                  visible and the list aligns with the preview. DetailColumn collapses
+                                  in the narrow state; preview-only mode spans both columns.  -->
                             <ColumnDefinition Width="35*" MinWidth="280" />
                             <ColumnDefinition x:Name="DetailColumn" Width="65*" MinWidth="308" />
                         </Grid.ColumnDefinitions>
 
                         <Grid x:Name="ListPane">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <ScrollViewer
-                                Margin="0,0,0,12"
-                                HorizontalScrollBarVisibility="Hidden"
-                                HorizontalScrollMode="Enabled"
-                                VerticalScrollBarVisibility="Disabled"
-                                VerticalScrollMode="Disabled">
-                                <Border
-                                    Padding="3"
-                                    HorizontalAlignment="Left"
-                                    Background="{ThemeResource PocketSunken}"
-                                    BorderBrush="{ThemeResource PocketLine}"
-                                    BorderThickness="1"
-                                    CornerRadius="10">
-                                    <StackPanel x:Name="FilterBar" Orientation="Horizontal" Spacing="2">
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="All">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="All" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AllCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Screenshots">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="Screenshots" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.ScreenshotCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Video">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="Video" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.VideoCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Audio">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="Audio" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.AudioCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Text">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="Text" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.TextCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Click="Filter_Click" Style="{StaticResource FilterPill}" Tag="Links">
-                                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                                <TextBlock Text="Links" />
-                                                <TextBlock Style="{StaticResource PocketNumericText}" FontSize="11" Text="{x:Bind ViewModel.LinkCount, Mode=OneWay}" />
-                                            </StackPanel>
-                                        </Button>
-                                    </StackPanel>
-                                </Border>
-                            </ScrollViewer>
-
-                            <Border x:Name="LibraryListPane" Grid.Row="1" Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
+                            <Border x:Name="LibraryListPane" Style="{StaticResource PocketCard}" Background="{ThemeResource PocketGlassPanel}">
                                 <Grid>
                                 <ListView
                                     x:Name="CaptureList"
