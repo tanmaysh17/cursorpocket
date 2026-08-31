@@ -62,6 +62,11 @@
                 <NavigationViewItem x:Name="LibraryNav" Content="Library" Icon="Pictures" IsSelected="True" Tag="library" />
                 <NavigationViewItem x:Name="CaptureNav" Content="Capture" Icon="Camera" Tag="capture" />
                 <NavigationViewItem x:Name="SettingsNav" Content="Settings" Icon="Setting" Tag="settings" />
+                <NavigationViewItem x:Name="FeedbackNav" Content="Feedback" Tag="feedback">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE939;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <Grid>
@@ -1370,10 +1375,10 @@
                                 Text="Privacy" />
                             <Border Style="{StaticResource PocketCard}" Background="Transparent" BorderThickness="0">
                                 <StackPanel Padding="16,14" Spacing="6">
-                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="No account, no analytics, no upload" />
+                                    <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="No CursorPocket account, analytics, or automatic upload" />
                                     <TextBlock
                                         Style="{StaticResource PocketCaptionText}"
-                                        Text="There is no cloud service, analytics, or AI service. Your microphone and camera open only after you choose a recording action, and close when it ends. The optional update check reads only the public release file described above."
+                                        Text="There is no CursorPocket cloud service, analytics, or AI service. Your microphone and camera open only after you choose a recording action, and close when it ends. Updates read the public release file; Feedback sends only the draft you review when you explicitly open GitHub."
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
@@ -1412,6 +1417,149 @@
                         </Grid>
                     </ScrollViewer>
 
+                </Grid>
+
+                <!--  ============================ FEEDBACK ============================  -->
+                <Grid x:Name="FeedbackPanel" Visibility="Collapsed">
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <Grid Padding="28,22,28,28">
+                            <StackPanel
+                                MaxWidth="760"
+                                HorizontalAlignment="Center"
+                                Spacing="22">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Style="{StaticResource PocketDisplayText}" Text="Feedback" />
+                                    <TextBlock
+                                        MaxWidth="620"
+                                        HorizontalAlignment="Left"
+                                        Style="{StaticResource PocketCaptionText}"
+                                        Text="One sentence is enough. CursorPocket prepares the issue, then GitHub lets you review it before posting."
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <Border Style="{StaticResource PocketCard}">
+                                    <StackPanel Padding="20" Spacing="18">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel VerticalAlignment="Center" Spacing="3">
+                                                <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="What kind of feedback is this?" />
+                                                <TextBlock
+                                                    Style="{StaticResource PocketCaptionText}"
+                                                    Text="This only changes the issue title."
+                                                    TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ComboBox
+                                                x:Name="FeedbackCategoryBox"
+                                                Grid.Column="1"
+                                                Width="180"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.Name="Feedback category"
+                                                SelectedIndex="0">
+                                                <ComboBoxItem Content="General feedback" Tag="general" />
+                                                <ComboBoxItem Content="Idea" Tag="idea" />
+                                                <ComboBoxItem Content="Problem" Tag="problem" />
+                                            </ComboBox>
+                                        </Grid>
+
+                                        <Rectangle Height="1" Fill="{ThemeResource PocketLine}" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Style="{StaticResource PocketBodyStrongText}" Text="What would make CursorPocket better?" />
+                                            <TextBox
+                                                x:Name="FeedbackMessageTextBox"
+                                                MinHeight="168"
+                                                AcceptsReturn="True"
+                                                AutomationProperties.Name="Feedback message"
+                                                MaxLength="2000"
+                                                PlaceholderText="Tell us what happened or what you wish it did."
+                                                TextChanged="FeedbackMessage_TextChanged"
+                                                TextWrapping="Wrap" />
+                                            <TextBlock
+                                                x:Name="FeedbackCharacterCountText"
+                                                HorizontalAlignment="Right"
+                                                Style="{StaticResource PocketMetaText}"
+                                                Text="0 / 2,000" />
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="FeedbackCrashOptionPanel" Spacing="6" Visibility="Collapsed">
+                                            <CheckBox
+                                                x:Name="IncludeCrashDetailsCheckBox"
+                                                AutomationProperties.Name="Include recent crash details"
+                                                Checked="IncludeCrashDetails_Changed"
+                                                Content="Include recent crash details"
+                                                Unchecked="IncludeCrashDetails_Changed" />
+                                            <TextBlock
+                                                Margin="28,0,0,0"
+                                                Style="{StaticResource PocketCaptionText}"
+                                                Text="The latest local crash entry is shortened and private paths and device names are removed."
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Expander
+                                            x:Name="FeedbackDetailsExpander"
+                                            AutomationProperties.Name="Review the system details included with feedback"
+                                            Header="Review details">
+                                            <Border
+                                                Margin="0,8,0,0"
+                                                Padding="14,12"
+                                                Background="{ThemeResource PocketSunken}"
+                                                CornerRadius="8">
+                                                <TextBlock
+                                                    x:Name="FeedbackDetailsText"
+                                                    FontFamily="Cascadia Mono"
+                                                    FontSize="13"
+                                                    Foreground="{ThemeResource PocketInkDim}"
+                                                    IsTextSelectionEnabled="True"
+                                                    TextWrapping="Wrap" />
+                                            </Border>
+                                        </Expander>
+
+                                        <TextBlock
+                                            Style="{StaticResource PocketCaptionText}"
+                                            Text="GitHub issues are public. Opening GitHub sends the displayed draft to GitHub so it can fill in the issue. Nothing is posted until you submit it there."
+                                            TextWrapping="Wrap" />
+
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                x:Name="FeedbackStatusText"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.Name="Feedback status"
+                                                Style="{StaticResource PocketMetaText}"
+                                                Text="Your draft stays in CursorPocket."
+                                                TextWrapping="Wrap" />
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                <Button
+                                                    x:Name="CopyFeedbackDraftButton"
+                                                    AutomationProperties.Name="Copy feedback draft"
+                                                    Click="CopyFeedbackDraft_Click"
+                                                    Content="Copy draft"
+                                                    IsEnabled="False"
+                                                    Style="{StaticResource PocketQuietButton}" />
+                                                <Button
+                                                    x:Name="OpenGitHubIssueButton"
+                                                    AutomationProperties.Name="Open a prefilled public GitHub issue"
+                                                    Click="OpenGitHubIssue_Click"
+                                                    Content="Open GitHub issue"
+                                                    IsEnabled="False"
+                                                    Style="{StaticResource PocketPrimaryButton}">
+                                                    <Button.KeyboardAccelerators>
+                                                        <KeyboardAccelerator Key="Enter" Modifiers="Control" />
+                                                    </Button.KeyboardAccelerators>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </NavigationView>

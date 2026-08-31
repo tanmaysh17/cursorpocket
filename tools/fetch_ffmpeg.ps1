@@ -7,10 +7,11 @@ $cacheDir = Join-Path $thirdPartyRoot "cache"
 $destinationExe = Join-Path $binaryDir "ffmpeg.exe"
 $destinationLicense = Join-Path $thirdPartyRoot "LICENSE.txt"
 
-$archiveName = "ffmpeg-n8.1.2-44-g7c533d0f86-win64-lgpl-8.1.zip"
-$archiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-17-13-05/$archiveName"
-$archiveSha256 = "BDA492675BDB354AC55F93B96AF2DBB35BABEF7DE264C37D4FF83E022831B19D"
-$executableSha256 = "E8E106D6F6A4166747FBD7374FBF47FFC4D2DD883520C3558FEEAC0281A2712D"
+# BtbN retains the last autobuild of each month for two years; mid-month builds are pruned.
+$archiveName = "ffmpeg-n8.1.2-50-g1a748fe2cd-win64-lgpl-8.1.zip"
+$archiveUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-31-13-27/$archiveName"
+$archiveSha256 = "F6274BBD9C247F9E90C1BBED066B03ED4A3907CECE2FB91BE6DD352393936365"
+$executableSha256 = "9C60DA6C0B083110D59084EA39F60AE149AA3E031C3B4BB4F573FAFA1C1E7CEA"
 
 function Assert-FfmpegCapabilities([string]$executablePath) {
     $version = (& $executablePath -hide_banner -version 2>&1 | Out-String).ToLowerInvariant()

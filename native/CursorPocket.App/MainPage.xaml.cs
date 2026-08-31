@@ -1,3 +1,4 @@
+using CursorPocket.Core.Feedback;
 using CursorPocket.Core.Models;
 using CursorPocket_App.ViewModels;
 using Microsoft.UI.Xaml;
@@ -26,6 +27,8 @@ public sealed partial class MainPage : Page
     private bool _startingTextEdit;
     private bool _textDetailLoadedFromFile;
     private bool _themeSubscribed;
+    private FeedbackSystemContext? _feedbackSystemContext;
+    private FeedbackDiagnosticExcerpt? _feedbackCrashDetails;
 
     public MainPage()
     {
@@ -64,6 +67,7 @@ public sealed partial class MainPage : Page
         {
             "capture" => CaptureNav,
             "settings" => SettingsNav,
+            "feedback" => FeedbackNav,
             _ => LibraryNav,
         };
     }
@@ -93,6 +97,7 @@ public sealed partial class MainPage : Page
         ApplyThemeModeSelection();
         ShowActivationShortcut();
         RefreshUpdateStatus();
+        RefreshFeedbackContext();
         // A tray-only launch has nothing on screen, so reading the manifest and
         // materializing every row can wait until the window is actually revealed.
         if (!App.StartedInBackground)
@@ -174,8 +179,8 @@ public sealed partial class MainPage : Page
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs eventArgs)
     {
         // SelectionChanged can fire while InitializeComponent is still constructing
-        // the page, before the three named panels have been assigned.
-        if (LibraryPanel is null || CapturePanel is null || SettingsPanel is null)
+        // the page, before the four named panels have been assigned.
+        if (LibraryPanel is null || CapturePanel is null || SettingsPanel is null || FeedbackPanel is null)
         {
             return;
         }
@@ -189,6 +194,12 @@ public sealed partial class MainPage : Page
         LibraryPanel.Visibility = tag == "library" ? Visibility.Visible : Visibility.Collapsed;
         CapturePanel.Visibility = tag == "capture" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPanel.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        FeedbackPanel.Visibility = tag == "feedback" ? Visibility.Visible : Visibility.Collapsed;
+        if (tag == "feedback")
+        {
+            RefreshFeedbackContext();
+            FeedbackMessageTextBox.Focus(FocusState.Programmatic);
+        }
     }
 
     private void CaptureStore_CaptureCompleted(object? sender, CaptureCompletedEventArgs eventArgs)
@@ -668,6 +679,145 @@ public sealed partial class MainPage : Page
         CheckForUpdatesButton.IsEnabled = !App.Services.Updates.IsChecking && !App.Services.Updates.IsDownloading;
     }
 
+    private void RefreshFeedbackContext()
+    {
+        if (FeedbackDetailsText is null || FeedbackCrashOptionPanel is null)
+        {
+            return;
+        }
+        _feedbackSystemContext = Services.FeedbackContextService.CreateSystemContext(
+            App.Window,
+            App.Services.Updates.CurrentVersion.ToString());
+        _feedbackCrashDetails = Services.FeedbackContextService.TryReadRecentCrash(App.Services.Settings);
+        FeedbackCrashOptionPanel.Visibility = _feedbackCrashDetails is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (_feedbackCrashDetails is null && IncludeCrashDetailsCheckBox is not null)
+        {
+            IncludeCrashDetailsCheckBox.IsChecked = false;
+        }
+        RefreshFeedbackDetailsPreview();
+    }
+
+    private void FeedbackMessage_TextChanged(object sender, TextChangedEventArgs eventArgs)
+    {
+        if (FeedbackCharacterCountText is null ||
+            OpenGitHubIssueButton is null ||
+            CopyFeedbackDraftButton is null)
+        {
+            return;
+        }
+        var length = FeedbackMessageTextBox.Text.Length;
+        var hasMessage = !string.IsNullOrWhiteSpace(FeedbackMessageTextBox.Text);
+        FeedbackCharacterCountText.Text = $"{length:N0} / {FeedbackIssueComposer.MaximumMessageLength:N0}";
+        OpenGitHubIssueButton.IsEnabled = hasMessage;
+        CopyFeedbackDraftButton.IsEnabled = hasMessage;
+        SetFeedbackStatus("Your draft stays in CursorPocket.");
+    }
+
+    private void IncludeCrashDetails_Changed(object sender, RoutedEventArgs eventArgs) =>
+        RefreshFeedbackDetailsPreview();
+
+    private void RefreshFeedbackDetailsPreview()
+    {
+        if (_feedbackSystemContext is null || FeedbackDetailsText is null)
+        {
+            return;
+        }
+        var crash = IncludeCrashDetailsCheckBox?.IsChecked == true
+            ? _feedbackCrashDetails
+            : null;
+        FeedbackDetailsText.Text = FeedbackIssueComposer.BuildDetails(_feedbackSystemContext, crash);
+    }
+
+    private FeedbackIssueDocument ComposeFeedbackDraft()
+    {
+        _feedbackSystemContext ??= Services.FeedbackContextService.CreateSystemContext(
+            App.Window,
+            App.Services.Updates.CurrentVersion.ToString());
+        var category = FeedbackCategoryBox.SelectedIndex switch
+        {
+            1 => FeedbackCategory.Idea,
+            2 => FeedbackCategory.Problem,
+            _ => FeedbackCategory.General,
+        };
+        return FeedbackIssueComposer.Compose(new FeedbackDraft(
+            category,
+            FeedbackMessageTextBox.Text,
+            _feedbackSystemContext,
+            IncludeCrashDetailsCheckBox.IsChecked == true ? _feedbackCrashDetails : null));
+    }
+
+    private bool TryComposeFeedbackDraft(out FeedbackIssueDocument? document)
+    {
+        try
+        {
+            document = ComposeFeedbackDraft();
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            document = null;
+            SetFeedbackStatus("Write a short note before opening GitHub.", isError: true);
+            FeedbackMessageTextBox.Focus(FocusState.Programmatic);
+            return false;
+        }
+    }
+
+    private void OpenGitHubIssue_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!TryComposeFeedbackDraft(out var document) || document is null)
+        {
+            return;
+        }
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(document.IssueUri.AbsoluteUri)
+            {
+                UseShellExecute = true,
+            });
+            SetFeedbackStatus("Draft opened in GitHub · review it there before posting");
+        }
+        catch (Exception exception) when (
+            exception is InvalidOperationException or System.ComponentModel.Win32Exception or FileNotFoundException)
+        {
+            SetFeedbackStatus("GitHub could not open · copy the draft and open GitHub in your browser", isError: true);
+        }
+    }
+
+    private void CopyFeedbackDraft_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        if (!TryComposeFeedbackDraft(out var document) || document is null)
+        {
+            return;
+        }
+        try
+        {
+            var package = new DataPackage();
+            package.SetText(document.ClipboardText);
+            Clipboard.SetContent(package);
+            Clipboard.Flush();
+            SetFeedbackStatus("Feedback draft copied");
+        }
+        catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or InvalidOperationException)
+        {
+            SetFeedbackStatus("The draft could not be copied · try again", isError: true);
+        }
+    }
+
+    private void SetFeedbackStatus(string message, bool isError = false)
+    {
+        if (FeedbackStatusText is null)
+        {
+            return;
+        }
+        FeedbackStatusText.Text = message;
+        FeedbackStatusText.Foreground = App.Theme.Brush(isError ? "PocketRed" : "PocketMuted");
+        AutomationProperties.SetLiveSetting(
+            FeedbackStatusText,
+            isError ? AutomationLiveSetting.Assertive : AutomationLiveSetting.Polite);
+    }
+
     private void ThemeMode_Click(object sender, RoutedEventArgs eventArgs)
     {
         if (sender is Button { Tag: string value } && int.TryParse(value, out var index))
@@ -901,6 +1051,7 @@ public sealed partial class MainPage : Page
         CaptureList.IsEnabled = enabled;
         CaptureNav.IsEnabled = enabled;
         SettingsNav.IsEnabled = enabled;
+        FeedbackNav.IsEnabled = enabled;
         MaximizePreviewButton.IsEnabled = enabled;
     }
 

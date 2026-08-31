@@ -266,7 +266,7 @@ These are deferred so the first release can make the core promise dependable: lo
 
 ## Implementation record
 
-- The legal/backend gate uses BtbN `autobuild-2026-08-17-13-05`, artifact `ffmpeg-n8.1.2-44-g7c533d0f86-win64-lgpl-8.1.zip`, archive SHA-256 `BDA492675BDB354AC55F93B96AF2DBB35BABEF7DE264C37D4FF83E022831B19D`, and executable SHA-256 `E8E106D6F6A4166747FBD7374FBF47FFC4D2DD883520C3558FEEAC0281A2712D`.
+- The legal/backend gate uses BtbN month-end release `autobuild-2026-08-31-13-27`, artifact `ffmpeg-n8.1.2-50-g1a748fe2cd-win64-lgpl-8.1.zip`, archive SHA-256 `F6274BBD9C247F9E90C1BBED066B03ED4A3907CECE2FB91BE6DD352393936365`, and executable SHA-256 `9C60DA6C0B083110D59084EA39F60AE149AA3E031C3B4BB4F573FAFA1C1E7CEA`.
 - Four real-device 15-second gates passed on the target machine: screen, screen + microphone, screen + webcam, and screen + microphone + webcam. The combined gate produced 449 of 450 expected frames with 15.04 seconds of audio.
 - DirectShow microphone and camera inputs are intentionally separate and opened before Desktop Duplication. The planned combined DirectShow input hung during shutdown on the target hardware; the separate-input pipeline stopped cleanly and synchronized correctly.
 - The frozen app packages only `ffmpeg.exe`; the same executable performs media validation, avoiding a second 114 MB `ffprobe.exe` while preserving the validation gate.

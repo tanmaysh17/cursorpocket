@@ -50,6 +50,50 @@ public sealed class MainPageContractTests
     }
 
     [Fact]
+    public void Feedback_is_a_permanent_destination_with_one_deliberate_action()
+    {
+        var xamlPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainPage.xaml");
+        var codePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainPage.xaml.cs.txt");
+        var xaml = File.ReadAllText(xamlPath);
+        var code = File.ReadAllText(codePath);
+        var panelStart = xaml.IndexOf("x:Name=\"FeedbackPanel\"", StringComparison.Ordinal);
+
+        Assert.True(panelStart >= 0, "The Feedback panel was not found.");
+        var panel = xaml[panelStart..];
+        Assert.Contains("x:Name=\"FeedbackNav\" Content=\"Feedback\" Tag=\"feedback\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("FeedbackPanel.Visibility = tag == \"feedback\"", code, StringComparison.Ordinal);
+        Assert.Contains("\"feedback\" => FeedbackNav", code, StringComparison.Ordinal);
+        Assert.Contains("FeedbackNav.IsEnabled = enabled", code, StringComparison.Ordinal);
+        Assert.Single(Regex.Matches(panel, "Style=\"\\{StaticResource PocketPrimaryButton\\}\"").Cast<Match>());
+        Assert.Contains("Content=\"Open GitHub issue\"", panel, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Copy draft\"", panel, StringComparison.Ordinal);
+        Assert.Contains("Modifiers=\"Control\"", panel, StringComparison.Ordinal);
+        Assert.Contains("Key=\"Enter\"", panel, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Feedback_handoff_is_reviewable_explicit_and_privacy_bounded()
+    {
+        var xamlPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainPage.xaml");
+        var codePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainPage.xaml.cs.txt");
+        var xaml = File.ReadAllText(xamlPath);
+        var code = File.ReadAllText(codePath);
+
+        Assert.Contains("MaxLength=\"2000\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FeedbackDetailsExpander\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"FeedbackCrashOptionPanel\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"IncludeCrashDetailsCheckBox\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("GitHub issues are public", xaml, StringComparison.Ordinal);
+        Assert.Contains("Nothing is posted until you submit it there", xaml, StringComparison.Ordinal);
+        Assert.Contains("FeedbackIssueComposer.BuildDetails", code, StringComparison.Ordinal);
+        Assert.Contains("FeedbackContextService.TryReadRecentCrash", code, StringComparison.Ordinal);
+        Assert.Contains("UseShellExecute = true", code, StringComparison.Ordinal);
+        Assert.Contains("review it there before posting", code, StringComparison.Ordinal);
+        Assert.Contains("GitHub could not open · copy the draft", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("FeedbackMessageTextBox.Text = string.Empty", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Text_captures_open_and_edit_inside_the_library()
     {
         var xamlPath = Path.Combine(AppContext.BaseDirectory, "Fixtures", "MainPage.xaml");
@@ -111,6 +155,7 @@ public sealed class MainPageContractTests
             "button.IsEnabled = enabled",
             "CaptureNav.IsEnabled = enabled",
             "SettingsNav.IsEnabled = enabled",
+            "FeedbackNav.IsEnabled = enabled",
             "MaximizePreviewButton.IsEnabled = enabled",
             "requireFullText: true",
             "_textDetailLoadedFromFile = true",

@@ -120,6 +120,12 @@ When a newer release is available, CursorPocket asks before downloading. It acce
 
 Early builds that still require a Tanmay Sharma code-signing certificate cannot install the first unsigned release automatically. Install version 0.4.1 manually from this repository once; automatic updates are seamless from 0.4.1 onward.
 
+## Send feedback
+
+Choose **Feedback** in the main window, select General feedback, Idea, or Problem, and write a short note. CursorPocket shows the app version, Windows version, architecture, and display scale that will accompany it. If a local crash report exists, you can explicitly include a shortened copy after reviewing it; private paths and known capture or device names are removed.
+
+**Open GitHub issue** sends the displayed draft to GitHub to prefill a public issue, but does not post it. Review and submit the issue in your browser. CursorPocket keeps the in-app draft for the rest of the session, and **Copy draft** remains available if the browser cannot open.
+
 ## Native Windows build
 
 The current application is a native .NET 8 / WinUI 3 x64 build. It is self-contained and does not require Python on the destination PC.
@@ -158,5 +164,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) before changing capture behavior or packa
 - The screen, microphone, and webcam are accessed only after you explicitly start a capture; active recording is shown with a red cursor and recording HUD.
 - CursorPocket never records keystrokes or continuously records the screen.
 - The optional update check reads one public GitHub Pages JSON file daily and sends no custom identifiers or content. The app remains fully usable offline.
+- Feedback contacts GitHub only when you choose **Open GitHub issue**. It sends the draft and visible system details needed to prefill a public issue; recent crash details are unchecked by default and included only after you review and select them. CursorPocket never reads or adds captures, the capture index, settings, capture paths, or device names to the draft.
 - Text is copied only from the selection you explicitly highlighted. Link capture briefly reads the active supported browser's address bar. Both actions use the Windows clipboard and replace its current contents with the captured text or URL.
 - This project focuses on fast local capture. It does not reproduce Clicky's AI assistant or screen-reading features.

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.19 — 2026-08-31
+
+- Added a permanent Feedback destination with a focused, keyboard-accessible composer that opens a reviewed draft as a prefilled public GitHub issue or copies it to the clipboard.
+- Kept feedback drafts in memory and made recent crash details explicitly opt-in, reviewable, truncated, and stripped of private paths and capture or device metadata.
+- Re-pinned the verified LGPL FFmpeg dependency to an upstream month-end build with two-year retention so clean release runners can keep producing installers.
+
 ## 0.4.18 — 2026-08-30
 
 - Made automatic updates reliably check at most once per day, retry while CursorPocket stays open, resume shortly after being enabled, and stay silent during active capture work until the user can approve the install.
