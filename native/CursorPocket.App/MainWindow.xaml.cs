@@ -234,6 +234,11 @@ public sealed partial class MainWindow : Window
             case "settings":
                 ShowSettings();
                 break;
+            case "feedback":
+                AppWindow.Show(true);
+                page?.NavigateTo("feedback");
+                ActivateMainWindow();
+                break;
             case "onboarding":
             case "welcome":
                 ShowOnboarding();

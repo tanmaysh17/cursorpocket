@@ -186,6 +186,14 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
 - Media-specific previews and playback are first-class; recoverable deletion always goes to Recycle Bin.
 
+### Feedback
+
+- Feedback is a permanent destination in the persistent main window, never a post-capture interruption, tray command, or command-mode action. Its one job is to turn a short field note into a reviewable public GitHub issue.
+- The surface has one multiline message, an optional General/Idea/Problem category that changes only the issue title, and one green primary action: **Open GitHub issue**. `Ctrl+Enter` invokes the same action. The draft remains in memory after GitHub opens because CursorPocket cannot know whether it was posted.
+- Opening GitHub sends the displayed title and body to GitHub to prefill the issue; it never posts or authenticates on the user's behalf. The surface says that issues are public before the action, and Copy draft remains available when a browser cannot open.
+- App version, Windows version and architecture, and active display scale are always visible in the review details. The latest local crash entry is available only through an unchecked opt-in, is truncated and stripped of paths and known private values, and is shown exactly as it will be included.
+- CursorPocket never reads or adds captures, capture metadata, settings files, capture or device names, or clipboard contents to a feedback draft. There is no feedback backend, telemetry, automatic prompt, or background submission.
+
 ### Updates and public distribution
 
 - The friend-facing path is one per-user `CursorPocket-Setup-x64.exe` linked from the CursorPocket GitHub Pages site and hosted by GitHub Releases. ZIP and MSIX builds are development artifacts, not competing public choices.
@@ -248,6 +256,7 @@ The design-consultation gate requires all of the following before release:
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
 - screenshots, video, audio, text, and links each produce the correct receipt and Library item.
 - Library Copy places the selected capture on the clipboard as an actual file, plus a directly pasteable bitmap for screenshots, never path text.
+- Feedback stays visible in the main navigation, keeps one unfinished draft in memory, exposes the exact GitHub handoff for review, and never includes recent crash details unless the user selects the opt-in.
 - automatic update checks can be disabled, never block offline startup, and cannot install an off-repository, corrupt, older, or incompatible artifact;
 - every annotation tool key is visible on its own button at full width, and no tool is hidden at any width;
 - no annotation ink is a state colour, and green on the annotation surface appears only on the active tool, the crop handles, and Save;
