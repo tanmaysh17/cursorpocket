@@ -7,10 +7,10 @@ CursorPocket distributes an unmodified FFmpeg executable beside the application 
 - Project: FFmpeg
 - Source: https://ffmpeg.org/
 - Windows build provider: https://github.com/BtbN/FFmpeg-Builds
-- Pinned release: `autobuild-2026-08-17-13-05`
-- Artifact: `ffmpeg-n8.1.2-44-g7c533d0f86-win64-lgpl-8.1.zip`
-- Archive SHA-256: `BDA492675BDB354AC55F93B96AF2DBB35BABEF7DE264C37D4FF83E022831B19D`
-- Executable SHA-256: `E8E106D6F6A4166747FBD7374FBF47FFC4D2DD883520C3558FEEAC0281A2712D`
+- Pinned release: `autobuild-2026-08-31-13-27`
+- Artifact: `ffmpeg-n8.1.2-50-g1a748fe2cd-win64-lgpl-8.1.zip`
+- Archive SHA-256: `F6274BBD9C247F9E90C1BBED066B03ED4A3907CECE2FB91BE6DD352393936365`
+- Executable SHA-256: `9C60DA6C0B083110D59084EA39F60AE149AA3E031C3B4BB4F573FAFA1C1E7CEA`
 - License: GNU Lesser General Public License (LGPL), version 2.1 or later
 
 This build has GPL and non-free components disabled. CursorPocket invokes `ffmpeg.exe` as a separate process and does not modify it. The complete license text supplied with the build is installed as `FFMPEG-LICENSE.txt`. FFmpeg source and build scripts are available from the links above.
