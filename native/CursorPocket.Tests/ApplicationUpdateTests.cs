@@ -1,7 +1,11 @@
+using System.ComponentModel;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using CursorPocket.Core.Models;
+using CursorPocket.Core.Services;
 using CursorPocket.Core.Updates;
+using CursorPocket_App.Services;
 
 namespace CursorPocket.Tests;
 
@@ -88,6 +92,119 @@ public sealed class ApplicationUpdateTests : IDisposable
 
         Assert.Equal(UpdateCheckStatus.Unavailable, offlineResult.Status);
         Assert.Equal(UpdateCheckStatus.Unavailable, timeoutResult.Status);
+    }
+
+    [Fact]
+    public async Task Failed_automatic_attempt_is_persisted_and_throttles_the_next_check()
+    {
+        var handler = new StubHandler(_ => throw new HttpRequestException("offline"));
+        var settings = new StubSettingsQueue(new AppSettings { AutomaticallyCheckForUpdates = true });
+        var startedAt = DateTimeOffset.UtcNow;
+        using var coordinator = new ApplicationUpdateCoordinator(
+            Service(handler),
+            settings,
+            () => settings.Current);
+
+        var first = await coordinator.CheckAsync(force: false);
+
+        Assert.Equal(UpdateCheckStatus.Unavailable, first.Status);
+        Assert.NotNull(settings.Current.LastUpdateCheckAt);
+        Assert.InRange(settings.Current.LastUpdateCheckAt!.Value, startedAt, DateTimeOffset.UtcNow);
+
+        var second = await coordinator.CheckAsync(force: false);
+
+        Assert.Equal(UpdateCheckStatus.Throttled, second.Status);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Automatic_scheduler_rechecks_while_the_process_stays_open()
+    {
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        var service = new StubUpdateService(() =>
+        {
+            if (Interlocked.Increment(ref calls) >= 2) completed.TrySetResult();
+            return new ApplicationUpdateCheckResult(UpdateCheckStatus.UpToDate, DateTimeOffset.UtcNow);
+        });
+        var settings = new StubSettingsQueue(new AppSettings { AutomaticallyCheckForUpdates = true });
+        using var coordinator = new ApplicationUpdateCoordinator(service, settings, () => settings.Current);
+
+        coordinator.ScheduleAutomaticCheck(TimeSpan.Zero, TimeSpan.FromMilliseconds(20));
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(service.CheckCount >= 2);
+    }
+
+    [Fact]
+    public void Enabling_automatic_checks_reschedules_the_background_loop()
+    {
+        var mainWindow = ReadRepositoryFile("native", "CursorPocket.App", "MainWindow.xaml.cs").ReplaceLineEndings("\n");
+
+        Assert.Contains(
+            "ApplicationUpdateCoordinator.ShouldRescheduleAutomaticCheck(_automaticUpdatesEnabled, settings.AutomaticallyCheckForUpdates)",
+            mainWindow,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "_automaticUpdatesEnabled = App.Services.Settings.AutomaticallyCheckForUpdates;",
+            mainWindow,
+            StringComparison.Ordinal);
+        Assert.Contains("_automaticUpdatesEnabled = settings.AutomaticallyCheckForUpdates;", mainWindow, StringComparison.Ordinal);
+        Assert.Contains(
+            "if (shouldRescheduleAutomaticCheck)\n            {\n                App.Services.Updates.ScheduleAutomaticCheck();\n            }",
+            mainWindow,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, false, false)]
+    public void Automatic_check_rescheduling_is_limited_to_the_disabled_to_enabled_transition(
+        bool wasEnabled,
+        bool isEnabled,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            ApplicationUpdateCoordinator.ShouldRescheduleAutomaticCheck(wasEnabled, isEnabled));
+    }
+
+    [Fact]
+    public void Failed_installer_launch_removes_the_pending_marker()
+    {
+        var marker = Path.Combine(_root, "pending-update.txt");
+        var settings = new StubSettingsQueue(new AppSettings());
+        using var coordinator = new ApplicationUpdateCoordinator(
+            new StubUpdateService(() => new ApplicationUpdateCheckResult(UpdateCheckStatus.UpToDate)),
+            settings,
+            () => settings.Current,
+            startInstaller: _ => throw new Win32Exception("blocked"),
+            pendingUpdatePath: marker);
+        var downloaded = new DownloadedApplicationUpdate(Update(123, new string('A', 64)), Path.Combine(_root, "setup.exe"));
+
+        Assert.Throws<Win32Exception>(() => coordinator.LaunchInstaller(downloaded));
+
+        Assert.False(File.Exists(marker));
+    }
+
+    [Fact]
+    public void Update_prompt_defers_active_work_and_keeps_explicit_receipt_actions()
+    {
+        var mainWindow = ReadRepositoryFile("native", "CursorPocket.App", "MainWindow.xaml.cs");
+        var coordinator = ReadRepositoryFile("native", "CursorPocket.App", "Services", "ApplicationUpdateCoordinator.cs");
+        var installer = ReadRepositoryFile("native", "installer", "CursorPocket.iss");
+
+        Assert.Contains("QueueUpdatePrompt(update)", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("_pendingUpdateTimer.Start()", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("if (IsBusyForUpdate())", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("new ReceiptAction(\"Download and install\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("new ReceiptAction(\"Release notes\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("new ReceiptAction(\"Later\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Win32Exception", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("/RELAUNCH", coordinator, StringComparison.Ordinal);
+        Assert.Contains("Check: RelaunchAfterUpdate", installer, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -270,6 +387,42 @@ public sealed class ApplicationUpdateTests : IDisposable
             Interlocked.Increment(ref _callCount);
             return Task.FromResult(new InstallerVerificationResult(valid, publisher));
         }
+    }
+
+    private sealed class StubSettingsQueue(AppSettings current) : ISettingsUpdateQueue
+    {
+        public AppSettings Current { get; private set; } = current;
+
+        public Task<AppSettings> UpdateAsync(
+            Func<AppSettings, AppSettings> update,
+            CancellationToken cancellationToken = default)
+        {
+            Current = update(Current);
+            return Task.FromResult(Current);
+        }
+    }
+
+    private sealed class StubUpdateService(Func<ApplicationUpdateCheckResult> check) : IApplicationUpdateService
+    {
+        private int _checkCount;
+        public int CheckCount => Volatile.Read(ref _checkCount);
+
+        public Task<ApplicationUpdateCheckResult> CheckAsync(
+            string installedVersion,
+            bool updatesEnabled,
+            DateTimeOffset? lastSuccessfulCheck,
+            bool force = false,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _checkCount);
+            return Task.FromResult(check());
+        }
+
+        public Task<DownloadedApplicationUpdate> DownloadAndVerifyAsync(
+            ApplicationUpdateInfo update,
+            string? expectedPublisher,
+            IProgress<double>? progress = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class StubHandler : HttpMessageHandler

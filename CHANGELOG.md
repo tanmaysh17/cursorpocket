@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.4.18 — 2026-08-30
+
+- Made automatic updates reliably check at most once per day, retry while CursorPocket stays open, resume shortly after being enabled, and stay silent during active capture work until the user can approve the install.
+- Kept failed update checks and installer launches non-disruptive, without repeated offline requests or stale pending-update errors.
+
 ## 0.4.17 — 2026-08-30
 
 - Rebuilt first-run onboarding around the complete local capture loop, every command-mode activation path and action, and a guided handoff into a useful first screenshot, video, or audio capture.
