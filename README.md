@@ -8,7 +8,7 @@ Everything is saved to one organized folder on your computer. CursorPocket has n
 
 1. Enter command mode by drawing two circles with the mouse, clicking the green dot, choosing **Open command mode** from the tray icon, or pressing `Ctrl + Shift + Space`.
 2. A transparent, edge-lit overlay appears on the current display. Tap one of the plain keys shown in its top-right shortcut guide—no `Ctrl` or `Alt` needed.
-3. Screenshots open in a full-resolution annotation surface. Audio and video use a clear recording HUD with save/discard controls. Every successful capture gets a receipt and appears immediately in the Library.
+3. Screenshots open in a full-resolution annotation surface. Audio and video use a clear recording HUD with save/discard controls. Every capture appears immediately in the Library; video, audio, text, and links also get a receipt, while a screenshot's confirmation is the editor itself.
 
 Drag anywhere on the panel to move command mode wherever you want it; it reopens in the same place next time, on whichever display your pointer is on. Double-click it to put it back in the top-right corner.
 
@@ -34,7 +34,7 @@ For text, highlight what you want, open CursorPocket, and press `T`. CursorPocke
 
 Every capture can be dealt with without touching the mouse.
 
-A receipt appears after each capture without stealing focus. Its labelled Open, Play, Mark up, and Show in folder actions can be clicked or reached after focusing the receipt. A focused receipt closes with `Escape`; it never registers global action keys that could interfere with another application.
+A receipt appears after each video, audio, text, or link capture without stealing focus. Screenshots skip it: the annotation surface that opens is the confirmation, and closing it leaves nothing behind. Its labelled Open, Play, Mark up, and Show in folder actions can be clicked or reached after focusing the receipt. A focused receipt closes with `Escape`; it never registers global action keys that could interfere with another application.
 
 Inside the Library, ordinary keys work because the window has focus:
 
@@ -52,7 +52,7 @@ Inside the Library, ordinary keys work because the window has focus:
 
 ### Screenshot annotation
 
-Every screenshot is copied to your clipboard the moment you take it, so it is ready to paste, and opens a full-resolution markup preview. Saving with marks copies the marked-up version. Choose **Pen**, **Highlight**, **Arrow**, **Rectangle**, or **Text**, pick a color, and draw directly on the image. `Ctrl + Z` undoes the last mark, `Enter` saves, and `Escape` keeps the original screenshot without markup.
+Every screenshot is copied to your clipboard the moment you take it, so it is ready to paste, and opens a full-resolution markup preview. Saving with marks copies the marked-up version. Choose **Pen**, **Highlight**, **Arrow**, **Rectangle**, or **Text**, pick a color, and draw directly on the image. A tool stays selected after you use it, so a second arrow is just another drag. `Ctrl + Z` undoes the last mark, `Enter` saves, and `Escape` keeps the original screenshot without markup — no receipt follows either way.
 
 ### Screen walkthroughs
 

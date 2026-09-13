@@ -444,10 +444,14 @@ public sealed partial class MainWindow : Window
             // Copy immediately, so the shot is pasteable the moment it is taken rather
             // than only after the annotation surface is dismissed.
             var copied = await CopyImageToClipboardAsync(path);
-            OpenEditor(record, path, AnnotationOrigin.FreshCapture, cancelled: () => ShowReceipt(
-                record,
-                copied ? "Screenshot saved · copied" : "Screenshot saved",
-                copied ? null : "The clipboard was busy. The saved capture is safe."));
+            if (!copied)
+            {
+                // The one receipt on the screenshot path, and only when something went
+                // wrong: the editor itself is the confirmation that the shot was taken.
+                ShowClipboardBusy("Screenshot saved · clipboard was busy", "Paste will not work until you copy from the editor.");
+            }
+
+            OpenEditor(record, path, AnnotationOrigin.FreshCapture);
         }
         catch (Exception error)
         {
@@ -614,20 +618,19 @@ public sealed partial class MainWindow : Window
     /// fresh capture needs ForceForeground because a transient surface has just hidden
     /// itself and the source app still owns the foreground lock, whereas an editor opened
     /// from the Library comes from a window that already has focus.
+    ///
+    /// No outcome of the editor produces a success receipt. The user has just been
+    /// looking at the full-resolution image, so a thumbnail card telling them it was
+    /// saved adds nothing; only a problem (a busy clipboard, a failed write) is announced.
     /// </summary>
     private void OpenEditor(
         CaptureRecord record,
         string path,
-        AnnotationOrigin origin,
-        Action? cancelled = null)
+        AnnotationOrigin origin)
     {
         var editor = new AnnotationWindow(record, path, origin);
         Interlocked.Increment(ref _activeEditors);
         editor.Closed += (_, _) => Interlocked.Decrement(ref _activeEditors);
-        if (cancelled is not null)
-        {
-            editor.Cancelled += (_, _) => cancelled();
-        }
 
         editor.CopyRequested += async (_, temporary) =>
         {
@@ -646,8 +649,10 @@ public sealed partial class MainWindow : Window
         editor.Saved += async (_, _) =>
         {
             var copied = await CopyImageToClipboardAsync(path);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
-                copied ? null : "Saved successfully, but the clipboard was busy.");
+            if (!copied)
+            {
+                ShowClipboardBusy("Saved, but the clipboard was busy", "The screenshot is on disk. Copy it from the Library to paste it.");
+            }
         };
 
         if (origin == AnnotationOrigin.FreshCapture)
@@ -712,8 +717,10 @@ public sealed partial class MainWindow : Window
                 new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
 
             var copied = await CopyImageToClipboardAsync(reservation.AbsolutePath);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied),
-                copied ? null : "Saved successfully, but the clipboard was busy.");
+            if (!copied)
+            {
+                ShowClipboardBusy("Edited copy saved, but the clipboard was busy", "The copy is on disk. Copy it from the Library to paste it.");
+            }
         }
         catch (Exception error)
         {
@@ -738,8 +745,8 @@ public sealed partial class MainWindow : Window
                 reservation.AbsolutePath,
                 $"Screenshot · {bitmap.Width} × {bitmap.Height}",
                 new Dictionary<string, object?> { ["width"] = bitmap.Width, ["height"] = bitmap.Height });
+            // The pin itself is the confirmation; a receipt beside it would be a second card.
             PinCapture(record, reservation.AbsolutePath);
-            ShowReceipt(record, "Screenshot saved and pinned");
         }
         catch (Exception error)
         {
@@ -900,6 +907,13 @@ public sealed partial class MainWindow : Window
 
     private void ShowError(string title, string detail)
         => _receipts.Show(new ReceiptRequest(null, title, detail, VisualKind: ReceiptVisualKind.Error));
+
+    /// <summary>
+    /// The screenshot path's only non-error receipt. A busy clipboard is not a failure
+    /// — the file is safe — but the user is about to paste, so it has to be said.
+    /// </summary>
+    private void ShowClipboardBusy(string title, string detail)
+        => _receipts.Show(new ReceiptRequest(null, title, detail, VisualKind: ReceiptVisualKind.Information));
 
     public async Task<ApplicationUpdateCheckResult> CheckForUpdatesAsync(bool force = true)
     {

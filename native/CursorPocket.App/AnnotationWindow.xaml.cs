@@ -104,6 +104,12 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private AnnotationTool _toolBeforeEyedrop = AnnotationTool.Arrow;
 
+    /// <summary>
+    /// The inline text box while a label is being typed, so Escape can drop it instead
+    /// of closing the whole editor around it. Null whenever no label is open.
+    /// </summary>
+    private TextBox? _textEditor;
+
     /// <summary>Which crop corner is being dragged, if any. Its opposite is the anchor.</summary>
     private (int Dx, int Dy)? _cropCorner;
 
@@ -1065,11 +1071,10 @@ public sealed partial class AnnotationWindow : Window
         AddVisual(mark);
         ApplyHistoryState();
 
-        // One placement, then back to Select — and the new mark is deliberately not
-        // selected, because fresh handles on a just-drawn arrow are noise. The cost is
-        // that three arrows in a row means pressing A three times; the benefit is that a
-        // stray drag can never add a mark you did not mean to place.
-        _tool = AnnotationTool.Select;
+        // The tool stays armed: three arrows in a row is three drags, not three presses
+        // of A. The new mark is deliberately not selected, because fresh handles on a
+        // just-drawn arrow are noise, and a stray drag is one Ctrl+Z away. The strip is
+        // refreshed so it keeps describing the armed tool rather than the last gesture.
         ApplyToolState();
     }
 
@@ -1861,6 +1866,7 @@ public sealed partial class AnnotationWindow : Window
         Canvas.SetLeft(editor, point.X);
         Canvas.SetTop(editor, point.Y);
         DrawingSurface.Children.Add(editor);
+        _textEditor = editor;
         editor.Focus(FocusState.Programmatic);
 
         editor.KeyDown += (_, args) =>
@@ -1873,6 +1879,7 @@ public sealed partial class AnnotationWindow : Window
             args.Handled = true;
             var value = editor.Text.Trim();
             DrawingSurface.Children.Remove(editor);
+            _textEditor = null;
             if (value.Length > 0)
             {
                 Commit(new TextMark
@@ -2481,9 +2488,10 @@ public sealed partial class AnnotationWindow : Window
     }
 
     /// <summary>
-    /// Escape returns an armed creation tool to Select, and closes once already in
-    /// Select. The last press always keeps the original, so nothing is ever lost — it
-    /// can just take two presses now. The status strip says so after the first.
+    /// Escape cancels whatever is in flight — an overlay, a drag, an open text box — and
+    /// otherwise closes the editor keeping the original. It does not disarm the tool
+    /// first: tools stay armed after a mark, so a stage that only returned to Select
+    /// would make every close a double press.
     /// </summary>
     private void HandleEscape()
     {
@@ -2515,11 +2523,13 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
-        if (_tool != AnnotationTool.Select)
+        if (_textEditor is not null)
         {
-            _tool = AnnotationTool.Select;
-            ApplyToolState();
-            StatusToolText.Text = "SELECT · Esc again to keep the original";
+            // Typed text is dropped, nothing is committed, and the editor stays open:
+            // Escape while typing means "not this label", not "not this screenshot".
+            DrawingSurface.Children.Remove(_textEditor);
+            _textEditor = null;
+            CanvasHost.Focus(FocusState.Programmatic);
             return;
         }
 
