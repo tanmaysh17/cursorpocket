@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.20 — 2026-09-13
+
+- Removed the receipt card after screenshots: the annotation editor that opens is the confirmation, so Save, keep-original, edited copies, and pins no longer show one. Only a busy clipboard or a failure is announced.
+- Kept the annotation tool armed after each mark, so repeated arrows, boxes, or labels no longer need the tool re-selected.
+- Made `Escape` in the editor close in one press when nothing is in flight; it still cancels an in-progress drag or an open text label first.
+
 ## 0.4.19 — 2026-08-31
 
 - Added a permanent Feedback destination with a focused, keyboard-accessible composer that opens a reviewed draft as a prefilled public GitHub issue or copies it to the clipboard.
