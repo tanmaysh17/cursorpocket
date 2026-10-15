@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.20 — 2026-10-15
+
+- Let several Focus regions spotlight different parts of a screenshot at once: each new dim region opens another bright hole in one shared dim layer instead of darkening the earlier regions, live while dragging and identically in the saved file.
+
 ## 0.4.19 — 2026-08-31
 
 - Added a permanent Feedback destination with a focused, keyboard-accessible composer that opens a reviewed draft as a prefilled public GitHub issue or copies it to the clipboard.
