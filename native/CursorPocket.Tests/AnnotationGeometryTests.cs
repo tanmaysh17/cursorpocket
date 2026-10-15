@@ -193,3 +193,48 @@ public sealed class AnnotationGeometryTests
         Assert.Equal(0, rect.Height);
     }
 }
+
+public sealed class FocusDimmingTests
+{
+    [Fact]
+    public void Dim_regions_keep_their_order_and_skip_everything_else()
+    {
+        var first = Focus(1, FocusMode.Dim);
+        var loupe = Focus(2, FocusMode.Loupe);
+        var second = Focus(3, FocusMode.Dim);
+        AnnotationMark[] marks = [first, Line(4), loupe, second];
+
+        var regions = FocusDimming.Regions(marks);
+
+        Assert.Equal([first, second], regions);
+        Assert.True(FocusDimming.OwnsLayer(first, regions));
+        Assert.False(FocusDimming.OwnsLayer(second, regions));
+    }
+
+    [Fact]
+    public void No_dim_focus_means_no_layer()
+    {
+        var regions = FocusDimming.Regions([Line(1), Focus(2, FocusMode.Loupe)]);
+
+        Assert.Empty(regions);
+        Assert.False(FocusDimming.OwnsLayer(Focus(3, FocusMode.Dim), regions));
+    }
+
+    private static FocusMark Focus(int id, FocusMode mode) => new()
+    {
+        Id = id,
+        Colour = AnnotationPalette.Inks[0].Colour,
+        StrokeWidth = 3,
+        Rect = new AnnRect(id * 10, 0, 8, 8),
+        Mode = mode,
+    };
+
+    private static LineMark Line(int id) => new()
+    {
+        Id = id,
+        Colour = AnnotationPalette.Inks[0].Colour,
+        StrokeWidth = 3,
+        Start = new AnnPoint(0, 0),
+        End = new AnnPoint(5, 5),
+    };
+}

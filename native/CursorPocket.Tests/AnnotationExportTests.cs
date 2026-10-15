@@ -226,6 +226,35 @@ public sealed class AnnotationExportTests
     }
 
     [Fact]
+    public void A_second_focus_region_opens_another_bright_hole_in_the_same_dim()
+    {
+        using var source = Flat(160, 80, Color.White);
+        var left = Focus(1, new AnnRect(10, 20, 40, 40), FocusMode.Dim);
+        var right = Focus(2, new AnnRect(110, 20, 40, 40), FocusMode.Dim, FocusShape.Ellipse);
+
+        using var single = Export(source, [left]);
+        using var both = Export(source, [left, right]);
+
+        Assert.True(IsWhite(both.GetPixel(30, 40)), "the first region was dimmed by the second");
+        Assert.True(IsWhite(both.GetPixel(130, 40)), "the second region was not left bright");
+        // One shared layer, not two stacked: the outside is exactly as dark as with one.
+        Assert.Equal(Tuple(single.GetPixel(80, 5)), Tuple(both.GetPixel(80, 5)));
+    }
+
+    [Fact]
+    public void A_loupe_does_not_punch_a_hole_in_the_dim()
+    {
+        using var source = Flat(160, 80, Color.White);
+        var dim = Focus(1, new AnnRect(10, 20, 40, 40), FocusMode.Dim);
+        var loupe = Focus(2, new AnnRect(110, 20, 40, 40), FocusMode.Loupe);
+
+        using var result = Export(source, [dim, loupe]);
+
+        Assert.True(IsWhite(result.GetPixel(30, 40)));
+        Assert.False(IsWhite(result.GetPixel(80, 5)), "the loupe removed the dim");
+    }
+
+    [Fact]
     public void Exporting_the_same_document_twice_produces_the_same_bytes()
     {
         using var source = Striped(90, 50);
@@ -397,6 +426,16 @@ public sealed class AnnotationExportTests
         StrokeWidth = 5,
         Rect = new AnnRect(15, 30, 70, 40),
         Filled = filled,
+    };
+
+    private static FocusMark Focus(int id, AnnRect rect, FocusMode mode, FocusShape shape = FocusShape.Rectangle) => new()
+    {
+        Id = id,
+        Colour = AnnotationPalette.Inks[0].Colour,
+        StrokeWidth = 3,
+        Rect = rect,
+        Mode = mode,
+        Shape = shape,
     };
 
     private static Bitmap Export(Bitmap source, IReadOnlyList<AnnotationMark> marks) =>

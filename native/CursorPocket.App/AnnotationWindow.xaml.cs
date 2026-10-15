@@ -1063,6 +1063,7 @@ public sealed partial class AnnotationWindow : Window
         _history.Add(mark);
         PruneStaleVisuals();
         AddVisual(mark);
+        RefreshDimLayer();
         ApplyHistoryState();
 
         // One placement, then back to Select — and the new mark is deliberately not
@@ -1095,6 +1096,7 @@ public sealed partial class AnnotationWindow : Window
     // ------------------------------------------------------------------ preview shapes
 
     private UIElement? _preview;
+    private bool _previewPunchesDim;
 
     private void RebuildPreview()
     {
@@ -1166,6 +1168,12 @@ public sealed partial class AnnotationWindow : Window
         // The provisional mark is discarded, so its identity must not be spent.
         _preview = CreateVisual(mark);
         DrawingSurface.Children.Add(_preview);
+
+        if (mark is FocusMark { Mode: FocusMode.Dim } focus)
+        {
+            _previewPunchesDim = true;
+            RefreshDimLayer(focus);
+        }
     }
 
     private void ClearPreview()
@@ -1174,6 +1182,14 @@ public sealed partial class AnnotationWindow : Window
         {
             DrawingSurface.Children.Remove(_preview);
             _preview = null;
+        }
+
+        // A dim region being dragged out punched a provisional hole in the shared layer;
+        // close it again, or a cancelled drag would leave a bright patch behind.
+        if (_previewPunchesDim)
+        {
+            _previewPunchesDim = false;
+            RefreshDimLayer();
         }
     }
 
@@ -1309,8 +1325,11 @@ public sealed partial class AnnotationWindow : Window
                     loupe.Shape,
                     loupe.StrokeWidth);
 
-            case FocusMark dim:
-                return DimOutside(dim);
+            case FocusMark:
+                // An empty host holding this mark's place in the z-order. Dim focus
+                // regions share one layer, which RefreshDimLayer puts into the host of
+                // whichever region owns it.
+                return new Canvas { IsHitTestVisible = false };
 
             case TextMark text:
                 return TextVisual(text, brush);
@@ -1388,19 +1407,56 @@ public sealed partial class AnnotationWindow : Window
     }
 
     /// <summary>
-    /// Darkens everything outside a region, by filling the whole image with one geometry
-    /// group whose even-odd rule punches the region out. This mirrors the exporter's
-    /// GraphicsPath with FillMode.Alternate exactly; four surrounding bands would leave
-    /// the corners of an elliptical or rounded region undimmed.
+    /// Rebuilds the one dim layer every dim focus region shares, in the host of the region
+    /// that owns it (<see cref="FocusDimming"/>). A provisional region being dragged out
+    /// joins the set, so its hole opens live in the existing dim instead of stacking a
+    /// second dim over it.
     /// </summary>
-    private UIElement DimOutside(FocusMark focus)
+    private void RefreshDimLayer(FocusMark? provisional = null)
+    {
+        var marks = _history.Visible.AsEnumerable();
+        if (provisional is not null)
+        {
+            marks = marks.Append(provisional);
+        }
+
+        var regions = FocusDimming.Regions(marks);
+        foreach (var mark in _history.Visible.OfType<FocusMark>())
+        {
+            if (_visuals.TryGetValue(mark.Id, out var visual) && visual is Canvas host)
+            {
+                host.Children.Clear();
+            }
+        }
+
+        if (regions.Count == 0)
+        {
+            return;
+        }
+
+        var owner = ReferenceEquals(regions[0], provisional)
+            ? _preview as Canvas
+            : _visuals.GetValueOrDefault(regions[0].Id) as Canvas;
+        owner?.Children.Add(DimOutside(regions));
+    }
+
+    /// <summary>
+    /// Darkens everything outside the regions, by filling the whole image with one
+    /// geometry group whose even-odd rule punches each region out. This mirrors the
+    /// exporter's GraphicsPath with FillMode.Alternate exactly; four surrounding bands
+    /// would leave the corners of an elliptical or rounded region undimmed.
+    /// </summary>
+    private UIElement DimOutside(IReadOnlyList<FocusMark> regions)
     {
         var group = new GeometryGroup { FillRule = FillRule.EvenOdd };
         group.Children.Add(new RectangleGeometry
         {
             Rect = new Windows.Foundation.Rect(0, 0, _sourceWidth, _sourceHeight),
         });
-        group.Children.Add(HoleGeometry(focus));
+        foreach (var region in regions)
+        {
+            group.Children.Add(HoleGeometry(region));
+        }
 
         return new ShapePath
         {
@@ -1942,6 +1998,7 @@ public sealed partial class AnnotationWindow : Window
                     DrawingSurface.Children.Remove(visual);
                 }
 
+                RefreshDimLayer();
                 break;
 
             case GeometryStep:
@@ -1967,6 +2024,7 @@ public sealed partial class AnnotationWindow : Window
                 // rather than a live element. The old surface could not offer redo for
                 // exactly that reason.
                 AddVisual(mark.Mark);
+                RefreshDimLayer();
                 break;
 
             case GeometryStep:
