@@ -204,7 +204,9 @@ public sealed partial class MainPage : Page
 
     private void CaptureStore_CaptureCompleted(object? sender, CaptureCompletedEventArgs eventArgs)
     {
-        App.DispatcherQueue.TryEnqueue(async () =>
+        // Low priority: a fresh screenshot is committed while its editor is coming up,
+        // and refreshing a Library row must never delay the editor taking input.
+        App.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
         {
             if (!_libraryLoaded)
             {

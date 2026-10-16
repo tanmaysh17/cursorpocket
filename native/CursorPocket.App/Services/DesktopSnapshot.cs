@@ -15,8 +15,13 @@ internal static class DesktopSnapshot
     /// remaining cost of opening command mode. BMP still avoids synchronous PNG
     /// compression while handing the decoder an exact, lossless desktop frame.
     /// </para>
+    /// <para>
+    /// The grabbed bitmap is handed back too, so a region can be cut straight out of
+    /// the frame the user was looking at rather than grabbing the screen again after
+    /// the selection. The caller owns it.
+    /// </para>
     /// </summary>
-    public static BitmapImage Capture(NativeMethods.Rect bounds)
+    public static BitmapImage Capture(NativeMethods.Rect bounds, out Bitmap frame)
     {
         var width = bounds.Right - bounds.Left;
         var height = bounds.Bottom - bounds.Top;
@@ -25,17 +30,28 @@ internal static class DesktopSnapshot
             throw new ArgumentOutOfRangeException(nameof(bounds), "Desktop snapshot bounds must have a visible area.");
         }
 
-        var frame = new MemoryStream(EstimateCapacity(width, height));
-        using (var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb))
-        using (var graphics = Graphics.FromImage(bitmap))
+        var encoded = new MemoryStream(EstimateCapacity(width, height));
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppPArgb);
+        try
         {
-            graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
-            bitmap.Save(frame, ImageFormat.Bmp);
+            using (var graphics = Graphics.FromImage(bitmap))
+            {
+                graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bitmap.Size, CopyPixelOperation.SourceCopy);
+            }
+
+            bitmap.Save(encoded, ImageFormat.Bmp);
         }
-        frame.Position = 0;
+        catch
+        {
+            bitmap.Dispose();
+            throw;
+        }
+
+        encoded.Position = 0;
+        frame = bitmap;
 
         var source = new BitmapImage();
-        _ = DecodeAsync(source, frame);
+        _ = DecodeAsync(source, encoded);
         return source;
     }
 

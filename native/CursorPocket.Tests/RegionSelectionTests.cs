@@ -1,3 +1,4 @@
+using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 
 namespace CursorPocket.Tests;
@@ -58,5 +59,24 @@ public sealed class RegionSelectionTests
         var bounds = RegionSelection.FromCorners(10, 10, 10 + RegionSelection.MinimumSide, 10 + RegionSelection.MinimumSide);
 
         Assert.True(RegionSelection.IsUsable(bounds));
+    }
+
+    [Fact]
+    public void A_selection_is_found_inside_a_frame_that_starts_left_of_the_primary_display()
+    {
+        // The frozen frame starts at the virtual-desktop origin, here a monitor sitting
+        // 1600 px left of and 200 px above the primary one.
+        var local = RegionSelection.WithinSnapshot(new CaptureBounds(100, 50, 400, 250), -1600, -200, 3520, 1280);
+
+        Assert.Equal(new CaptureBounds(1700, 250, 2000, 450), local);
+    }
+
+    [Fact]
+    public void A_selection_partly_off_the_frame_is_clipped_and_one_entirely_off_it_is_null()
+    {
+        var clipped = RegionSelection.WithinSnapshot(new CaptureBounds(1800, 900, 2100, 1200), 0, 0, 1920, 1080);
+        Assert.Equal(new CaptureBounds(1800, 900, 1920, 1080), clipped);
+
+        Assert.Null(RegionSelection.WithinSnapshot(new CaptureBounds(2000, 0, 2100, 100), 0, 0, 1920, 1080));
     }
 }

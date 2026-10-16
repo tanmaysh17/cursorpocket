@@ -46,26 +46,37 @@ public sealed partial class AnnotationWindow : Window
 
     private const double MaximumCornerRadius = 24;
 
-    private readonly CaptureRecord _record;
-    private readonly string _path;
-    private readonly AnnotationOrigin _origin;
+    // Set by Open, not the constructor: the window is built ahead of time, before
+    // there is a capture to show.
+    private string _path = string.Empty;
+    private AnnotationOrigin _origin;
     private readonly AnnotationHistory _history = new();
     private readonly Dictionary<int, UIElement> _visuals = [];
     private readonly List<Button> _toolButtons = [];
     private readonly List<Button> _swatchButtons = [];
-    private readonly IDisposable _escapeLease;
+    private IDisposable? _escapeLease;
     private readonly SemaphoreSlim _outputGate = new(1, 1);
+    private bool _opened;
 
     /// <summary>
-    /// The source pixels, decoded once and held for the session. The first version set
-    /// the Image source straight from the file path and re-read that same path at save
-    /// time, then moved a temporary file over it — reading and overwriting one file.
-    /// Holding the bitmap also gives the eyedropper, redaction, and OCR their pixels.
+    /// Completes once a fresh capture's PNG is on disk. The editor opens on the pixels
+    /// in memory while the file is still being written, so anything that touches the
+    /// file — saving over it above all — waits for this first.
     /// </summary>
-    private readonly System.Drawing.Bitmap _source;
+    private Task _committed = Task.CompletedTask;
 
-    private readonly int _sourceWidth;
-    private readonly int _sourceHeight;
+    private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// The source pixels, held for the session. The first version set the Image source
+    /// straight from the file path and re-read that same path at save time, then moved a
+    /// temporary file over it — reading and overwriting one file. Holding the bitmap
+    /// also gives the eyedropper, redaction, and OCR their pixels.
+    /// </summary>
+    private System.Drawing.Bitmap _source = null!;
+
+    private int _sourceWidth;
+    private int _sourceHeight;
 
     private AnnotationTool _tool = AnnotationTool.Arrow;
     private AnnotationInk _ink = AnnotationPalette.Default;
@@ -117,16 +128,16 @@ public sealed partial class AnnotationWindow : Window
     private Polyline? _strokeVisual;
     private Point _lastStrokePoint;
 
-    public AnnotationWindow(CaptureRecord record, string path)
-        : this(record, path, AnnotationOrigin.FreshCapture)
+    /// <summary>
+    /// Builds everything that does not depend on a capture: the XAML, the theme and
+    /// backdrop, the swatches, the key sheet, the accelerators, and the OCR recognizer.
+    /// That is most of what made the editor slow to appear, so MainWindow builds one
+    /// ahead of time and the capture path only has to call <see cref="Open"/>. Each
+    /// window is still used for one capture and then closed, so no state from one
+    /// screenshot can reach the next.
+    /// </summary>
+    public AnnotationWindow()
     {
-    }
-
-    public AnnotationWindow(CaptureRecord record, string path, AnnotationOrigin origin)
-    {
-        _record = record;
-        _path = path;
-        _origin = origin;
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.Workspace);
         App.Theme.ThemeChanged += Theme_ThemeChanged;
@@ -134,50 +145,20 @@ public sealed partial class AnnotationWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AnnotationTitleBar);
 
-        var bounds = WindowPlacement.MonitorUnderPointer(true);
-        var scale = WindowPlacement.ScaleFor(this);
-        var availableWidth = Math.Max(1, bounds.Right - bounds.Left - 40);
-        var availableHeight = Math.Max(1, bounds.Bottom - bounds.Top - 40);
-        _constrainedLayout = availableWidth / Math.Max(1, scale) < 860
-            || availableHeight / Math.Max(1, scale) < 520;
-        AppWindow.MoveAndResize(new RectInt32(
-            bounds.Left + 20,
-            bounds.Top + 20,
-            availableWidth,
-            availableHeight));
-
-        _source = LoadSource(path, out var displaySource);
-        _sourceWidth = _source.Width;
-        _sourceHeight = _source.Height;
-
-        BuildToolRail();
-        if (_constrainedLayout) ApplyConstrainedLayout();
-
-        // The stage is sized to the source bitmap, so a canvas coordinate is an image
-        // pixel. Nudging, the native-pixel readout, and a faithful export all rest on
-        // that identity; the Viewbox above only scales it to fit the window.
-        Stage.Width = _sourceWidth;
-        Stage.Height = _sourceHeight;
-        DrawingSurface.Width = _sourceWidth;
-        DrawingSurface.Height = _sourceHeight;
-        ScreenshotImage.Source = displaySource;
-
-        SourceNameText.Text = $"{Path.GetFileName(path)} · {_sourceWidth} × {_sourceHeight}";
-
         BuildSwatches();
         BuildKeySheet();
         RegisterOemAccelerators();
         CollectToolButtons();
-        ApplyToolState();
-        ApplyHistoryState();
-        RefreshGeometry();
 
-        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(HandleEscape));
         // Focus has to land on Loaded, not on Activated: Activated fires before the
         // content tree exists, so Focus() there silently returns false and leaves the
         // window with nothing focused — which is what kept every accelerator dead until
         // the user happened to click a toolbar button.
-        CanvasHost.Loaded += (_, _) => CanvasHost.Focus(FocusState.Programmatic);
+        CanvasHost.Loaded += (_, _) =>
+        {
+            CanvasHost.Focus(FocusState.Programmatic);
+            _ready.TrySetResult();
+        };
         Activated += (_, args) =>
         {
             // XamlRoot does not exist yet on the first activation, and FocusManager
@@ -198,17 +179,87 @@ public sealed partial class AnnotationWindow : Window
         Closed += (_, _) =>
         {
             App.Theme.ThemeChanged -= Theme_ThemeChanged;
-            _escapeLease.Dispose();
-            _source.Dispose();
-            if (!_finished)
+            _escapeLease?.Dispose();
+            _source?.Dispose();
+            _ready.TrySetResult();
+            if (_opened && !_finished)
             {
                 Cancelled?.Invoke(this, EventArgs.Empty);
             }
         };
     }
 
+    /// <summary>Completes once the editor is on screen and takes keys.</summary>
+    public Task Ready => _ready.Task;
+
+    /// <summary>
+    /// Puts a capture in the window and lays it out for the display under the pointer.
+    /// A fresh screenshot arrives as pixels already in memory, with its file still being
+    /// written; anything else is read from <paramref name="path"/>.
+    /// </summary>
+    public void Open(string path, AnnotationOrigin origin, ScreenshotFrame? frame = null)
+    {
+        _opened = true;
+        _path = path;
+        _origin = origin;
+
+        var bounds = WindowPlacement.MonitorUnderPointer(true);
+        var scale = WindowPlacement.ScaleFor(this);
+        var availableWidth = Math.Max(1, bounds.Right - bounds.Left - 40);
+        var availableHeight = Math.Max(1, bounds.Bottom - bounds.Top - 40);
+        _constrainedLayout = availableWidth / Math.Max(1, scale) < 860
+            || availableHeight / Math.Max(1, scale) < 520;
+        AppWindow.MoveAndResize(new RectInt32(
+            bounds.Left + 20,
+            bounds.Top + 20,
+            availableWidth,
+            availableHeight));
+
+        ImageSource displaySource;
+        if (frame is null)
+        {
+            _source = LoadSource(path, out displaySource);
+        }
+        else
+        {
+            _source = frame.Pixels;
+            _committed = frame.Committed;
+            displaySource = DisplaySource(frame);
+        }
+
+        _sourceWidth = _source.Width;
+        _sourceHeight = _source.Height;
+
+        BuildToolRail();
+        if (_constrainedLayout) ApplyConstrainedLayout();
+
+        // The stage is sized to the source bitmap, so a canvas coordinate is an image
+        // pixel. Nudging, the native-pixel readout, and a faithful export all rest on
+        // that identity; the Viewbox above only scales it to fit the window.
+        Stage.Width = _sourceWidth;
+        Stage.Height = _sourceHeight;
+        DrawingSurface.Width = _sourceWidth;
+        DrawingSurface.Height = _sourceHeight;
+        ScreenshotImage.Source = displaySource;
+
+        SourceNameText.Text = $"{Path.GetFileName(path)} · {_sourceWidth} × {_sourceHeight}";
+
+        ApplyToolState();
+        ApplyHistoryState();
+        RefreshGeometry();
+
+        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(HandleEscape));
+    }
+
     private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>
     {
+        // A window built ahead of time has no capture yet, so there is no geometry to
+        // repaint; Open paints everything from the current theme anyway.
+        if (!_opened)
+        {
+            return;
+        }
+
         ApplyToolState();
         RefreshGeometry();
     });
@@ -236,6 +287,23 @@ public sealed partial class AnnotationWindow : Window
     public event EventHandler<string>? PinExportRequested;
 
     // ---------------------------------------------------------------- source loading
+
+    /// <summary>
+    /// The preview of a fresh capture, straight from the rows already in memory: one
+    /// copy into the bitmap's buffer, where the old path encoded a PNG, wrote it, read
+    /// it back, and decoded it twice.
+    /// </summary>
+    private static ImageSource DisplaySource(ScreenshotFrame frame)
+    {
+        var bitmap = new WriteableBitmap(frame.Pixels.Width, frame.Pixels.Height);
+        using (var stream = bitmap.PixelBuffer.AsStream())
+        {
+            stream.Write(frame.DisplayPixels, 0, frame.DisplayPixels.Length);
+        }
+
+        bitmap.Invalidate();
+        return bitmap;
+    }
 
     /// <summary>
     /// Reads the file once into memory and hands back both an independent GDI+ bitmap
@@ -311,7 +379,7 @@ public sealed partial class AnnotationWindow : Window
                 Style = (Style)Application.Current.Resources["PocketSwatchButton"],
                 Tag = ink,
             };
-            ToolTipService.SetToolTip(button, $"{ink.Name} · {key}");
+            ToolTipService.SetToolTip(button, $"{ink.Name} · Shift+{key}");
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, $"{ink.Name} ink");
 
             var stack = new StackPanel { Spacing = 1 };
@@ -353,7 +421,7 @@ public sealed partial class AnnotationWindow : Window
         {
             Style = (Style)Application.Current.Resources["PocketSwatchButton"],
         };
-        ToolTipService.SetToolTip(button, "Sampled colour · 7 · press I to sample");
+        ToolTipService.SetToolTip(button, "Sampled colour · Shift+7 · press I to sample");
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, "Sampled ink");
 
         var stack = new StackPanel { Spacing = 1 };
@@ -456,27 +524,51 @@ public sealed partial class AnnotationWindow : Window
         // The digit says which number is about to be placed, not a generic glyph.
         StepNumberText.Text = MarkerNumbering.Next(_history.Visible).ToString();
 
-        SizeStepText.Text = _size switch
+        foreach (var button in SizeOptions.Children.OfType<Button>())
         {
-            AnnotationSizeStep.Small => "S",
-            AnnotationSizeStep.Large => "L",
-            _ => "M",
-        };
+            var active = button.Tag is string tag
+                && Enum.TryParse<AnnotationSizeStep>(tag, out var step)
+                && step == _size;
+            // The same selection treatment as a swatch, and for the same reason: green
+            // already means the active tool on this surface.
+            button.BorderBrush = active ? App.Theme.Brush("PocketInk") : clear;
+            button.Background = active ? App.Theme.Brush("PocketRaised") : clear;
+            PaintToolButton(button, active ? App.Theme.Brush("PocketInk") : dim, active ? App.Theme.Brush("PocketInk") : muted);
+        }
 
+        // Size and colour stay on screen for every tool and dim when the tool ignores
+        // them. Collapsing them made the rail jump under the pointer on every tool change.
         var properties = AnnotationToolCatalog.Get(_tool).Properties;
-        SwatchStrip.Visibility = properties.HasFlag(AnnotationToolProperties.Ink) ? Visibility.Visible : Visibility.Collapsed;
-        SizeButton.Visibility = properties.HasFlag(AnnotationToolProperties.Size) ? Visibility.Visible : Visibility.Collapsed;
-        PropertyHintText.Text = properties switch
-        {
-            AnnotationToolProperties.None => "This tool has no adjustable properties.",
-            _ when properties.HasFlag(AnnotationToolProperties.Variant) => "Press the tool key again to cycle its variant.",
-            _ when properties.HasFlag(AnnotationToolProperties.Results) => "OCR results replace this inspector after recognition.",
-            _ => "Choose an ink colour and mark size.",
-        };
+        SetGroupEnabled(SizeSection, properties.HasFlag(AnnotationToolProperties.Size));
+        SetGroupEnabled(ColourSection, properties.HasFlag(AnnotationToolProperties.Ink));
 
         StatusToolText.Text = ToSentenceCase(DescribeTool());
 
         static Visibility Show(bool visible) => visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static void SetGroupEnabled(Panel group, bool enabled)
+    {
+        group.Opacity = enabled ? 1 : 0.38;
+        foreach (var button in Descendants(group).OfType<Button>())
+        {
+            button.IsEnabled = enabled;
+        }
+
+        static IEnumerable<UIElement> Descendants(Panel panel)
+        {
+            foreach (var child in panel.Children)
+            {
+                yield return child;
+                if (child is Panel nested)
+                {
+                    foreach (var inner in Descendants(nested))
+                    {
+                        yield return inner;
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -546,8 +638,8 @@ public sealed partial class AnnotationWindow : Window
             _ => "REDACT · BLUR · partly recoverable · D for solid",
         },
         AnnotationTool.Focus => _focusMode == FocusMode.Dim
-            ? "FOCUS · DIM OUTSIDE · S for loupe"
-            : $"FOCUS · LOUPE {_loupeMagnification:0.#}× {_focusShape.ToString().ToUpperInvariant()} · S to cycle",
+            ? "FOCUS · DIM OUTSIDE · F for loupe"
+            : $"FOCUS · LOUPE {_loupeMagnification:0.#}× {_focusShape.ToString().ToUpperInvariant()} · F to cycle",
         AnnotationTool.Eyedrop => "EYEDROPPER · click the screenshot to take its colour",
         AnnotationTool.Crop => Geometry.Crop is null
             ? "CROP · drag what to keep"
@@ -617,7 +709,7 @@ public sealed partial class AnnotationWindow : Window
 
     /// <summary>
     /// Dim, then the loupe in each of its three outlines — the same four-step cycle the
-    /// reference tool uses, reached by pressing S again rather than by a submenu.
+    /// reference tool uses, reached by pressing F again rather than by a submenu.
     /// </summary>
     private void CycleFocus()
     {
@@ -639,24 +731,25 @@ public sealed partial class AnnotationWindow : Window
         }
     }
 
-    private void Size_Click(object sender, RoutedEventArgs eventArgs) => StepSize(1, cycle: true);
-
-    /// <summary>
-    /// Steps the mark size. The toolbar button cycles, because a single button has no
-    /// direction of its own; the bracket keys and the wheel do not, because a key that
-    /// wrapped from largest back to smallest would feel broken.
-    /// </summary>
-    private void StepSize(int direction, bool cycle)
+    private void SizeOption_Click(object sender, RoutedEventArgs eventArgs)
     {
-        var next = AnnotationMetrics.Step(_size, direction);
-        if (cycle && next == _size && direction > 0)
+        if (sender is Button { Tag: string tag } && Enum.TryParse<AnnotationSizeStep>(tag, out var size))
         {
-            next = AnnotationSizeStep.Small;
+            SetSize(size);
         }
+    }
 
-        _size = next;
+    private void SetSize(AnnotationSizeStep size)
+    {
+        _size = size;
         ApplyToolState();
     }
+
+    /// <summary>
+    /// Steps the mark size from the bracket keys and the wheel. Neither wraps: a key
+    /// that went from largest back to smallest would feel broken.
+    /// </summary>
+    private void StepSize(int direction) => SetSize(AnnotationMetrics.Step(_size, direction));
 
     // -------------------------------------------------------------------- drawing
 
@@ -874,7 +967,7 @@ public sealed partial class AnnotationWindow : Window
 
         if (!IsDown(VirtualKey.Menu))
         {
-            StepSize(direction, cycle: false);
+            StepSize(direction);
             return;
         }
 
@@ -889,7 +982,7 @@ public sealed partial class AnnotationWindow : Window
                 ApplyToolState();
                 break;
             default:
-                StepSize(direction, cycle: false);
+                StepSize(direction);
                 break;
         }
     }
@@ -1066,11 +1159,10 @@ public sealed partial class AnnotationWindow : Window
         RefreshDimLayer();
         ApplyHistoryState();
 
-        // One placement, then back to Select — and the new mark is deliberately not
-        // selected, because fresh handles on a just-drawn arrow are noise. The cost is
-        // that three arrows in a row means pressing A three times; the benefit is that a
-        // stray drag can never add a mark you did not mean to place.
-        _tool = AnnotationTool.Select;
+        // The tool stays armed: three arrows are three drags, and three step markers are
+        // three clicks. Dropping back to Select after every mark made each one cost a key
+        // press. Escape is still the way out, and still two-stage, because Select remains
+        // the inert state the first press lands in.
         ApplyToolState();
     }
 
@@ -1823,7 +1915,6 @@ public sealed partial class AnnotationWindow : Window
             ? $"no text found · {reading.Language}"
             : $"{reading.WordCount} words · {reading.Language}";
         OcrPanel.Visibility = Visibility.Visible;
-        PropertyPanel.Visibility = Visibility.Collapsed;
 
         // Faint boxes over each word, so it is obvious which part of the image the text
         // came from. Informational blue is reserved for text and link captures, and this
@@ -1855,7 +1946,6 @@ public sealed partial class AnnotationWindow : Window
     private void HideOcr()
     {
         OcrPanel.Visibility = Visibility.Collapsed;
-        PropertyPanel.Visibility = Visibility.Visible;
         OcrOverlay.Children.Clear();
         OcrText.Text = string.Empty;
     }
@@ -1902,8 +1992,31 @@ public sealed partial class AnnotationWindow : Window
 
     // ---------------------------------------------------------------------- text tool
 
+    /// <summary>The inline label being typed, if any. One at a time.</summary>
+    private TextBox? _textEditor;
+
+    private Action? _finishText;
+
+    /// <summary>
+    /// Commits the label being typed, if there is one. The Text tool stays armed, so a
+    /// click elsewhere starts the next label — and Escape arrives through a global hotkey
+    /// the text box never sees — so both have to close the open editor rather than leave
+    /// it stranded on the canvas.
+    /// </summary>
+    private bool FinishText()
+    {
+        if (_finishText is null)
+        {
+            return false;
+        }
+
+        _finishText();
+        return true;
+    }
+
     private void BeginText(Point point)
     {
+        FinishText();
         var fontSize = AnnotationMetrics.TextSize(_sourceWidth, _sourceHeight, _size);
         var editor = new TextBox
         {
@@ -1918,6 +2031,8 @@ public sealed partial class AnnotationWindow : Window
         Canvas.SetTop(editor, point.Y);
         DrawingSurface.Children.Add(editor);
         editor.Focus(FocusState.Programmatic);
+        _textEditor = editor;
+        _finishText = Finish;
 
         editor.KeyDown += (_, args) =>
         {
@@ -1927,6 +2042,18 @@ public sealed partial class AnnotationWindow : Window
             }
 
             args.Handled = true;
+            Finish();
+        };
+
+        void Finish()
+        {
+            if (!ReferenceEquals(_textEditor, editor))
+            {
+                return;
+            }
+
+            _textEditor = null;
+            _finishText = null;
             var value = editor.Text.Trim();
             DrawingSurface.Children.Remove(editor);
             if (value.Length > 0)
@@ -1943,7 +2070,7 @@ public sealed partial class AnnotationWindow : Window
             }
 
             CanvasHost.Focus(FocusState.Programmatic);
-        };
+        }
     }
 
     // ------------------------------------------------------------------------ readout
@@ -2059,7 +2186,8 @@ public sealed partial class AnnotationWindow : Window
         ];
         (string Key, string Meaning)[] right =
         [
-            ("1 – 6", "ink colour · 7 is the sampled one"),
+            ("1 · 2 · 3", "small, medium, large marks"),
+            ("Shift+1 – 6", "ink colour · Shift+7 is the sampled one"),
             ("Ctrl+Z", "undo · Ctrl+Y redoes"),
             ("Ctrl+C", "copy without saving"),
             ("Enter", "save · Esc keeps the original"),
@@ -2103,8 +2231,8 @@ public sealed partial class AnnotationWindow : Window
         const int oemCloseBracket = 221;
         const int oemQuestion = 191;
 
-        Add((VirtualKey)oemOpenBracket, VirtualKeyModifiers.None, () => StepSize(-1, cycle: false));
-        Add((VirtualKey)oemCloseBracket, VirtualKeyModifiers.None, () => StepSize(1, cycle: false));
+        Add((VirtualKey)oemOpenBracket, VirtualKeyModifiers.None, () => StepSize(-1));
+        Add((VirtualKey)oemCloseBracket, VirtualKeyModifiers.None, () => StepSize(1));
         Add((VirtualKey)oemQuestion, VirtualKeyModifiers.Shift, ToggleKeySheet);
 
         void Add(VirtualKey key, VirtualKeyModifiers modifiers, Action action)
@@ -2154,7 +2282,7 @@ public sealed partial class AnnotationWindow : Window
             VirtualKey.T => AnnotationTool.Text,
             VirtualKey.N => AnnotationTool.Step,
             VirtualKey.D => AnnotationTool.Redact,
-            VirtualKey.S => AnnotationTool.Focus,
+            VirtualKey.F => AnnotationTool.Focus,
             VirtualKey.I => AnnotationTool.Eyedrop,
             VirtualKey.O => AnnotationTool.ReadText,
             VirtualKey.C => AnnotationTool.Crop,
@@ -2171,6 +2299,31 @@ public sealed partial class AnnotationWindow : Window
         SelectTool_(tool.Value);
     }
 
+    /// <summary>1, 2 and 3 pick Small, Medium and Large directly.</summary>
+    private void SizeAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
+    {
+        if (!ToolKeysActive())
+        {
+            return;
+        }
+
+        AnnotationSizeStep? size = sender.Key switch
+        {
+            VirtualKey.Number1 => AnnotationSizeStep.Small,
+            VirtualKey.Number2 => AnnotationSizeStep.Medium,
+            VirtualKey.Number3 => AnnotationSizeStep.Large,
+            _ => null,
+        };
+
+        if (size is null)
+        {
+            return;
+        }
+
+        eventArgs.Handled = true;
+        SetSize(size.Value);
+    }
+
     private void InkAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs eventArgs)
     {
         if (!ToolKeysActive())
@@ -2180,7 +2333,7 @@ public sealed partial class AnnotationWindow : Window
 
         var digit = (int)(sender.Key - VirtualKey.Number0);
 
-        // 7 is the eyedropper's slot. Until something has been sampled there is no ink
+        // Shift+7 is the eyedropper's slot. Until something has been sampled there is no ink
         // there, so the key arms the eyedropper instead of selecting nothing.
         if (digit == AnnotationPalette.Inks.Count + 1)
         {
@@ -2304,6 +2457,14 @@ public sealed partial class AnnotationWindow : Window
 
             if (mode == AnnotationSaveMode.Overwrite)
             {
+                // A fresh capture may still be on its way to the disk. Overwriting before
+                // it lands would race the commit's own move into place.
+                if (!await CommittedAsync())
+                {
+                    try { File.Delete(temporary); } catch (IOException) { }
+                    return;
+                }
+
                 File.Move(temporary, _path, true);
                 _finished = true;
                 Saved?.Invoke(this, EventArgs.Empty);
@@ -2318,6 +2479,24 @@ public sealed partial class AnnotationWindow : Window
         finally
         {
             _outputGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Waits for a fresh capture's file. False, with the reason in the status strip, if
+    /// it could not be written — the editor stays open so the pixels are not lost.
+    /// </summary>
+    private async Task<bool> CommittedAsync()
+    {
+        try
+        {
+            await _committed;
+            return true;
+        }
+        catch (Exception error)
+        {
+            StatusToolText.Text = $"NOT SAVED · the screenshot could not be written · {error.Message}";
+            return false;
         }
     }
 
@@ -2357,16 +2536,21 @@ public sealed partial class AnnotationWindow : Window
             ToolRail.Children.Add(button);
         }
 
-        MoveToPanel(SwatchStrip, ToolbarLeft, ToolContextHost);
-        MoveToPanel(SizeButton, ToolbarLeft, ToolContextHost);
-        SizeButton.Width = double.NaN;
-        SizeButton.HorizontalAlignment = HorizontalAlignment.Stretch;
+        MoveToPanel(SwatchStrip, ToolbarLeft, SwatchHost);
+        // A full row of seven in the wide rail; two rows in the three-column one.
+        SwatchStrip.MaximumRowsOrColumns = _constrainedLayout ? 5 : 7;
 
-        MoveToPanel(UndoButton, ToolbarLeft, HistoryHost);
-        MoveToPanel(RedoButton, ToolbarLeft, HistoryHost);
+        MoveToPanel(UndoButton, ToolbarLeft, ActionHost);
+        MoveToPanel(RedoButton, ToolbarLeft, ActionHost);
+        ActionHost.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
+        {
+            Style = (Style)Application.Current.Resources["ToolbarDivider"],
+        });
 
-        MoveOutput(PinButton, "Pin");
-        MoveOutput(CopyButton, "Copy");
+        // The constrained layout keeps Pin and Copy as their icons; the status bar has
+        // no room for labels there.
+        MoveOutput(PinButton, _constrainedLayout ? null : "Pin");
+        MoveOutput(CopyButton, _constrainedLayout ? null : "Copy");
         MoveOutput(KeepOriginalButton);
         MoveOutput(SaveButton);
         ToolbarRow.Visibility = Visibility.Collapsed;
@@ -2377,20 +2561,18 @@ public sealed partial class AnnotationWindow : Window
         AnnotationTitleBar.Height = 32;
         EditorBody.Padding = new Thickness(4);
         EditorBody.RowSpacing = 0;
-        WorkspaceGrid.ColumnSpacing = 4;
+        CanvasWell.Margin = new Thickness(4, 0, 0, 0);
+        OcrPanel.Margin = new Thickness(4, 0, 0, 0);
         ToolRail.RowSpacing = 0;
         ToolRail.ColumnSpacing = 2;
         ToolRailBorder.Padding = new Thickness(0);
-        PropertyPanel.Width = 160;
-        PropertyPanel.Padding = new Thickness(6);
+        RailStack.Spacing = 4;
         OcrPanel.Width = 160;
         OcrPanel.Padding = new Thickness(8);
         OcrActions.Orientation = Orientation.Vertical;
-        PropertiesLabel.Visibility = Visibility.Collapsed;
-        PropertyHintText.Visibility = Visibility.Collapsed;
-        OutputLabel.Visibility = Visibility.Collapsed;
-        ToolContextHost.Spacing = 2;
-        OutputHost.Spacing = 2;
+        SizeLabel.Visibility = Visibility.Collapsed;
+        ColourLabel.Visibility = Visibility.Collapsed;
+        ActionHost.Spacing = 4;
         // Keep the safety/state teaching visible when display scale forces this
         // layout. Pointer and in-progress geometry are secondary; active variant,
         // redaction recoverability, output size, and discard remain essential.
@@ -2398,7 +2580,7 @@ public sealed partial class AnnotationWindow : Window
         StatusPointerText.Visibility = Visibility.Collapsed;
         StatusSizeText.Visibility = Visibility.Collapsed;
         StatusKeysButton.Visibility = Visibility.Collapsed;
-        foreach (var button in OutputHost.Children.OfType<Button>()) button.MinHeight = 36;
+        foreach (var button in ActionHost.Children.OfType<Button>()) button.MinHeight = 32;
     }
 
     private static void AddToolLabel(Button button, string label)
@@ -2439,15 +2621,14 @@ public sealed partial class AnnotationWindow : Window
     private void MoveOutput(Button button, string? label = null)
     {
         ToolbarRight.Children.Remove(button);
-        button.Width = double.NaN;
-        button.MinHeight = 40;
-        button.HorizontalAlignment = HorizontalAlignment.Stretch;
+        button.MinHeight = 36;
+        button.VerticalAlignment = VerticalAlignment.Center;
         if (label is not null)
         {
             button.Style = (Style)Application.Current.Resources["PocketQuietButton"];
             button.Content = label;
         }
-        OutputHost.Children.Add(button);
+        ActionHost.Children.Add(button);
     }
 
     private static string ToSentenceCase(string value) => value.Length == 0
@@ -2556,6 +2737,13 @@ public sealed partial class AnnotationWindow : Window
         if (OcrPanel.Visibility == Visibility.Visible)
         {
             HideOcr();
+            return;
+        }
+
+        // Escape is a global hotkey here, so the text box never sees it. Keep what was
+        // typed — Escape never throws work away on this surface.
+        if (FinishText())
+        {
             return;
         }
 

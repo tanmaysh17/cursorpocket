@@ -11,20 +11,52 @@ using Point = Windows.Foundation.Point;
 
 namespace CursorPocket_App;
 
+/// <summary>
+/// What the user selected, plus the frozen desktop frame it was selected from. Whoever
+/// handles the selection owns <see cref="Snapshot"/> and must dispose it.
+/// </summary>
+public sealed record SelectedRegion(
+    CaptureBounds Bounds,
+    System.Drawing.Bitmap? Snapshot,
+    int SnapshotLeft,
+    int SnapshotTop);
+
 public sealed partial class RegionSelectorWindow : Window
 {
-    private readonly IDisposable _escapeLease;
+    private IDisposable? _escapeLease;
+    private System.Drawing.Bitmap? _snapshot;
     private Point _start;
     private (int X, int Y) _startPhysical;
     private bool _dragging;
     private int _virtualLeft;
     private int _virtualTop;
 
+    /// <summary>
+    /// Builds the window without showing it. Construction is the expensive, state-free
+    /// part (XAML, theme, window styles), so MainWindow keeps one built ahead of time and
+    /// <see cref="Open"/> does only what has to happen at the moment of capture. Each
+    /// instance is still used once and closed: nothing from one selection can leak into
+    /// the next.
+    /// </summary>
     public RegionSelectorWindow()
     {
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.CaptureOverlay);
         WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
+        Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
+        Closed += (_, _) =>
+        {
+            _escapeLease?.Dispose();
+            _snapshot?.Dispose();
+            _snapshot = null;
+        };
+    }
+
+    public event EventHandler<SelectedRegion>? RegionSelected;
+
+    /// <summary>Freezes the desktop under the selector and shows it.</summary>
+    public void Open()
+    {
         _virtualLeft = NativeMethods.GetSystemMetrics(NativeMethods.SmXVirtualScreen);
         _virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
         var width = NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen);
@@ -35,14 +67,12 @@ public sealed partial class RegionSelectorWindow : Window
             Top = _virtualTop,
             Right = _virtualLeft + width,
             Bottom = _virtualTop + height,
-        });
+        }, out var frame);
+        _snapshot = frame;
         AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
         _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
-        Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
-        Closed += (_, _) => _escapeLease.Dispose();
+        Activate();
     }
-
-    public event EventHandler<CaptureBounds>? RegionSelected;
 
     private void Surface_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
@@ -82,8 +112,12 @@ public sealed partial class RegionSelectorWindow : Window
             Close();
             return;
         }
+
+        // The frame leaves with the selection, so Closed must not dispose it.
+        var snapshot = _snapshot;
+        _snapshot = null;
         Close();
-        RegionSelected?.Invoke(this, bounds);
+        RegionSelected?.Invoke(this, new SelectedRegion(bounds, snapshot, _virtualLeft, _virtualTop));
     }
 
     private void UpdateSelection(Point point)

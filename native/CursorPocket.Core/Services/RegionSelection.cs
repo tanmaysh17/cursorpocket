@@ -22,4 +22,25 @@ public static class RegionSelection
 
     public static bool IsUsable(CaptureBounds bounds) =>
         bounds.Width >= MinimumSide && bounds.Height >= MinimumSide;
+
+    /// <summary>
+    /// Where a selection sits inside the frozen desktop frame the selector showed, so the
+    /// shot can be cut from that frame instead of grabbing the screen a second time. The
+    /// frame starts at the virtual-desktop origin, which is negative when a monitor sits
+    /// left of or above the primary one. Null when the selection misses the frame.
+    /// </summary>
+    public static CaptureBounds? WithinSnapshot(
+        CaptureBounds bounds,
+        int snapshotLeft,
+        int snapshotTop,
+        int snapshotWidth,
+        int snapshotHeight)
+    {
+        var left = Math.Clamp(bounds.Left - snapshotLeft, 0, snapshotWidth);
+        var top = Math.Clamp(bounds.Top - snapshotTop, 0, snapshotHeight);
+        var right = Math.Clamp(bounds.Right - snapshotLeft, 0, snapshotWidth);
+        var bottom = Math.Clamp(bounds.Bottom - snapshotTop, 0, snapshotHeight);
+        var local = new CaptureBounds(left, top, right, bottom);
+        return local.Width > 0 && local.Height > 0 ? local : null;
+    }
 }

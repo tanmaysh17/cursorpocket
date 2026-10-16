@@ -2,10 +2,12 @@ using System.ComponentModel;
 using System.Drawing;
 using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
+using CursorPocket.Core.Diagnostics;
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket.Core.Updates;
 using CursorPocket_App.Services;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.Graphics;
@@ -33,6 +35,13 @@ public sealed partial class MainWindow : Window
     private int _activeEditors;
     private int _activeCaptureOperations;
     private bool _regionSelectorOpen;
+
+    // One of each capture surface, built ahead of time while the app is idle, so a
+    // screenshot does not pay for constructing a window. Each is used once and closed;
+    // the replacement is built after the surface it replaced has gone.
+    private RegionSelectorWindow? _spareSelector;
+    private AnnotationWindow? _spareEditor;
+    private bool _warmQueued;
     private readonly ReceiptCoordinator _receipts;
     private readonly DispatcherTimer _pendingUpdateTimer;
     private ApplicationUpdateInfo? _pendingUpdate;
@@ -78,6 +87,7 @@ public sealed partial class MainWindow : Window
         _automaticUpdatesEnabled = App.Services.Settings.AutomaticallyCheckForUpdates;
         App.Services.SettingsChanged += Services_SettingsChanged;
         App.Services.Updates.UpdateAvailable += Updates_UpdateAvailable;
+        ScheduleWarmSurfaces(TimeSpan.FromSeconds(3));
         App.Services.Updates.StateChanged += Updates_StateChanged;
         App.Services.Updates.ScheduleAutomaticCheck();
         if (App.Services.Updates.ConsumePendingUpdateResult() is { } updateError)
@@ -423,31 +433,65 @@ public sealed partial class MainWindow : Window
             case CaptureActionId.Audio: await ToggleAudioRecordingAsync(); break;
             case CaptureActionId.Text: await CaptureTextAsync(); break;
             case CaptureActionId.Link: await CaptureLinkAsync(); break;
-            case CaptureActionId.Display: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureDisplayAsync()); break;
-            case CaptureActionId.AllDisplays: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureAllDisplaysAsync()); break;
-            case CaptureActionId.Window: await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureWindowAsync(source)); break;
-            case CaptureActionId.Region: SelectRegion(async bounds => await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureRegionAsync(bounds))); break;
+            case CaptureActionId.Display:
+                await CaptureScreenshotAsync(() => App.Services.Screenshots.BeginDisplayAsync(), CaptureTimeline.Start("display"));
+                break;
+            case CaptureActionId.AllDisplays:
+                await CaptureScreenshotAsync(() => App.Services.Screenshots.BeginAllDisplaysAsync(), CaptureTimeline.Start("all-displays"));
+                break;
+            case CaptureActionId.Window:
+                await CaptureScreenshotAsync(() => App.Services.Screenshots.BeginWindowAsync(source), CaptureTimeline.Start("window"));
+                break;
+            case CaptureActionId.Region:
+            {
+                var timeline = CaptureTimeline.Start("region");
+                SelectRegion(
+                    async selected => await CaptureScreenshotAsync(
+                        () => selected.Snapshot is { } snapshot
+                            ? App.Services.Screenshots.BeginFromSnapshotAsync(snapshot, selected.SnapshotLeft, selected.SnapshotTop, selected.Bounds)
+                            : App.Services.Screenshots.BeginRegionAsync(selected.Bounds),
+                        timeline),
+                    timeline);
+                break;
+            }
             case CaptureActionId.PreviousRegion:
                 if (_lastRegion is null) ShowError("No previous region", "Capture a region once and CursorPocket will remember it.");
-                else await CaptureScreenshotAsync(() => App.Services.Screenshots.CaptureRegionAsync(_lastRegion));
+                else await CaptureScreenshotAsync(() => App.Services.Screenshots.BeginRegionAsync(_lastRegion), CaptureTimeline.Start("previous-region"));
                 break;
         }
     }
 
-    private async Task CaptureScreenshotAsync(Func<Task<CaptureRecord>> capture)
+    /// <summary>
+    /// Opens the editor on the shot's pixels the moment they are in memory. The PNG is
+    /// still being encoded and written when the editor appears, and the clipboard copy
+    /// follows as soon as it lands — neither is on the path between the key press and an
+    /// editor that takes input any more. That path used to encode, write, re-read and
+    /// decode the image twice, and flush the clipboard, before building the window.
+    /// </summary>
+    private async Task CaptureScreenshotAsync(Func<Task<ScreenshotFrame>> begin, CaptureTimeline? timeline = null)
     {
         Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
-            var record = await capture();
-            var path = App.Services.Library.GetAbsolutePath(record);
-            // Copy immediately, so the shot is pasteable the moment it is taken rather
-            // than only after the annotation surface is dismissed.
-            var copied = await CopyImageToClipboardAsync(path);
-            OpenEditor(record, path, AnnotationOrigin.FreshCapture, cancelled: () => ShowReceipt(
-                record,
-                copied ? "Screenshot saved · copied" : "Screenshot saved",
-                copied ? null : "The clipboard was busy. The saved capture is safe."));
+            var frame = await begin();
+            timeline?.Mark("pixels");
+            var copiedFromEditor = false;
+            var clipboard = Task.FromResult<bool?>(false);
+            var editor = OpenEditor(
+                frame.Committed,
+                frame.Path,
+                AnnotationOrigin.FreshCapture,
+                cancelled: () => _ = ShowFreshCaptureReceiptAsync(frame.Committed, clipboard),
+                frame: frame);
+            editor.CopyRequested += (_, _) => copiedFromEditor = true;
+            timeline?.Mark("editor-shown");
+
+            // Pasteable as soon as the file exists, without ever holding the editor back.
+            clipboard = CopyWhenCommittedAsync(frame, () => copiedFromEditor, timeline);
+            if (timeline is not null)
+            {
+                _ = WriteTimelineAsync(timeline, editor.Ready, clipboard);
+            }
         }
         catch (Exception error)
         {
@@ -457,6 +501,150 @@ public sealed partial class MainWindow : Window
         {
             Interlocked.Decrement(ref _activeCaptureOperations);
         }
+    }
+
+    /// <summary>
+    /// Puts a fresh shot on the clipboard once its PNG is on disk. Null when the user
+    /// already copied from the editor first — their marked-up copy must not be replaced
+    /// by the plain one arriving a moment later.
+    /// </summary>
+    private async Task<bool?> CopyWhenCommittedAsync(ScreenshotFrame frame, Func<bool> copiedFromEditor, CaptureTimeline? timeline)
+    {
+        try
+        {
+            await frame.Committed;
+        }
+        catch (Exception error)
+        {
+            ShowError("The screenshot was not saved", error.Message);
+            return false;
+        }
+
+        timeline?.Mark("committed");
+        if (copiedFromEditor())
+        {
+            return null;
+        }
+
+        var copied = await CopyImageToClipboardAsync(frame.Path);
+        timeline?.Mark("clipboard");
+        return copied;
+    }
+
+    private async Task ShowFreshCaptureReceiptAsync(Task<CaptureRecord> committed, Task<bool?> clipboard)
+    {
+        CaptureRecord record;
+        try
+        {
+            record = await committed;
+        }
+        catch (Exception)
+        {
+            // Already reported by CopyWhenCommittedAsync.
+            return;
+        }
+
+        var copied = await clipboard;
+        ShowReceipt(
+            record,
+            copied == true ? "Screenshot saved · copied" : "Screenshot saved",
+            copied == false ? "The clipboard was busy. The saved capture is safe." : null);
+    }
+
+    /// <summary>Appends one capture's step timings to the local perf log.</summary>
+    private static async Task WriteTimelineAsync(CaptureTimeline timeline, Task ready, Task clipboard)
+    {
+        await ready;
+        timeline.Mark("editor-ready");
+        try
+        {
+            await clipboard;
+        }
+        catch (Exception)
+        {
+            // A failed save is reported elsewhere; the timings are still worth keeping.
+        }
+
+        var line = timeline.Complete(DateTimeOffset.Now);
+        if (line is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "CursorPocket");
+            Directory.CreateDirectory(directory);
+            await File.AppendAllTextAsync(Path.Combine(directory, "perf.log"), line + Environment.NewLine);
+        }
+        catch (Exception)
+        {
+            // Measurement must never interfere with a capture.
+        }
+    }
+
+    /// <summary>
+    /// Builds the spare region selector and editor once the app is idle. Each is built
+    /// in its own low-priority turn so input can be handled between the two. Building
+    /// ahead is purely an optimisation: if a spare is missing, the capture path builds
+    /// its own window exactly as it always did.
+    /// </summary>
+    private void ScheduleWarmSurfaces(TimeSpan? delay = null)
+    {
+        if (_warmQueued || _quitting)
+        {
+            return;
+        }
+
+        _warmQueued = true;
+        _ = WarmAsync(delay ?? TimeSpan.FromSeconds(2));
+
+        async Task WarmAsync(TimeSpan wait)
+        {
+            // Wait until whatever just closed — usually an editor — is fully gone, so
+            // building the next one never competes with it.
+            await Task.Delay(wait);
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+            {
+                // Never while someone is drawing: building a window is a visible hitch,
+                // and the editor's own Closed schedules this again anyway.
+                if (Volatile.Read(ref _activeEditors) > 0)
+                {
+                    _warmQueued = false;
+                    return;
+                }
+
+                if (!_quitting && _spareSelector is null && !_regionSelectorOpen)
+                {
+                    try { _spareSelector = new RegionSelectorWindow(); } catch (Exception) { }
+                }
+
+                DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+                {
+                    _warmQueued = false;
+                    if (!_quitting && _spareEditor is null)
+                    {
+                        try { _spareEditor = new AnnotationWindow(); } catch (Exception) { }
+                    }
+                });
+            });
+        }
+    }
+
+    private AnnotationWindow TakeEditor()
+    {
+        var editor = _spareEditor ?? new AnnotationWindow();
+        _spareEditor = null;
+        return editor;
+    }
+
+    private RegionSelectorWindow TakeSelector()
+    {
+        var selector = _spareSelector ?? new RegionSelectorWindow();
+        _spareSelector = null;
+        return selector;
     }
 
     /// <summary>Asks for an image on disk and opens the editor on a copy of it.</summary>
@@ -512,7 +700,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        OpenEditor(record, path, AnnotationOrigin.ExistingCapture);
+        OpenEditor(Task.FromResult(record), path, AnnotationOrigin.ExistingCapture);
     }
 
     /// <summary>Opens the editor on whatever image is on the clipboard.</summary>
@@ -555,7 +743,7 @@ public sealed partial class MainWindow : Window
                     ["source"] = "clipboard",
                 });
 
-            OpenEditor(record, reservation.AbsolutePath, AnnotationOrigin.FreshCapture);
+            OpenEditor(Task.FromResult(record), reservation.AbsolutePath, AnnotationOrigin.FreshCapture);
         }
         catch (Exception error)
         {
@@ -597,7 +785,7 @@ public sealed partial class MainWindow : Window
                 $"Screenshot · {width} × {height}",
                 new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
 
-            OpenEditor(record, App.Services.Library.GetAbsolutePath(record), AnnotationOrigin.FreshCapture);
+            OpenEditor(Task.FromResult(record), App.Services.Library.GetAbsolutePath(record), AnnotationOrigin.FreshCapture);
         }
         catch (Exception error)
         {
@@ -615,15 +803,30 @@ public sealed partial class MainWindow : Window
     /// itself and the source app still owns the foreground lock, whereas an editor opened
     /// from the Library comes from a window that already has focus.
     /// </summary>
-    private void OpenEditor(
-        CaptureRecord record,
+    private AnnotationWindow OpenEditor(
+        Task<CaptureRecord> record,
         string path,
         AnnotationOrigin origin,
-        Action? cancelled = null)
+        Action? cancelled = null,
+        ScreenshotFrame? frame = null)
     {
-        var editor = new AnnotationWindow(record, path, origin);
+        var editor = TakeEditor();
+        try
+        {
+            editor.Open(path, origin, frame);
+        }
+        catch
+        {
+            editor.Close();
+            throw;
+        }
+
         Interlocked.Increment(ref _activeEditors);
-        editor.Closed += (_, _) => Interlocked.Decrement(ref _activeEditors);
+        editor.Closed += (_, _) =>
+        {
+            Interlocked.Decrement(ref _activeEditors);
+            ScheduleWarmSurfaces();
+        };
         if (cancelled is not null)
         {
             editor.Cancelled += (_, _) => cancelled();
@@ -645,8 +848,10 @@ public sealed partial class MainWindow : Window
         editor.PinExportRequested += async (_, temporary) => await RegisterEditedCopyAndPinAsync(temporary);
         editor.Saved += async (_, _) =>
         {
+            // The editor only raises Saved after the capture's own commit has finished.
+            var saved = await record;
             var copied = await CopyImageToClipboardAsync(path);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
+            ShowReceipt(saved, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
                 copied ? null : "Saved successfully, but the clipboard was busy.");
         };
 
@@ -659,6 +864,8 @@ public sealed partial class MainWindow : Window
         {
             editor.Activate();
         }
+
+        return editor;
     }
 
     /// <summary>
@@ -757,11 +964,14 @@ public sealed partial class MainWindow : Window
     /// index. The file was already written before the editor opened, so discarding is the
     /// only way to undo having taken the shot at all.
     /// </summary>
-    private async Task DiscardCaptureAsync(CaptureRecord record, string path)
+    private async Task DiscardCaptureAsync(Task<CaptureRecord> pending, string path)
     {
         Interlocked.Increment(ref _activeCaptureOperations);
         try
         {
+            // A fresh shot may still be on its way to the disk; it has to land before it
+            // can go to the Recycle Bin and out of the index.
+            var record = await pending;
             if (File.Exists(path))
             {
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
@@ -783,24 +993,39 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void SelectRegion(Func<CaptureBounds, Task> callback)
+    /// <summary>
+    /// Shows the region selector. The callback owns the selection's desktop frame and
+    /// must dispose it.
+    /// </summary>
+    private void SelectRegion(Func<SelectedRegion, Task> callback, CaptureTimeline? timeline = null)
     {
-        var selector = new RegionSelectorWindow();
+        var selector = TakeSelector();
         _regionSelectorOpen = true;
-        selector.Closed += (_, _) => _regionSelectorOpen = false;
-        selector.RegionSelected += async (_, bounds) =>
+        selector.Closed += (_, _) =>
         {
-            _lastRegion = bounds;
-            await callback(bounds);
+            _regionSelectorOpen = false;
+            ScheduleWarmSurfaces();
         };
-        selector.Activate();
+        selector.RegionSelected += async (_, selected) =>
+        {
+            timeline?.Mark("released");
+            _lastRegion = selected.Bounds;
+            await callback(selected);
+        };
+        selector.Open();
+        timeline?.Mark("selector-shown");
     }
 
     private async Task StartVideoAsync(RecordingOptions options)
     {
         if (options.SourceKind == VideoSourceKind.Region && options.Bounds is null)
         {
-            SelectRegion(async bounds => await StartVideoAsync(options with { Bounds = bounds }));
+            SelectRegion(async selected =>
+            {
+                // Video records live pixels; the frozen frame is only for screenshots.
+                selected.Snapshot?.Dispose();
+                await StartVideoAsync(options with { Bounds = selected.Bounds });
+            });
             return;
         }
         Interlocked.Increment(ref _activeCaptureOperations);

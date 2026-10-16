@@ -310,9 +310,12 @@ public sealed class AnnotationContractTests
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
         Assert.Contains("x:Name=\"ToolRail\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"PropertyPanel\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ToolContextHost\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"OutputHost\"", xaml, StringComparison.Ordinal);
+        // Size and colour live under the tools; history and output in the status bar. The
+        // right-hand inspector they replaced cost a third of the width for two rows.
+        Assert.Contains("x:Name=\"SizeSection\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ColourSection\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"ActionHost\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"PropertyPanel\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MoreToolsButton", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("AnnotationToolCatalog.Get", code, StringComparison.Ordinal);
@@ -367,15 +370,27 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
-    public void A_fresh_screenshot_is_copied_before_the_editor_opens_and_the_editor_comes_forward()
+    public void A_fresh_screenshot_opens_on_its_pixels_and_is_copied_once_written()
     {
         var main = ReadFixture("MainWindow.xaml.cs.txt");
         var capture = Slice(main, "private async Task CaptureScreenshotAsync", "private void SelectRegion");
+        var flow = Slice(main, "private async Task CaptureScreenshotAsync", "private async Task<bool?> CopyWhenCommittedAsync");
+        var copy = Slice(main, "private async Task<bool?> CopyWhenCommittedAsync", "private async Task ShowFreshCaptureReceiptAsync");
 
-        // Pasteable the moment it is taken, not only once annotation is dismissed.
-        var copy = capture.IndexOf("CopyImageToClipboardAsync", StringComparison.Ordinal);
-        var open = capture.IndexOf("new AnnotationWindow", StringComparison.Ordinal);
-        Assert.True(copy >= 0 && open > copy, "The shot must reach the clipboard before the editor opens.");
+        // Nothing stands between the pixels and the editor: the clipboard flush and the
+        // PNG write used to, and together they were most of the wait.
+        Assert.DoesNotContain("await CopyImageToClipboardAsync", flow, StringComparison.Ordinal);
+        Assert.DoesNotContain("await frame.Committed", flow, StringComparison.Ordinal);
+        Assert.True(
+            flow.IndexOf("OpenEditor(", StringComparison.Ordinal) < flow.IndexOf("CopyWhenCommittedAsync", StringComparison.Ordinal),
+            "The editor opens before the clipboard copy is even started.");
+
+        // Still pasteable without being asked — as soon as the file exists — and never
+        // over the top of a marked-up copy the user already took from the editor.
+        Assert.True(
+            copy.IndexOf("await frame.Committed", StringComparison.Ordinal) <
+            copy.IndexOf("CopyImageToClipboardAsync", StringComparison.Ordinal));
+        Assert.Contains("copiedFromEditor()", copy, StringComparison.Ordinal);
 
         // Command mode has just hidden itself, so the source app owns the foreground
         // lock. Activate() alone loses that race and leaves the editor behind or
@@ -563,9 +578,11 @@ public sealed class AnnotationContractTests
         var main = ReadFixture("MainWindow.xaml.cs.txt");
 
         // Four entry points now: a fresh capture, the Library, a receipt, and an image
-        // CursorPocket never took. One construction site, so the clipboard re-copy, the
-        // edited-copy path, and Discard cannot be wired on some paths and not others.
-        Assert.Equal(1, Occurrences(main, "new AnnotationWindow("));
+        // CursorPocket never took. One place opens and wires an editor, so the clipboard
+        // re-copy, the edited-copy path, and Discard cannot be wired on some paths and not
+        // others. Windows are built ahead of time, but only ever opened here.
+        Assert.Equal(1, Occurrences(main, "editor.Open("));
+        Assert.Equal(1, Occurrences(main, "private AnnotationWindow TakeEditor()"));
         Assert.Contains("public void AnnotateExisting(", main, StringComparison.Ordinal);
         Assert.Contains("public async Task AnnotateClipboardAsync()", main, StringComparison.Ordinal);
         Assert.Contains("public async Task AnnotateFileAsync(", main, StringComparison.Ordinal);
@@ -575,7 +592,7 @@ public sealed class AnnotationContractTests
     public void A_fresh_capture_is_forced_forward_and_an_existing_one_is_merely_activated()
     {
         var main = ReadFixture("MainWindow.xaml.cs.txt");
-        var open = Slice(main, "private void OpenEditor(", "private async Task RegisterEditedCopyAsync");
+        var open = Slice(main, "private AnnotationWindow OpenEditor(", "private async Task RegisterEditedCopyAsync");
 
         // A transient surface has just hidden itself on the capture path, so the source app
         // still owns the foreground lock and Activate() loses that race — this is the
@@ -694,6 +711,63 @@ public sealed class AnnotationContractTests
         // listed resource is missing, so the list has to name every top-level XAML.
         Assert.Contains("PinnedCaptureWindow.xbf", build, StringComparison.Ordinal);
         Assert.Contains("AnnotationWindow.xbf", build, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_tool_stays_armed_after_it_places_a_mark()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var commit = Slice(code, "private void Commit(AnnotationMark mark)", "private void PruneStaleVisuals()");
+
+        // Dropping back to Select after every mark made three arrows cost three key
+        // presses. Escape is still the way out, and still lands in Select first.
+        Assert.DoesNotContain("AnnotationTool.Select", commit, StringComparison.Ordinal);
+        var escape = Slice(code, "private void HandleEscape()", "private void Cancel()");
+        Assert.Contains("_tool = AnnotationTool.Select", escape, StringComparison.Ordinal);
+        // The text box never sees Escape (it is a global hotkey), so Escape closes it.
+        Assert.Contains("FinishText()", escape, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Digits_pick_the_size_and_shifted_digits_pick_the_ink()
+    {
+        var xaml = ReadFixture("AnnotationWindow.xaml");
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        foreach (var digit in new[] { 1, 2, 3 })
+        {
+            Assert.Contains($"<KeyboardAccelerator Key=\"Number{digit}\" Invoked=\"SizeAccelerator_Invoked\" />", xaml, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(7, Occurrences(xaml, "Modifiers=\"Shift\" Invoked=\"InkAccelerator_Invoked\""));
+        Assert.DoesNotContain("Key=\"Number4\" Invoked=\"InkAccelerator_Invoked\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VirtualKey.Number1 => AnnotationSizeStep.Small", code, StringComparison.Ordinal);
+        Assert.Contains("VirtualKey.Number3 => AnnotationSizeStep.Large", code, StringComparison.Ordinal);
+        Assert.Contains("VirtualKey.F => AnnotationTool.Focus", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Focus_is_F_and_the_step_marker_takes_a_size()
+    {
+        var focus = CursorPocket.Core.Annotations.AnnotationToolCatalog.Get(CursorPocket.Core.Annotations.AnnotationTool.Focus);
+        var step = CursorPocket.Core.Annotations.AnnotationToolCatalog.Get(CursorPocket.Core.Annotations.AnnotationTool.Step);
+
+        Assert.Equal("F", focus.Key);
+        Assert.True(step.Properties.HasFlag(CursorPocket.Core.Annotations.AnnotationToolProperties.Size));
+    }
+
+    [Fact]
+    public void A_fresh_capture_is_shown_from_memory_and_saved_over_only_once_written()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+        var save = Slice(code, "private async Task SaveAsync()", "private async Task<bool> CommittedAsync()");
+
+        Assert.Contains("frame.DisplayPixels", code, StringComparison.Ordinal);
+        Assert.Contains("_source = frame.Pixels", code, StringComparison.Ordinal);
+        Assert.True(
+            save.IndexOf("await CommittedAsync()", StringComparison.Ordinal) <
+            save.IndexOf("File.Move(temporary, _path, true)", StringComparison.Ordinal),
+            "Overwriting must wait for the capture's own file to land.");
     }
 
     private static int Occurrences(string source, string value)

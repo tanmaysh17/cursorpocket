@@ -20,12 +20,23 @@ public interface ICaptureTransaction
 
 public sealed class CaptureTransaction(CaptureStore store) : ICaptureTransaction
 {
-    public async Task<CaptureTransactionResult> CommitAsync(
+    public Task<CaptureTransactionResult> CommitAsync(
+        CaptureTransactionRequest request,
+        Func<string, CancellationToken, Task> write,
+        CancellationToken cancellationToken = default) =>
+        CommitReservedAsync(store.Reserve(request.Kind, request.Extension), request, write, cancellationToken);
+
+    /// <summary>
+    /// Writes into a reservation taken earlier. A screenshot reserves first so its final
+    /// path is known while the pixels are still in memory, which lets the editor open on
+    /// those pixels without waiting for the PNG to reach the disk.
+    /// </summary>
+    public async Task<CaptureTransactionResult> CommitReservedAsync(
+        CaptureReservation reservation,
         CaptureTransactionRequest request,
         Func<string, CancellationToken, Task> write,
         CancellationToken cancellationToken = default)
     {
-        var reservation = store.Reserve(request.Kind, request.Extension);
         var directory = Path.GetDirectoryName(reservation.AbsolutePath)!;
         var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(reservation.AbsolutePath)}.{Guid.NewGuid():N}.tmp");
         try
