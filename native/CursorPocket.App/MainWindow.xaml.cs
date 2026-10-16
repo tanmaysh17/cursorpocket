@@ -42,6 +42,19 @@ public sealed partial class MainWindow : Window
     private RegionSelectorWindow? _spareSelector;
     private AnnotationWindow? _spareEditor;
     private bool _warmQueued;
+
+    /// <summary>
+    /// The desktop, frozen on a worker thread as soon as screenshot mode opens. Choosing
+    /// a region then shows the selector over a frame that is already there, instead of
+    /// spending the grab — the largest remaining cost of a region shot — after the key.
+    /// </summary>
+    private Task<FrozenDesktop?>? _prefreeze;
+
+    /// <summary>
+    /// Past this a frame frozen at screenshot mode is stale enough to notice, and the
+    /// selector freezes a fresh one.
+    /// </summary>
+    private static readonly TimeSpan PrefreezeLimit = TimeSpan.FromSeconds(2);
     private readonly ReceiptCoordinator _receipts;
     private readonly DispatcherTimer _pendingUpdateTimer;
     private ApplicationUpdateInfo? _pendingUpdate;
@@ -187,8 +200,12 @@ public sealed partial class MainWindow : Window
     {
         _palette = new CommandPaletteWindow();
         _palette.CommandRequested += Palette_CommandRequested;
+        _palette.ScreenshotModeEntered += (_, _) => BeginPrefreeze();
         _palette.PaletteHidden += (_, _) =>
         {
+            // After the command that hid the palette has had its turn: a region command
+            // takes the frame synchronously, and anything else leaves it to be dropped.
+            DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, ReleasePrefreeze);
             if (_openLibraryAfterPaletteCloses)
             {
                 _openLibraryAfterPaletteCloses = false;
@@ -445,13 +462,15 @@ public sealed partial class MainWindow : Window
             case CaptureActionId.Region:
             {
                 var timeline = CaptureTimeline.Start("region");
+                var frozen = await TakePrefreezeAsync();
                 SelectRegion(
                     async selected => await CaptureScreenshotAsync(
                         () => selected.Snapshot is { } snapshot
                             ? App.Services.Screenshots.BeginFromSnapshotAsync(snapshot, selected.SnapshotLeft, selected.SnapshotTop, selected.Bounds)
                             : App.Services.Screenshots.BeginRegionAsync(selected.Bounds),
                         timeline),
-                    timeline);
+                    timeline,
+                    frozen);
                 break;
             }
             case CaptureActionId.PreviousRegion:
@@ -482,7 +501,8 @@ public sealed partial class MainWindow : Window
                 frame.Path,
                 AnnotationOrigin.FreshCapture,
                 cancelled: () => _ = ShowFreshCaptureReceiptAsync(frame.Committed, clipboard),
-                frame: frame);
+                frame: frame,
+                timeline: timeline);
             editor.CopyRequested += (_, _) => copiedFromEditor = true;
             timeline?.Mark("editor-shown");
 
@@ -631,6 +651,62 @@ public sealed partial class MainWindow : Window
                 });
             });
         }
+    }
+
+    private void BeginPrefreeze()
+    {
+        ReleasePrefreeze();
+        var desktop = DesktopSnapshot.VirtualDesktop();
+        _prefreeze = Task.Run<FrozenDesktop?>(() =>
+        {
+            try
+            {
+                return DesktopSnapshot.Freeze(desktop);
+            }
+            catch (Exception)
+            {
+                // Purely ahead-of-time work; the selector freezes its own frame instead.
+                return null;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Claims the frame frozen at screenshot mode. Waits if it is still being taken —
+    /// a grab already under way finishes sooner than a new one would.
+    /// </summary>
+    private async Task<FrozenDesktop?> TakePrefreezeAsync()
+    {
+        var pending = _prefreeze;
+        _prefreeze = null;
+        if (pending is null)
+        {
+            return null;
+        }
+
+        var frozen = await pending;
+        if (frozen is not null && frozen.Age > PrefreezeLimit)
+        {
+            frozen.Dispose();
+            return null;
+        }
+
+        return frozen;
+    }
+
+    private void ReleasePrefreeze()
+    {
+        var pending = _prefreeze;
+        _prefreeze = null;
+        pending?.ContinueWith(
+            completed =>
+            {
+                if (completed.IsCompletedSuccessfully)
+                {
+                    completed.Result?.Dispose();
+                }
+            },
+            TaskScheduler.Default);
     }
 
     private AnnotationWindow TakeEditor()
@@ -808,12 +884,15 @@ public sealed partial class MainWindow : Window
         string path,
         AnnotationOrigin origin,
         Action? cancelled = null,
-        ScreenshotFrame? frame = null)
+        ScreenshotFrame? frame = null,
+        CaptureTimeline? timeline = null)
     {
+        timeline?.Mark(_spareEditor is null ? "editor-cold" : "editor-spare");
         var editor = TakeEditor();
+        timeline?.Mark("editor-taken");
         try
         {
-            editor.Open(path, origin, frame);
+            editor.Open(path, origin, frame, timeline);
         }
         catch
         {
@@ -858,7 +937,9 @@ public sealed partial class MainWindow : Window
         if (origin == AnnotationOrigin.FreshCapture)
         {
             editor.AppWindow.Show(true);
+            timeline?.Mark("editor-show");
             WindowPlacement.ForceForeground(editor);
+            timeline?.Mark("editor-foreground");
         }
         else
         {
@@ -997,9 +1078,14 @@ public sealed partial class MainWindow : Window
     /// Shows the region selector. The callback owns the selection's desktop frame and
     /// must dispose it.
     /// </summary>
-    private void SelectRegion(Func<SelectedRegion, Task> callback, CaptureTimeline? timeline = null)
+    private void SelectRegion(
+        Func<SelectedRegion, Task> callback,
+        CaptureTimeline? timeline = null,
+        FrozenDesktop? frozen = null)
     {
+        timeline?.Mark(_spareSelector is null ? "selector-cold" : "selector-spare");
         var selector = TakeSelector();
+        timeline?.Mark("selector-taken");
         _regionSelectorOpen = true;
         selector.Closed += (_, _) =>
         {
@@ -1012,7 +1098,7 @@ public sealed partial class MainWindow : Window
             _lastRegion = selected.Bounds;
             await callback(selected);
         };
-        selector.Open();
+        selector.Open(timeline, frozen);
         timeline?.Mark("selector-shown");
     }
 

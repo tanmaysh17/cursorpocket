@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using CursorPocket.Core.Annotations;
+using CursorPocket.Core.Diagnostics;
 using CursorPocket.Core.Media;
 using CursorPocket.Core.Models;
 using CursorPocket_App.Services;
@@ -197,7 +198,7 @@ public sealed partial class AnnotationWindow : Window
     /// A fresh screenshot arrives as pixels already in memory, with its file still being
     /// written; anything else is read from <paramref name="path"/>.
     /// </summary>
-    public void Open(string path, AnnotationOrigin origin, ScreenshotFrame? frame = null)
+    public void Open(string path, AnnotationOrigin origin, ScreenshotFrame? frame = null, CaptureTimeline? timeline = null)
     {
         _opened = true;
         _path = path;
@@ -214,6 +215,7 @@ public sealed partial class AnnotationWindow : Window
             bounds.Top + 20,
             availableWidth,
             availableHeight));
+        timeline?.Mark("editor-placed");
 
         ImageSource displaySource;
         if (frame is null)
@@ -229,6 +231,7 @@ public sealed partial class AnnotationWindow : Window
 
         _sourceWidth = _source.Width;
         _sourceHeight = _source.Height;
+        timeline?.Mark("editor-preview");
 
         BuildToolRail();
         if (_constrainedLayout) ApplyConstrainedLayout();
@@ -247,8 +250,10 @@ public sealed partial class AnnotationWindow : Window
         ApplyToolState();
         ApplyHistoryState();
         RefreshGeometry();
+        timeline?.Mark("editor-laid-out");
 
         _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(HandleEscape));
+        timeline?.Mark("editor-escape-lease");
     }
 
     private void Theme_ThemeChanged(object? sender, EventArgs eventArgs) => DispatcherQueue.TryEnqueue(() =>

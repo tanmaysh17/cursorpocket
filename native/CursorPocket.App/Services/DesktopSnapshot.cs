@@ -1,8 +1,56 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace CursorPocket_App.Services;
+
+/// <summary>
+/// A grabbed desktop frame: the pixels, and the same pixels encoded for the backdrop.
+/// Produced without touching WinUI, so it can be made on a worker thread ahead of time.
+/// </summary>
+internal sealed class FrozenDesktop : IDisposable
+{
+    private readonly long _takenAt = Stopwatch.GetTimestamp();
+
+    public FrozenDesktop(NativeMethods.Rect bounds, Bitmap frame, MemoryStream encoded)
+    {
+        Bounds = bounds;
+        Frame = frame;
+        Encoded = encoded;
+    }
+
+    public NativeMethods.Rect Bounds { get; }
+
+    /// <summary>The pixels. Whoever takes it from here owns it.</summary>
+    public Bitmap? Frame { get; private set; }
+
+    public MemoryStream? Encoded { get; private set; }
+
+    public TimeSpan Age => Stopwatch.GetElapsedTime(_takenAt);
+
+    public Bitmap TakeFrame()
+    {
+        var frame = Frame ?? throw new ObjectDisposedException(nameof(FrozenDesktop));
+        Frame = null;
+        return frame;
+    }
+
+    public MemoryStream TakeEncoded()
+    {
+        var encoded = Encoded ?? throw new ObjectDisposedException(nameof(FrozenDesktop));
+        Encoded = null;
+        return encoded;
+    }
+
+    public void Dispose()
+    {
+        Frame?.Dispose();
+        Frame = null;
+        Encoded?.Dispose();
+        Encoded = null;
+    }
+}
 
 internal static class DesktopSnapshot
 {
@@ -16,12 +64,13 @@ internal static class DesktopSnapshot
     /// compression while handing the decoder an exact, lossless desktop frame.
     /// </para>
     /// <para>
-    /// The grabbed bitmap is handed back too, so a region can be cut straight out of
-    /// the frame the user was looking at rather than grabbing the screen again after
-    /// the selection. The caller owns it.
+    /// No WinUI is touched here, so this runs on a worker thread — and it can run
+    /// while command mode is still on screen, because a GDI screen grab cannot see
+    /// WinUI or DirectComposition surfaces. That is what lets the frame be taken the
+    /// moment screenshot mode opens instead of after the region command is chosen.
     /// </para>
     /// </summary>
-    public static BitmapImage Capture(NativeMethods.Rect bounds, out Bitmap frame)
+    public static FrozenDesktop Freeze(NativeMethods.Rect bounds)
     {
         var width = bounds.Right - bounds.Left;
         var height = bounds.Bottom - bounds.Top;
@@ -44,15 +93,37 @@ internal static class DesktopSnapshot
         catch
         {
             bitmap.Dispose();
+            encoded.Dispose();
             throw;
         }
 
         encoded.Position = 0;
-        frame = bitmap;
+        return new FrozenDesktop(bounds, bitmap, encoded);
+    }
 
+    /// <summary>
+    /// The backdrop for a frozen frame. Takes the encoded copy; the pixels stay with
+    /// <paramref name="frozen"/>. Must run on the UI thread.
+    /// </summary>
+    public static BitmapImage Present(FrozenDesktop frozen)
+    {
         var source = new BitmapImage();
-        _ = DecodeAsync(source, encoded);
+        _ = DecodeAsync(source, frozen.TakeEncoded());
         return source;
+    }
+
+    /// <summary>The current virtual desktop, in physical pixels.</summary>
+    public static NativeMethods.Rect VirtualDesktop()
+    {
+        var left = NativeMethods.GetSystemMetrics(NativeMethods.SmXVirtualScreen);
+        var top = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
+        return new NativeMethods.Rect
+        {
+            Left = left,
+            Top = top,
+            Right = left + NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen),
+            Bottom = top + NativeMethods.GetSystemMetrics(NativeMethods.SmCyVirtualScreen),
+        };
     }
 
     private static int EstimateCapacity(int width, int height)

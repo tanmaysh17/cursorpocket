@@ -308,6 +308,26 @@ public sealed class UtilitySurfaceContractTests
     }
 
     [Fact]
+    public void The_desktop_is_frozen_when_screenshot_mode_opens_not_after_the_region_key()
+    {
+        var palette = ReadFixture("CommandPaletteWindow.xaml.cs.txt");
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var screenshotMode = Slice(palette, "private void ShowScreenshotCommands()", "private void ShowPrimaryCommands()");
+
+        // The full-desktop grab was the largest cost left in a region shot. A GDI grab
+        // cannot see WinUI surfaces, so it can run while command mode is still up.
+        Assert.Contains("ScreenshotModeEntered?.Invoke", screenshotMode, StringComparison.Ordinal);
+        Assert.Contains("_palette.ScreenshotModeEntered += (_, _) => BeginPrefreeze();", main, StringComparison.Ordinal);
+        var region = Slice(main, "case CaptureActionId.Region:", "case CaptureActionId.PreviousRegion:");
+        Assert.True(
+            region.IndexOf("await TakePrefreezeAsync()", StringComparison.Ordinal) <
+            region.IndexOf("SelectRegion(", StringComparison.Ordinal));
+        // An unclaimed frame is dropped, and a stale one is never shown.
+        Assert.Contains("ReleasePrefreeze", main, StringComparison.Ordinal);
+        Assert.Contains("frozen.Age > PrefreezeLimit", main, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Region_selector_keeps_the_desktop_visible_while_selecting()
     {
         var xaml = ReadFixture("RegionSelectorWindow.xaml");
@@ -1030,6 +1050,15 @@ public sealed class UtilitySurfaceContractTests
         // A tray-only launch must not build the Library.
         Assert.Contains("StartedInBackground", app, StringComparison.Ordinal);
         Assert.Contains("EnsureLibraryLoadedAsync", ReadFixture("MainPage.xaml.cs.txt"), StringComparison.Ordinal);
+    }
+
+    private static string Slice(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"'{startMarker}' was not found.");
+        var end = source.IndexOf(endMarker, start + startMarker.Length, StringComparison.Ordinal);
+        Assert.True(end >= 0, $"'{endMarker}' was not found after '{startMarker}'.");
+        return source[start..end];
     }
 
     private static string ReadFixture(string name) =>

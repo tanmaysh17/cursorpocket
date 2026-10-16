@@ -1,3 +1,4 @@
+using CursorPocket.Core.Diagnostics;
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
@@ -54,25 +55,43 @@ public sealed partial class RegionSelectorWindow : Window
 
     public event EventHandler<SelectedRegion>? RegionSelected;
 
-    /// <summary>Freezes the desktop under the selector and shows it.</summary>
-    public void Open()
+    /// <summary>
+    /// Shows the selector over a frozen desktop frame. Command mode usually froze one
+    /// already, when screenshot mode opened; this takes ownership of it. Without one —
+    /// or if the displays changed since — the desktop is frozen here instead.
+    /// </summary>
+    internal void Open(CaptureTimeline? timeline = null, FrozenDesktop? frozen = null)
     {
-        _virtualLeft = NativeMethods.GetSystemMetrics(NativeMethods.SmXVirtualScreen);
-        _virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
-        var width = NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen);
-        var height = NativeMethods.GetSystemMetrics(NativeMethods.SmCyVirtualScreen);
-        BackdropImage.Source = DesktopSnapshot.Capture(new NativeMethods.Rect
+        var desktop = DesktopSnapshot.VirtualDesktop();
+        if (frozen is not null && !SameArea(frozen.Bounds, desktop))
         {
-            Left = _virtualLeft,
-            Top = _virtualTop,
-            Right = _virtualLeft + width,
-            Bottom = _virtualTop + height,
-        }, out var frame);
-        _snapshot = frame;
+            frozen.Dispose();
+            frozen = null;
+        }
+
+        timeline?.Mark(frozen is null ? "selector-freezing" : "selector-prefrozen");
+        frozen ??= DesktopSnapshot.Freeze(desktop);
+        using (frozen)
+        {
+            BackdropImage.Source = DesktopSnapshot.Present(frozen);
+            _snapshot = frozen.TakeFrame();
+        }
+
+        _virtualLeft = desktop.Left;
+        _virtualTop = desktop.Top;
+        var width = desktop.Right - desktop.Left;
+        var height = desktop.Bottom - desktop.Top;
+        timeline?.Mark("selector-snapshot");
         AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
+        timeline?.Mark("selector-placed");
         _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
+        timeline?.Mark("selector-escape-lease");
         Activate();
     }
+
+    private static bool SameArea(NativeMethods.Rect first, NativeMethods.Rect second) =>
+        first.Left == second.Left && first.Top == second.Top
+        && first.Right == second.Right && first.Bottom == second.Bottom;
 
     private void Surface_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
