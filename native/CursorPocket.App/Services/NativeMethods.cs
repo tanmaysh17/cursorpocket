@@ -185,6 +185,12 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetCursorPos(out Point point);
 
+    internal const int VkLButton = 0x01;
+    internal const int VkRButton = 0x02;
+
+    [DllImport("user32.dll")]
+    internal static extern short GetAsyncKeyState(int virtualKey);
+
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);
 

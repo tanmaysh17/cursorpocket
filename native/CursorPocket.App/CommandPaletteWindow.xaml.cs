@@ -207,6 +207,12 @@ public sealed partial class CommandPaletteWindow : Window
     public event EventHandler<CaptureActionId>? CommandRequested;
     public event EventHandler? PaletteHidden;
 
+    /// <summary>
+    /// Raised when the screenshot choices come up. MainWindow freezes the desktop on
+    /// this, so the frame is ready by the time a region is asked for.
+    /// </summary>
+    public event EventHandler? ScreenshotModeEntered;
+
     private void Command_Click(object sender, RoutedEventArgs eventArgs)
     {
         ResetTimeout();
@@ -285,6 +291,7 @@ public sealed partial class CommandPaletteWindow : Window
         ApplySavedPlacement();
         RegionCommand.Focus(FocusState.Programmatic);
         ResetTimeout();
+        ScreenshotModeEntered?.Invoke(this, EventArgs.Empty);
     }
 
     private void ShowPrimaryCommands()

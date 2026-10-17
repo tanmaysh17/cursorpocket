@@ -1,3 +1,4 @@
+using CursorPocket.Core.Diagnostics;
 using CursorPocket.Core.Models;
 using CursorPocket.Core.Services;
 using CursorPocket_App.Services;
@@ -11,38 +12,86 @@ using Point = Windows.Foundation.Point;
 
 namespace CursorPocket_App;
 
+/// <summary>
+/// What the user selected, plus the frozen desktop frame it was selected from. Whoever
+/// handles the selection owns <see cref="Snapshot"/> and must dispose it.
+/// </summary>
+public sealed record SelectedRegion(
+    CaptureBounds Bounds,
+    System.Drawing.Bitmap? Snapshot,
+    int SnapshotLeft,
+    int SnapshotTop);
+
 public sealed partial class RegionSelectorWindow : Window
 {
-    private readonly IDisposable _escapeLease;
+    private IDisposable? _escapeLease;
+    private System.Drawing.Bitmap? _snapshot;
     private Point _start;
     private (int X, int Y) _startPhysical;
     private bool _dragging;
     private int _virtualLeft;
     private int _virtualTop;
 
+    /// <summary>
+    /// Builds the window without showing it. Construction is the expensive, state-free
+    /// part (XAML, theme, window styles), so MainWindow keeps one built ahead of time and
+    /// <see cref="Open"/> does only what has to happen at the moment of capture. Each
+    /// instance is still used once and closed: nothing from one selection can leak into
+    /// the next.
+    /// </summary>
     public RegionSelectorWindow()
     {
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.CaptureOverlay);
         WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
-        _virtualLeft = NativeMethods.GetSystemMetrics(NativeMethods.SmXVirtualScreen);
-        _virtualTop = NativeMethods.GetSystemMetrics(NativeMethods.SmYVirtualScreen);
-        var width = NativeMethods.GetSystemMetrics(NativeMethods.SmCxVirtualScreen);
-        var height = NativeMethods.GetSystemMetrics(NativeMethods.SmCyVirtualScreen);
-        BackdropImage.Source = DesktopSnapshot.Capture(new NativeMethods.Rect
-        {
-            Left = _virtualLeft,
-            Top = _virtualTop,
-            Right = _virtualLeft + width,
-            Bottom = _virtualTop + height,
-        });
-        AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
-        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
         Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
-        Closed += (_, _) => _escapeLease.Dispose();
+        Closed += (_, _) =>
+        {
+            _escapeLease?.Dispose();
+            _snapshot?.Dispose();
+            _snapshot = null;
+        };
     }
 
-    public event EventHandler<CaptureBounds>? RegionSelected;
+    public event EventHandler<SelectedRegion>? RegionSelected;
+
+    /// <summary>
+    /// Shows the selector over a frozen desktop frame. Command mode usually froze one
+    /// already, when screenshot mode opened; this takes ownership of it. Without one —
+    /// or if the displays changed since — the desktop is frozen here instead.
+    /// </summary>
+    internal void Open(CaptureTimeline? timeline = null, FrozenDesktop? frozen = null)
+    {
+        var desktop = DesktopSnapshot.VirtualDesktop();
+        if (frozen is not null && !SameArea(frozen.Bounds, desktop))
+        {
+            frozen.Dispose();
+            frozen = null;
+        }
+
+        timeline?.Mark(frozen is null ? "selector-freezing" : "selector-prefrozen");
+        frozen ??= DesktopSnapshot.Freeze(desktop);
+        using (frozen)
+        {
+            BackdropImage.Source = DesktopSnapshot.Present(frozen);
+            _snapshot = frozen.TakeFrame();
+        }
+
+        _virtualLeft = desktop.Left;
+        _virtualTop = desktop.Top;
+        var width = desktop.Right - desktop.Left;
+        var height = desktop.Bottom - desktop.Top;
+        timeline?.Mark("selector-snapshot");
+        AppWindow.MoveAndResize(new RectInt32(_virtualLeft, _virtualTop, width, height));
+        timeline?.Mark("selector-placed");
+        _escapeLease = App.Services.EscapeHotkey.Capture(() => DispatcherQueue.TryEnqueue(Cancel));
+        timeline?.Mark("selector-escape-lease");
+        Activate();
+    }
+
+    private static bool SameArea(NativeMethods.Rect first, NativeMethods.Rect second) =>
+        first.Left == second.Left && first.Top == second.Top
+        && first.Right == second.Right && first.Bottom == second.Bottom;
 
     private void Surface_PointerPressed(object sender, PointerRoutedEventArgs eventArgs)
     {
@@ -82,8 +131,12 @@ public sealed partial class RegionSelectorWindow : Window
             Close();
             return;
         }
+
+        // The frame leaves with the selection, so Closed must not dispose it.
+        var snapshot = _snapshot;
+        _snapshot = null;
         Close();
-        RegionSelected?.Invoke(this, bounds);
+        RegionSelected?.Invoke(this, new SelectedRegion(bounds, snapshot, _virtualLeft, _virtualTop));
     }
 
     private void UpdateSelection(Point point)

@@ -59,9 +59,10 @@ internal static class AnnotationExport
         using (var graphics = Graphics.FromImage(composited))
         {
             Configure(graphics);
+            var dimRegions = FocusDimming.Regions(marks);
             foreach (var mark in marks)
             {
-                Draw(graphics, source, mark);
+                Draw(graphics, source, mark, dimRegions);
             }
         }
 
@@ -187,7 +188,11 @@ internal static class AnnotationExport
     internal static double CornerRadiusFor(double width, double height) =>
         Math.Clamp(Math.Min(width, height) * 0.16, 4, 48);
 
-    private static void Draw(Graphics graphics, Bitmap source, AnnotationMark mark)
+    private static void Draw(
+        Graphics graphics,
+        Bitmap source,
+        AnnotationMark mark,
+        IReadOnlyList<FocusMark> dimRegions)
     {
         var colour = ToGdi(mark.Colour);
 
@@ -294,7 +299,7 @@ internal static class AnnotationExport
             }
 
             case FocusMark focus:
-                DrawFocus(graphics, source, focus);
+                DrawFocus(graphics, source, focus, dimRegions);
                 break;
 
             case TextMark text:
@@ -378,7 +383,11 @@ internal static class AnnotationExport
         graphics.DrawString(label, font, text, bounds, format);
     }
 
-    private static void DrawFocus(Graphics graphics, Bitmap source, FocusMark focus)
+    private static void DrawFocus(
+        Graphics graphics,
+        Bitmap source,
+        FocusMark focus,
+        IReadOnlyList<FocusMark> dimRegions)
     {
         var rect = ToRect(focus.Rect);
         if (rect.Width <= 0 || rect.Height <= 0)
@@ -407,12 +416,25 @@ internal static class AnnotationExport
             return;
         }
 
-        // Dim everything outside the shape: one path holding the whole image and the
-        // shape, filled with the alternate rule so the shape punches a hole.
+        // Every dim focus shares one layer, drawn by the first; the rest only add holes.
+        if (!FocusDimming.OwnsLayer(focus, dimRegions))
+        {
+            return;
+        }
+
+        // Dim everything outside the shapes: one path holding the whole image and every
+        // shape, filled with the alternate rule so each shape punches a hole.
         using var mask = new GraphicsPath { FillMode = FillMode.Alternate };
         mask.AddRectangle(new RectangleF(0, 0, source.Width, source.Height));
-        using (var inner = ShapePath(rect, focus.Shape))
+        foreach (var region in dimRegions)
         {
+            var hole = ToRect(region.Rect);
+            if (hole.Width <= 0 || hole.Height <= 0)
+            {
+                continue;
+            }
+
+            using var inner = ShapePath(hole, region.Shape);
             mask.AddPath(inner, connect: false);
         }
 
