@@ -770,6 +770,18 @@ public sealed class AnnotationContractTests
             "Overwriting must wait for the capture's own file to land.");
     }
 
+    [Fact]
+    public void Spares_are_replaced_once_the_editor_is_up_not_when_it_closes()
+    {
+        var main = ReadFixture("MainWindow.xaml.cs.txt");
+        var open = Slice(main, "private AnnotationWindow OpenEditor(", "editor.Closed += (_, _) =>");
+        var warm = Slice(main, "private void ScheduleWarmSurfaces(", "private void BeginPrefreeze()");
+
+        Assert.Contains("WarmWhenReadyAsync(editor.Ready)", open, StringComparison.Ordinal);
+        Assert.Contains("MouseButtonHeld()", warm, StringComparison.Ordinal);
+        Assert.DoesNotContain("_activeEditors", warm, StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string source, string value)
     {
         var count = 0;

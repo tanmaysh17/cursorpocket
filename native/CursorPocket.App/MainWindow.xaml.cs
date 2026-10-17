@@ -606,10 +606,17 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Builds the spare region selector and editor once the app is idle. Each is built
-    /// in its own low-priority turn so input can be handled between the two. Building
-    /// ahead is purely an optimisation: if a spare is missing, the capture path builds
-    /// its own window exactly as it always did.
+    /// Builds the spare region selector and editor. Each is built in its own
+    /// low-priority turn so input can be handled between the two. Building ahead is
+    /// purely an optimisation: if a spare is missing, the capture path builds its own
+    /// window exactly as it always did.
+    /// <para>
+    /// Replacements are built as soon as the editor that used a spare is up, not once
+    /// it closes: shots are often taken back to back, and waiting for the close left the
+    /// next capture to build both windows on its own critical path. The one moment that
+    /// is avoided is a held mouse button — a window build mid-stroke is a visible hitch
+    /// in the mark being drawn — so the build waits for the button to come up.
+    /// </para>
     /// </summary>
     private void ScheduleWarmSurfaces(TimeSpan? delay = null)
     {
@@ -619,23 +626,20 @@ public sealed partial class MainWindow : Window
         }
 
         _warmQueued = true;
-        _ = WarmAsync(delay ?? TimeSpan.FromSeconds(2));
+        _ = WarmAsync(delay ?? WarmDelay);
 
         async Task WarmAsync(TimeSpan wait)
         {
-            // Wait until whatever just closed — usually an editor — is fully gone, so
-            // building the next one never competes with it.
+            // Let whatever just appeared or closed finish its first frames, so building
+            // the next window never competes with it.
             await Task.Delay(wait);
+            while (!_quitting && MouseButtonHeld())
+            {
+                await Task.Delay(WarmDelay);
+            }
+
             DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
             {
-                // Never while someone is drawing: building a window is a visible hitch,
-                // and the editor's own Closed schedules this again anyway.
-                if (Volatile.Read(ref _activeEditors) > 0)
-                {
-                    _warmQueued = false;
-                    return;
-                }
-
                 if (!_quitting && _spareSelector is null && !_regionSelectorOpen)
                 {
                     try { _spareSelector = new RegionSelectorWindow(); } catch (Exception) { }
@@ -652,6 +656,16 @@ public sealed partial class MainWindow : Window
             });
         }
     }
+
+    /// <summary>
+    /// Long enough for a surface that has just been shown or closed to paint, short
+    /// enough that a spare is back before a deliberate second capture.
+    /// </summary>
+    private static readonly TimeSpan WarmDelay = TimeSpan.FromMilliseconds(250);
+
+    private static bool MouseButtonHeld() =>
+        (NativeMethods.GetAsyncKeyState(NativeMethods.VkLButton) & 0x8000) != 0
+        || (NativeMethods.GetAsyncKeyState(NativeMethods.VkRButton) & 0x8000) != 0;
 
     private void BeginPrefreeze()
     {
@@ -707,6 +721,24 @@ public sealed partial class MainWindow : Window
                 }
             },
             TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Replaces the spares once this editor is interactive, so a second capture taken
+    /// while it is still open — or right after it closes — finds them already built.
+    /// </summary>
+    private async Task WarmWhenReadyAsync(Task ready)
+    {
+        try
+        {
+            await ready;
+        }
+        catch (Exception)
+        {
+            // The editor's Closed still schedules the warm-up.
+        }
+
+        ScheduleWarmSurfaces();
     }
 
     private AnnotationWindow TakeEditor()
@@ -901,6 +933,7 @@ public sealed partial class MainWindow : Window
         }
 
         Interlocked.Increment(ref _activeEditors);
+        _ = WarmWhenReadyAsync(editor.Ready);
         editor.Closed += (_, _) =>
         {
             Interlocked.Decrement(ref _activeEditors);
