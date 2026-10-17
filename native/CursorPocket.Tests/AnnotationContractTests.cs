@@ -126,18 +126,20 @@ public sealed class AnnotationContractTests
     }
 
     [Fact]
-    public void Escape_returns_to_select_first_and_then_keeps_the_original()
+    public void Escape_cancels_anything_in_flight_and_otherwise_keeps_the_original()
     {
         var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
 
         var escape = Slice(code, "private void HandleEscape()", "private void Cancel()");
-        // Two stage: an armed creation tool returns to Select, and Escape from Select
-        // closes. The last press always keeps the original, so nothing is ever lost —
-        // it can just take two presses. A dead-feeling first press is the risk, so the
-        // status strip has to say what the next press will do.
-        Assert.Contains("AnnotationTool.Select", escape, StringComparison.Ordinal);
-        Assert.Contains("Esc again to keep the original", escape, StringComparison.Ordinal);
+        // Whatever is in flight goes first — a drag, an open text label — and otherwise
+        // Escape closes in one press. Tools stay armed after a mark, so a stage that
+        // only returned to Select would turn every close into a double press; that
+        // stage used to exist and must not come back.
+        Assert.Contains("_dragging", escape, StringComparison.Ordinal);
+        Assert.Contains("_textEditor", escape, StringComparison.Ordinal);
         Assert.Contains("Cancel();", escape, StringComparison.Ordinal);
+        Assert.DoesNotContain("_tool = AnnotationTool.Select", escape, StringComparison.Ordinal);
+        Assert.DoesNotContain("Esc again to keep the original", escape, StringComparison.Ordinal);
 
         var cancel = Slice(code, "private void Cancel()", "// ------");
         Assert.Contains("Cancelled?.Invoke", cancel, StringComparison.Ordinal);
@@ -375,7 +377,7 @@ public sealed class AnnotationContractTests
         var main = ReadFixture("MainWindow.xaml.cs.txt");
         var capture = Slice(main, "private async Task CaptureScreenshotAsync", "private void SelectRegion");
         var flow = Slice(main, "private async Task CaptureScreenshotAsync", "private async Task<bool?> CopyWhenCommittedAsync");
-        var copy = Slice(main, "private async Task<bool?> CopyWhenCommittedAsync", "private async Task ShowFreshCaptureReceiptAsync");
+        var copy = Slice(main, "private async Task<bool?> CopyWhenCommittedAsync", "private static async Task WriteTimelineAsync");
 
         // Nothing stands between the pixels and the editor: the clipboard flush and the
         // PNG write used to, and together they were most of the wait.
@@ -397,9 +399,28 @@ public sealed class AnnotationContractTests
         // minimized — this is why ForceForeground exists.
         Assert.Contains("WindowPlacement.ForceForeground(editor)", capture, StringComparison.Ordinal);
 
-        // Both outcomes produce a receipt; a capture never completes silently.
-        Assert.Contains("editor.Saved", capture, StringComparison.Ordinal);
-        Assert.Contains("editor.Cancelled", capture, StringComparison.Ordinal);
+        // No success receipt on the screenshot path: the editor is the confirmation.
+        // The capture step announces only a busy clipboard, and the editor's own Save
+        // copies again and likewise speaks up only when that copy fails.
+        Assert.DoesNotContain("\"Screenshot saved\"", capture, StringComparison.Ordinal);
+        Assert.DoesNotContain("editor.Cancelled", capture, StringComparison.Ordinal);
+        var wiring = Slice(main, "private AnnotationWindow OpenEditor(", "private async Task RegisterEditedCopyAsync");
+        Assert.Contains("editor.Saved", wiring, StringComparison.Ordinal);
+        Assert.Contains("if (!copied)", wiring, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveTarget.Describe", wiring, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowReceipt(", wiring, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_committed_mark_leaves_the_tool_armed()
+    {
+        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
+
+        // Three arrows in a row is three drags, not three presses of A. The strip is
+        // still refreshed, so it goes on describing the armed tool.
+        var commit = Slice(code, "private void Commit(", "private void PruneStaleVisuals");
+        Assert.DoesNotContain("AnnotationTool.Select", commit, StringComparison.Ordinal);
+        Assert.Contains("ApplyToolState()", commit, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -711,21 +732,6 @@ public sealed class AnnotationContractTests
         // listed resource is missing, so the list has to name every top-level XAML.
         Assert.Contains("PinnedCaptureWindow.xbf", build, StringComparison.Ordinal);
         Assert.Contains("AnnotationWindow.xbf", build, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void A_tool_stays_armed_after_it_places_a_mark()
-    {
-        var code = ReadFixture("AnnotationWindow.xaml.cs.txt");
-        var commit = Slice(code, "private void Commit(AnnotationMark mark)", "private void PruneStaleVisuals()");
-
-        // Dropping back to Select after every mark made three arrows cost three key
-        // presses. Escape is still the way out, and still lands in Select first.
-        Assert.DoesNotContain("AnnotationTool.Select", commit, StringComparison.Ordinal);
-        var escape = Slice(code, "private void HandleEscape()", "private void Cancel()");
-        Assert.Contains("_tool = AnnotationTool.Select", escape, StringComparison.Ordinal);
-        // The text box never sees Escape (it is a global hotkey), so Escape closes it.
-        Assert.Contains("FinishText()", escape, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -2,13 +2,18 @@
 
 ## Unreleased
 
-## 0.4.20 — 2026-10-15
+## 0.4.21 — 2026-10-16
 
 - Let several Focus regions spotlight different parts of a screenshot at once: each new dim region opens another bright hole in one shared dim layer instead of darkening the earlier regions, live while dragging and identically in the saved file.
-- Kept the chosen annotation tool armed after each mark, so several arrows, boxes, or numbered steps no longer need the tool key pressed again; Escape still returns to Select first.
 - Moved size and colour under the tools in one left rail, with Small, Medium, and Large as three direct choices on keys 1, 2, and 3; colours moved to Shift+1–7, Focus moved to F, and the right-hand inspector is gone, with Undo, Redo, Pin, Copy, Keep original, and Save in the bottom bar.
 - Made screenshots reach the editor faster: the editor opens on the pixels already in memory while the PNG is written and copied in the background, a region is cut from the frozen frame instead of grabbing the screen twice, the desktop is frozen the moment screenshot mode opens, and the region selector and editor are built ahead of time and replaced as soon as the editor is up, so back-to-back shots stay fast.
 - Added an opt-in local timing log (`CURSORPOCKET_PERF=1` writes `%LOCALAPPDATA%\CursorPocket\perf.log`) for measuring the capture path.
+
+## 0.4.20 — 2026-09-13
+
+- Removed the receipt card after screenshots: the annotation editor that opens is the confirmation, so Save, keep-original, edited copies, and pins no longer show one. Only a busy clipboard or a failure is announced.
+- Kept the annotation tool armed after each mark, so repeated arrows, boxes, or labels no longer need the tool re-selected.
+- Made `Escape` in the editor close in one press when nothing is in flight; it still cancels an in-progress drag or an open text label first.
 
 ## 0.4.19 — 2026-08-31
 

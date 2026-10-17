@@ -116,6 +116,12 @@ public sealed partial class AnnotationWindow : Window
     /// </summary>
     private AnnotationTool _toolBeforeEyedrop = AnnotationTool.Arrow;
 
+    /// <summary>
+    /// The inline text box while a label is being typed, so Escape can drop it instead
+    /// of closing the whole editor around it. Null whenever no label is open.
+    /// </summary>
+    private TextBox? _textEditor;
+
     /// <summary>Which crop corner is being dragged, if any. Its opposite is the anchor.</summary>
     private (int Dx, int Dy)? _cropCorner;
 
@@ -1164,10 +1170,10 @@ public sealed partial class AnnotationWindow : Window
         RefreshDimLayer();
         ApplyHistoryState();
 
-        // The tool stays armed: three arrows are three drags, and three step markers are
-        // three clicks. Dropping back to Select after every mark made each one cost a key
-        // press. Escape is still the way out, and still two-stage, because Select remains
-        // the inert state the first press lands in.
+        // The tool stays armed: three arrows in a row is three drags, not three presses
+        // of A. The new mark is deliberately not selected, because fresh handles on a
+        // just-drawn arrow are noise, and a stray drag is one Ctrl+Z away. The strip is
+        // refreshed so it keeps describing the armed tool rather than the last gesture.
         ApplyToolState();
     }
 
@@ -1997,16 +2003,12 @@ public sealed partial class AnnotationWindow : Window
 
     // ---------------------------------------------------------------------- text tool
 
-    /// <summary>The inline label being typed, if any. One at a time.</summary>
-    private TextBox? _textEditor;
-
     private Action? _finishText;
 
     /// <summary>
     /// Commits the label being typed, if there is one. The Text tool stays armed, so a
-    /// click elsewhere starts the next label — and Escape arrives through a global hotkey
-    /// the text box never sees — so both have to close the open editor rather than leave
-    /// it stranded on the canvas.
+    /// click elsewhere starts the next label, and that has to close the open editor
+    /// rather than leave it stranded on the canvas.
     /// </summary>
     private bool FinishText()
     {
@@ -2035,9 +2037,9 @@ public sealed partial class AnnotationWindow : Window
         Canvas.SetLeft(editor, point.X);
         Canvas.SetTop(editor, point.Y);
         DrawingSurface.Children.Add(editor);
-        editor.Focus(FocusState.Programmatic);
         _textEditor = editor;
         _finishText = Finish;
+        editor.Focus(FocusState.Programmatic);
 
         editor.KeyDown += (_, args) =>
         {
@@ -2725,9 +2727,10 @@ public sealed partial class AnnotationWindow : Window
     }
 
     /// <summary>
-    /// Escape returns an armed creation tool to Select, and closes once already in
-    /// Select. The last press always keeps the original, so nothing is ever lost — it
-    /// can just take two presses now. The status strip says so after the first.
+    /// Escape cancels whatever is in flight — an overlay, a drag, an open text box — and
+    /// otherwise closes the editor keeping the original. It does not disarm the tool
+    /// first: tools stay armed after a mark, so a stage that only returned to Select
+    /// would make every close a double press.
     /// </summary>
     private void HandleEscape()
     {
@@ -2745,13 +2748,6 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
-        // Escape is a global hotkey here, so the text box never sees it. Keep what was
-        // typed — Escape never throws work away on this surface.
-        if (FinishText())
-        {
-            return;
-        }
-
         if (_dragging)
         {
             _dragging = false;
@@ -2766,11 +2762,14 @@ public sealed partial class AnnotationWindow : Window
             return;
         }
 
-        if (_tool != AnnotationTool.Select)
+        if (_textEditor is not null)
         {
-            _tool = AnnotationTool.Select;
-            ApplyToolState();
-            StatusToolText.Text = "SELECT · Esc again to keep the original";
+            // Typed text is dropped, nothing is committed, and the editor stays open:
+            // Escape while typing means "not this label", not "not this screenshot".
+            DrawingSurface.Children.Remove(_textEditor);
+            _textEditor = null;
+            _finishText = null;
+            CanvasHost.Focus(FocusState.Programmatic);
             return;
         }
 

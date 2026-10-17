@@ -77,7 +77,7 @@ Live verification on the installed build after `ba71232` confirmed:
 
 - `Escape` during an audio recording stops and saves, producing the saved receipt;
 - `Escape` closes region selection without creating a capture;
-- `Escape` closes annotation and keeps the original screenshot, producing the expected receipt;
+- `Escape` closes annotation and keeps the original screenshot (since the receipt change, no card follows a screenshot; only a busy clipboard is announced);
 - the installed `CursorPocket.dll` matches the release build and the app remains responsive in background mode.
 
 The recording HUD and receipt use capture exclusion, so Windows Graphics Capture-based automation may show the underlying source rather than those surfaces. Use accessibility inspection for state/actions and direct visual inspection on the unlocked desktop for chrome.

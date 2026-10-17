@@ -495,19 +495,17 @@ public sealed partial class MainWindow : Window
             var frame = await begin();
             timeline?.Mark("pixels");
             var copiedFromEditor = false;
-            var clipboard = Task.FromResult<bool?>(false);
             var editor = OpenEditor(
                 frame.Committed,
                 frame.Path,
                 AnnotationOrigin.FreshCapture,
-                cancelled: () => _ = ShowFreshCaptureReceiptAsync(frame.Committed, clipboard),
                 frame: frame,
                 timeline: timeline);
             editor.CopyRequested += (_, _) => copiedFromEditor = true;
             timeline?.Mark("editor-shown");
 
             // Pasteable as soon as the file exists, without ever holding the editor back.
-            clipboard = CopyWhenCommittedAsync(frame, () => copiedFromEditor, timeline);
+            var clipboard = CopyWhenCommittedAsync(frame, () => copiedFromEditor, timeline);
             if (timeline is not null)
             {
                 _ = WriteTimelineAsync(timeline, editor.Ready, clipboard);
@@ -548,27 +546,14 @@ public sealed partial class MainWindow : Window
 
         var copied = await CopyImageToClipboardAsync(frame.Path);
         timeline?.Mark("clipboard");
+        if (!copied)
+        {
+            // The one receipt on the screenshot path, and only when something went
+            // wrong: the editor itself is the confirmation that the shot was taken.
+            ShowClipboardBusy("Screenshot saved · clipboard was busy", "Paste will not work until you copy from the editor.");
+        }
+
         return copied;
-    }
-
-    private async Task ShowFreshCaptureReceiptAsync(Task<CaptureRecord> committed, Task<bool?> clipboard)
-    {
-        CaptureRecord record;
-        try
-        {
-            record = await committed;
-        }
-        catch (Exception)
-        {
-            // Already reported by CopyWhenCommittedAsync.
-            return;
-        }
-
-        var copied = await clipboard;
-        ShowReceipt(
-            record,
-            copied == true ? "Screenshot saved · copied" : "Screenshot saved",
-            copied == false ? "The clipboard was busy. The saved capture is safe." : null);
     }
 
     /// <summary>Appends one capture's step timings to the local perf log.</summary>
@@ -910,12 +895,15 @@ public sealed partial class MainWindow : Window
     /// fresh capture needs ForceForeground because a transient surface has just hidden
     /// itself and the source app still owns the foreground lock, whereas an editor opened
     /// from the Library comes from a window that already has focus.
+    ///
+    /// No outcome of the editor produces a success receipt. The user has just been
+    /// looking at the full-resolution image, so a thumbnail card telling them it was
+    /// saved adds nothing; only a problem (a busy clipboard, a failed write) is announced.
     /// </summary>
     private AnnotationWindow OpenEditor(
         Task<CaptureRecord> record,
         string path,
         AnnotationOrigin origin,
-        Action? cancelled = null,
         ScreenshotFrame? frame = null,
         CaptureTimeline? timeline = null)
     {
@@ -939,10 +927,6 @@ public sealed partial class MainWindow : Window
             Interlocked.Decrement(ref _activeEditors);
             ScheduleWarmSurfaces();
         };
-        if (cancelled is not null)
-        {
-            editor.Cancelled += (_, _) => cancelled();
-        }
 
         editor.CopyRequested += async (_, temporary) =>
         {
@@ -961,10 +945,12 @@ public sealed partial class MainWindow : Window
         editor.Saved += async (_, _) =>
         {
             // The editor only raises Saved after the capture's own commit has finished.
-            var saved = await record;
+            await record;
             var copied = await CopyImageToClipboardAsync(path);
-            ShowReceipt(saved, SaveTarget.Describe(AnnotationSaveMode.Overwrite, copied),
-                copied ? null : "Saved successfully, but the clipboard was busy.");
+            if (!copied)
+            {
+                ShowClipboardBusy("Saved, but the clipboard was busy", "The screenshot is on disk. Copy it from the Library to paste it.");
+            }
         };
 
         if (origin == AnnotationOrigin.FreshCapture)
@@ -1033,8 +1019,10 @@ public sealed partial class MainWindow : Window
                 new Dictionary<string, object?> { ["width"] = width, ["height"] = height });
 
             var copied = await CopyImageToClipboardAsync(reservation.AbsolutePath);
-            ShowReceipt(record, SaveTarget.Describe(AnnotationSaveMode.NewCapture, copied),
-                copied ? null : "Saved successfully, but the clipboard was busy.");
+            if (!copied)
+            {
+                ShowClipboardBusy("Edited copy saved, but the clipboard was busy", "The copy is on disk. Copy it from the Library to paste it.");
+            }
         }
         catch (Exception error)
         {
@@ -1059,8 +1047,8 @@ public sealed partial class MainWindow : Window
                 reservation.AbsolutePath,
                 $"Screenshot · {bitmap.Width} × {bitmap.Height}",
                 new Dictionary<string, object?> { ["width"] = bitmap.Width, ["height"] = bitmap.Height });
+            // The pin itself is the confirmation; a receipt beside it would be a second card.
             PinCapture(record, reservation.AbsolutePath);
-            ShowReceipt(record, "Screenshot saved and pinned");
         }
         catch (Exception error)
         {
@@ -1244,6 +1232,13 @@ public sealed partial class MainWindow : Window
 
     private void ShowError(string title, string detail)
         => _receipts.Show(new ReceiptRequest(null, title, detail, VisualKind: ReceiptVisualKind.Error));
+
+    /// <summary>
+    /// The screenshot path's only non-error receipt. A busy clipboard is not a failure
+    /// — the file is safe — but the user is about to paste, so it has to be said.
+    /// </summary>
+    private void ShowClipboardBusy(string title, string detail)
+        => _receipts.Show(new ReceiptRequest(null, title, detail, VisualKind: ReceiptVisualKind.Information));
 
     public async Task<ApplicationUpdateCheckResult> CheckForUpdatesAsync(bool force = true)
     {
