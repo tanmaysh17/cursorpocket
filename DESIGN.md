@@ -6,7 +6,7 @@ CursorPocket is an instrumental, local-first Windows utility: it should feel pre
 
 1. **Source first.** Command mode uses desktop acrylic to preserve the live source context without obscuring it.
 2. **One deliberate next action.** Each surface has one dominant decision: choose a command, confirm a recording, stop and save, or inspect a capture.
-3. **State is visible.** Green means ready/saved. Red is reserved for recording, discard, and destructive action. Every successful or failed capture produces a receipt.
+3. **State is visible.** Green means ready/saved. Red is reserved for recording, discard, and destructive action. Every failed capture produces a receipt, and so does every successful video, audio, text, and link capture. A successful screenshot does not: the full-resolution editor that opens is its confirmation, and a card after it would repeat what the user was just looking at. Only a busy clipboard is announced.
 4. **Local is legible.** Device names, the capture folder, final file type, and reveal/open actions are explicit. There are no cloud, account, sharing, or analytics affordances.
 5. **Transient versus persistent.** The edge overlay, cursor companion, HUD, and receipts are compact transient tools. Library and Settings are normal movable, resizable Windows surfaces.
 
@@ -180,7 +180,7 @@ Key chips are real keys: `KeyCapButton` (32 px) and `KeyCapLargeButton` (40 px),
 - Receipt appears without stealing focus. Screenshot receipts remain for 3 seconds; video and audio receipts remain for 6 seconds. The countdown pauses on hover or keyboard focus, and a 36 px dismiss control plus `Esc` provide an immediate exit.
 - Receipts never register global action shortcuts. Their labelled controls are pointer- and keyboard-operable when focused, and `Esc` dismisses a focused receipt without stealing keys from the user's work.
 - The Library is fully keyboard-drivable through page accelerators, which cannot affect other applications: arrows to move, `Enter` open, `Space` play or pause, `Ctrl+R` reveal, `Ctrl+C` copy the selected capture itself, `Delete` remove, `Ctrl+A` select all, `Ctrl+M` fill the window, `Ctrl+1`–`Ctrl+6` filters. Screenshot copies expose both bitmap and file formats; every other capture exposes the real file rather than path text. Every accelerator stands down while a text box has focus, so Settings never loses `Space` or `Ctrl+A`. The list takes focus when the Library opens.
-- Receipts use the correct media preview and labelled click actions such as Open, Mark up, and Show in folder. Receipt-specific global action shortcuts are forbidden. A screenshot is copied to the clipboard when taken and after a saved annotation; Copy inside the editor never overwrites the source capture.
+- Receipts use the correct media preview and labelled click actions such as Open, Mark up, and Show in folder. Receipt-specific global action shortcuts are forbidden. A screenshot is copied to the clipboard when taken and after a saved annotation, and no receipt follows a screenshot save, keep-original, edited copy, or pin — only a busy clipboard or a failure is announced. Copy inside the editor never overwrites the source capture.
 - Library is a standard resizable Acrylic window with a transparent root, top navigation, and two non-overlapping glass content panes. The wordmark and section names stay visible at every width, plus All/Screenshots/Video/Audio/Text/Links filters.
 - Selection is carried by fill, not by a green wash. Filters are one segmented control with a live count per filter. At wide widths that control shares the action toolbar so the list and preview start on the same edge; at narrower widths it takes a full row below the actions rather than clipping or hiding capture types.
 - Beside the preview the detail pane states kind, size, saved time, and file name as facts rather than leaving an empty well.
@@ -218,14 +218,13 @@ The identity is **Pocket + Orbit**, led by one stable application mark. The full
 
 ## Deliberate exceptions
 
-Four rules above are overridden by explicit product decision on one surface each. They are written down here so the code and the design system do not contradict each other, and so nobody "fixes" the code back.
+The rules below are overridden by explicit product decision on one surface each. They are written down here so the code and the design system do not contradict each other, and so nobody "fixes" the code back.
 
 | Rule | Override | Scope |
 | --- | --- | --- |
 | Avoid excessive gradients | The custom-ink swatch shows a colour wheel | One 26 px control, and only until a colour has been sampled. Backdrops are flat fills, not mesh gradients — that half of the reference tool's look was declined. |
 | Separation comes from the opaque surface, radius, and restrained shadow | Exported backdrops render a layered drop shadow under the image | The exported artwork only. No app chrome gains a shadow stack, and `ThemeShadow` is still absent everywhere. |
 | Default tooltip delay | Instant tooltips | The annotation toolbar only. |
-| `Escape` in annotation cancels without losing the original | `Escape` is two-stage: an armed tool returns to Select, and Select closes | The end state is unchanged — nothing is ever lost — but it can take two presses. The status strip says so after the first, and creation tools return to Select on their own, so most first presses *are* the closing press. |
 | Public installers are code-signed | Releases are intentionally unsigned to keep this open-source project free | Windows may show Unknown publisher or SmartScreen. The supported download remains the repository's GitHub Release asset, protected by exact size/SHA-256 validation, CI installation checks, and GitHub provenance. Signing can be restored later without redesigning the updater. |
 
 ## Design acceptance gate
@@ -254,7 +253,7 @@ The design-consultation gate requires all of the following before release:
 - green appears only on live state, the primary action, the current selection, and the command-mode field;
 - typography matches the scale above and every button shares one height and hover response;
 - the brand mark is legible at 16 px and carries no gloss, bevel, or sphere;
-- screenshots, video, audio, text, and links each produce the correct receipt and Library item.
+- video, audio, text, and links each produce the correct receipt and Library item; a screenshot produces its Library item and opens the editor with no receipt after it.
 - Library Copy places the selected capture on the clipboard as an actual file, plus a directly pasteable bitmap for screenshots, never path text.
 - Feedback stays visible in the main navigation, keeps one unfinished draft in memory, exposes the exact GitHub handoff for review, and never includes recent crash details unless the user selects the opt-in.
 - automatic update checks can be disabled, never block offline startup, and cannot install an off-repository, corrupt, older, or incompatible artifact;
@@ -264,7 +263,8 @@ The design-consultation gate requires all of the following before release:
 - a solid redaction leaves nothing of the content recoverable, and the status strip says which mode is live;
 - recognised text reaches the clipboard only when asked;
 - a crop, a cut, or a backdrop writes a new capture and leaves the original untouched, with correct dimensions in the Library;
-- `Escape` never loses the original, in one press or two;
+- `Escape` never loses the original: it drops an in-flight drag or text label first, and otherwise closes in one press;
+- a committed mark leaves its tool armed, so a second arrow needs no second press of A;
 - a pin appears only by explicit action, is visible in a subsequent capture, does not survive a restart, and never swallows `Escape` from another application.
 
 Approval is based on an end-to-end visual and interaction pass of the installed build, not on XAML inspection alone.
