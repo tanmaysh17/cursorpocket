@@ -359,7 +359,10 @@ public sealed class UtilitySurfaceContractTests
         Assert.Contains("App.Services.Context.RestoreFocus(SourceWindow)", code, StringComparison.Ordinal);
         Assert.Contains("_restoreSourceOnClose = command != CaptureActionId.Library", code, StringComparison.Ordinal);
         Assert.Contains("_openLibraryAfterPaletteCloses", ReadFixture("MainWindow.xaml.cs.txt"), StringComparison.Ordinal);
-        Assert.Contains("excludeFromCapture: false", code, StringComparison.Ordinal);
+        // Command mode is chrome, not content: the pre-freeze runs while the palette
+        // is still on screen, so display affinity is what keeps it out of the frame.
+        Assert.Contains("WindowPlacement.ConfigureUtilityWindow(this);", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("excludeFromCapture: false", code, StringComparison.Ordinal);
         Assert.Contains("FocusCommandSurface", code, StringComparison.Ordinal);
         Assert.Contains("CommandAccelerator_Invoked", ReadFixture("CommandPaletteWindow.xaml"), StringComparison.Ordinal);
         var globalKeys = ReadFixture("PaletteHotkeyService.cs.txt");
