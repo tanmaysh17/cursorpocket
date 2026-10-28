@@ -43,7 +43,10 @@ public sealed partial class CommandPaletteWindow : Window
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.Transient);
         BuildCommands();
-        WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
+        // Command mode is CursorPocket's own chrome, so it never belongs in a
+        // capture. The desktop pre-freeze deliberately runs while the palette is
+        // still on screen, so display affinity — not timing — is what keeps it out.
+        WindowPlacement.ConfigureUtilityWindow(this);
         App.Theme.ThemeChanged += Theme_ThemeChanged;
         _timeout.Tick += (_, _) => HidePalette();
         _commandKeys.Invoked += CommandKeys_Invoked;
