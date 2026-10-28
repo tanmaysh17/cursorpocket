@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.4.22 — 2026-10-27
+
+- Kept command mode and the region selector out of screenshots and recordings. A shot taken while command mode was open had the panel baked into it, because the desktop is deliberately frozen the moment screenshot mode opens — while the panel is still on screen. Both surfaces are now excluded from capture, so they stay visible to you and absent from the file, and the capture stays as fast as it was.
+
 ## 0.4.21 — 2026-10-16
 
 - Let several Focus regions spotlight different parts of a screenshot at once: each new dim region opens another bright hole in one shared dim layer instead of darkening the earlier regions, live while dragging and identically in the saved file.
