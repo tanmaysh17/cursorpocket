@@ -43,7 +43,9 @@ public sealed partial class RegionSelectorWindow : Window
     {
         InitializeComponent();
         App.Theme.Register(this, Root, SurfaceRole.CaptureOverlay);
-        WindowPlacement.ConfigureUtilityWindow(this, excludeFromCapture: false);
+        // Excluded like the rest of the chrome: a selection that runs off the
+        // frozen frame falls back to a live grab, which must not catch the selector.
+        WindowPlacement.ConfigureUtilityWindow(this);
         Activated += (_, _) => Surface.Focus(FocusState.Programmatic);
         Closed += (_, _) =>
         {

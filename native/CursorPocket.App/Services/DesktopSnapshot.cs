@@ -65,9 +65,11 @@ internal static class DesktopSnapshot
     /// </para>
     /// <para>
     /// No WinUI is touched here, so this runs on a worker thread — and it can run
-    /// while command mode is still on screen, because a GDI screen grab cannot see
-    /// WinUI or DirectComposition surfaces. That is what lets the frame be taken the
-    /// moment screenshot mode opens instead of after the region command is chosen.
+    /// while command mode is still on screen: the palette and the region selector are
+    /// capture-excluded, so they are absent from the grab. A GDI screen grab can see
+    /// WinUI surfaces, so it is that exclusion — not the capture API — that lets the
+    /// frame be taken the moment screenshot mode opens instead of after the region
+    /// command is chosen.
     /// </para>
     /// </summary>
     public static FrozenDesktop Freeze(NativeMethods.Rect bounds)
